@@ -177,8 +177,8 @@ insert into public.scenes (
     language: 'yaml',
     part: 5,
     description:
-      'GitHub Actions workflow (Build and Release APK) with Zulu Java 17, Flutter stable, Force compileSdk 34 for AndroidX across .pub-cache/hosted, --dart-define secrets injection, and actions/upload-artifact@v4.',
-    lineCount: 83,
+      'GitHub Actions workflow (Build and Release APK) with Zulu Java 17, Flutter stable, Force compileSdk 36 for AndroidX across .pub-cache/hosted, --dart-define secrets injection, and actions/upload-artifact@v4.',
+    lineCount: 90,
     content: `name: Build and Release APK
 
 on:
@@ -210,19 +210,31 @@ jobs:
           if [ ! -f "android/gradlew" ]; then
             flutter create --platforms=android --org com.actlikeit --project-name act_like_it .
           fi
-          sed -i 's/compileSdk = .*/compileSdk = 34/g' android/app/build.gradle.kts || true
+          sed -i 's/compileSdk = .*/compileSdk = 36/g' android/app/build.gradle.kts || true
 
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Force compileSdk 34 for AndroidX
+      - name: Force compileSdk 36 for AndroidX
         run: |
           for cache_dir in "/home/runner/.pub-cache/hosted" "\${PUB_CACHE}/hosted"; do
             if [ -d "\$cache_dir" ]; then
               find "\$cache_dir" \\( -name "build.gradle" -o -name "build.gradle.kts" \\) -exec sed -i \\
-                -e 's/compileSdkVersion 31/compileSdkVersion 34/g' \\
-                -e 's/compileSdkVersion 32/compileSdkVersion 34/g' \\
-                -e 's/compileSdkVersion 33/compileSdkVersion 34/g' {} +
+                -e 's/compileSdkVersion 31/compileSdkVersion 36/g' \\
+                -e 's/compileSdkVersion 32/compileSdkVersion 36/g' \\
+                -e 's/compileSdkVersion 33/compileSdkVersion 36/g' \\
+                -e 's/compileSdkVersion 34/compileSdkVersion 36/g' \\
+                -e 's/compileSdkVersion 35/compileSdkVersion 36/g' \\
+                -e 's/compileSdk 31/compileSdk 36/g' \\
+                -e 's/compileSdk 32/compileSdk 36/g' \\
+                -e 's/compileSdk 33/compileSdk 36/g' \\
+                -e 's/compileSdk 34/compileSdk 36/g' \\
+                -e 's/compileSdk 35/compileSdk 36/g' \\
+                -e 's/compileSdk = 31/compileSdk = 36/g' \\
+                -e 's/compileSdk = 32/compileSdk = 36/g' \\
+                -e 's/compileSdk = 33/compileSdk = 36/g' \\
+                -e 's/compileSdk = 34/compileSdk = 36/g' \\
+                -e 's/compileSdk = 35/compileSdk = 36/g' {} +
             fi
           done
 
