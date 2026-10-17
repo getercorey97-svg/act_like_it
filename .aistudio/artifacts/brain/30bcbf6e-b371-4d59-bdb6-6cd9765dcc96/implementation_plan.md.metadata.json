@@ -1,0 +1,6 @@
+{
+  "summary": "Surgical fix plan to resolve the Android SDK 36 Kotlin coroutine NoSuchMethodError in SharedPreferencesApiRegistrar by updating shared_preferences to ^2.5.2 and adding dependency_overrides for shared_preferences_android: ^2.4.7 in pubspec.yaml under strict code isolation.",
+  "updatedAt": "2026-10-17T21:01:42.503042850Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

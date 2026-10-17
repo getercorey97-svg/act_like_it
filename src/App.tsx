@@ -65,7 +65,7 @@ const LATE_NIGHT_PROMPTS = [
 
 export default function App() {
   const [selectedFilePath, setSelectedFilePath] = useState<string>(
-    'lib/judging_engine.dart'
+    'lib/dashboard_marquee.dart'
   );
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'files' | 'late-night' | 'sync-guide'>('files');
@@ -179,10 +179,10 @@ export default function App() {
                 <span>All 5 Batches Complete</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                QA Logic Audit All 4 Phases Complete: judging_engine.dart
+                Game Show Audio Engine Ready: pubspec.yaml &amp; dashboard_marquee.dart
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Completed Phase 4 (final phase) of the sequential logic audit in <code className="font-mono text-amber-400">lib/judging_engine.dart</code> and <code className="font-mono text-amber-400">lib/offline_manager.dart</code>: added <code className="font-mono text-amber-400">_extractJsonObject()</code> markdown fence sanitization &amp; 15s timeout for Gemini 2.5 Flash telemetrics, detached <code className="font-mono text-amber-400">VideoPlayerController</code> prior to disposal, enforced anonymous auth + <code className="font-mono text-amber-400">public.profiles</code> upsert before <code className="font-mono text-amber-400">public.match_history</code> inserts, and deduplicated per-round history records via <code className="font-mono text-amber-400">_roundHistoryId</code>.
+                Added <code className="font-mono text-amber-400">audioplayers: ^6.1.0</code> to <code className="font-mono text-amber-400">pubspec.yaml</code> (preserving the Android SDK 36 <code className="font-mono text-amber-400">shared_preferences_android: ^2.4.7</code> override) and injected the auto-playing <code className="font-mono text-amber-400">ReleaseMode.loop</code> Game Show soundtrack, header mute/unmute toggle (<code className="font-mono text-amber-400">Icons.volume_up</code> / <code className="font-mono text-amber-400">Icons.volume_off</code>), and navigation/dispose lifecycle cleanup into <code className="font-mono text-amber-400">lib/dashboard_marquee.dart</code>.
               </p>
             </div>
 

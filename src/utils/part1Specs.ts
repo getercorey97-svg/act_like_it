@@ -121,24 +121,28 @@ class OfflineManager extends ChangeNotifier {
     language: 'dart',
     part: 1,
     description:
-      'The Living Marquee & Neon Backstage home dashboard with Shared Element (Hero + StageSharedTransitionRoute) transitions flying each glowing Movie Ticket directly into the Matchmaking Lobby and Active Acting Screen teleprompter.',
-    lineCount: 1525,
+      'The Living Marquee & Neon Backstage home dashboard with auto-playing Game Show background music loop (AudioPlayer + ReleaseMode.loop + UrlSource SoundHelix-Song-1.mp3), mute toggle IconButton (Icons.volume_up / Icons.volume_off), navigation/dispose lifecycle cleanup, and Shared Element (Hero + StageSharedTransitionRoute) transitions.',
+    lineCount: 1984,
     content: `import 'dart:async';
 import 'dart:math' as math;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'main.dart';
 import 'lobby.dart';
 import 'webrtc_manager.dart';
 import 'late_night_vault.dart';
+import 'offline_manager.dart';
+import 'match_history_screen.dart';
 
 class LivingMarqueeDashboardScreen extends StatefulWidget {
   const LivingMarqueeDashboardScreen({super.key});
   // 1. Dynamic RadialGradient Spotlights (Purple #A855F7, Cyan #06B6D4, Amber #F59E0B)
   // 2. Animated Telemetrics HUD Circular Progress Gauges (AI, Peer, Social)
-  // 3. Physical Clapping Movie Clapperboard Primary CTA -> StageSharedTransitionRoute
-  // 4. Horizontally Scrolling Glowing Movie Tickets Carousel with Hero(tag: SceneHeroTags.ticketTag(ticket.category))
-  // 5. Continuous Global Marquee Live Ticker at Bottom
+  // 3. Game Show Background Music Loop (AudioPlayer + ReleaseMode.loop + UrlSource('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'))
+  // 4. Mute/Unmute Toggle IconButton (Icons.volume_up / Icons.volume_off) + pause on navigation + dispose()
+  // 5. Physical Clapping Movie Clapperboard Primary CTA -> StageSharedTransitionRoute
+  // 6. Horizontally Scrolling Glowing Movie Tickets Carousel with Hero(tag: SceneHeroTags.ticketTag(ticket.category))
 }`,
   },
   {
@@ -399,15 +403,60 @@ import 'package:livekit_client/livekit_client.dart';
     language: 'yaml',
     part: 1,
     description:
-      'Flutter manifest configuring supabase_flutter, livekit_client, flutter_webrtc, google_generative_ai, camera, video_player, path_provider, and connectivity_plus.',
-    lineCount: 49,
+      'Flutter manifest configuring supabase_flutter, livekit_client, flutter_webrtc, google_generative_ai, video_player, audioplayers: ^6.1.0, camera, path_provider, connectivity_plus, shared_preferences: ^2.5.2, and dependency_overrides for shared_preferences_android: ^2.4.7.',
+    lineCount: 53,
     content: `name: act_like_it
+description: >-
+  Act Like It — A full-stack real-time multiplayer acting and performance game
+  powered by Supabase (PostgreSQL, Realtime Channels, Edge Storage), LiveKit
+  WebRTC SFU (2-8 remote players), and Google Gemini Multimodal AI Telemetrics.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
 dependencies:
+  flutter:
+    sdk: flutter
+
+  # Backend, PostgreSQL Database, Realtime State Sync & Edge Storage
   supabase_flutter: ^2.8.0
+
+  # Real-Time Video/Audio WebRTC SFU Routing (2-8 Remote Players)
   livekit_client: ^2.3.0
+  flutter_webrtc: ^0.12.0
+
+  # Multimodal AI Telemetrics Judging (Video/Audio Frame Evaluation)
   google_generative_ai: ^0.4.6
+
+  # Media Playback, Camera Capture & Device Permissions
+  video_player: ^2.9.2
+  audioplayers: ^6.1.0
+  camera: ^0.11.0+2
+  permission_handler: ^11.3.1
   path_provider: ^2.1.4
-  connectivity_plus: ^6.1.0`,
+  connectivity_plus: ^6.1.0
+
+  # State Management, Utilities & Social Sharing
+  provider: ^6.1.2
+  shared_preferences: ^2.5.2
+  share_plus: ^10.1.2
+  http: ^1.2.2
+  uuid: ^4.5.1
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+dependency_overrides:
+  shared_preferences_android: ^2.4.7`,
   },
   {
     path: 'lib/main.dart',

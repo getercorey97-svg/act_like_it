@@ -96,12 +96,26 @@ test('Supabase migration and seed files exist on disk and pass schema & category
   assert.ok(mainDart.includes("import 'dashboard_marquee.dart';"));
   assert.ok(mainDart.includes('home: const LivingMarqueeDashboardScreen()'));
 
-  // Verify Store & Forward Offline Mode (pubspec.yaml, lib/offline_manager.dart, lib/lobby.dart, lib/judging_engine.dart)
+  // Verify Store & Forward Offline Mode & Android SDK 36 SharedPreferences override (pubspec.yaml, lib/offline_manager.dart, lib/lobby.dart, lib/judging_engine.dart)
   const pubspecDisk = fs.readFileSync('pubspec.yaml', 'utf8');
   const offlineDart = fs.readFileSync('lib/offline_manager.dart', 'utf8');
   const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
   assert.ok(pubspecDisk.includes('connectivity_plus:'));
   assert.ok(pubspecDisk.includes('path_provider:'));
+  assert.ok(pubspecDisk.includes('audioplayers: ^6.1.0'));
+  assert.ok(pubspecDisk.includes('shared_preferences: ^2.5.2'));
+  assert.ok(pubspecDisk.includes('dependency_overrides:'));
+  assert.ok(pubspecDisk.includes('shared_preferences_android: ^2.4.7'));
+  assert.ok(dashboardDart.includes("import 'package:audioplayers/audioplayers.dart';"));
+  assert.ok(dashboardDart.includes('ReleaseMode.loop'));
+  assert.ok(
+    dashboardDart.includes(
+      'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+    )
+  );
+  assert.ok(dashboardDart.includes('Icons.volume_up'));
+  assert.ok(dashboardDart.includes('Icons.volume_off'));
+  assert.ok(dashboardDart.includes('_audioPlayer.dispose()'));
   assert.ok(offlineDart.includes('class OfflineManager'));
   assert.ok(offlineDart.includes('class OfflineLocalPartyScreen'));
   assert.ok(offlineDart.includes('downloadAndCacheScenePacks'));

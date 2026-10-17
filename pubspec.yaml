@@ -25,6 +25,7 @@ dependencies:
 
   # Media Playback, Camera Capture & Device Permissions
   video_player: ^2.9.2
+  audioplayers: ^6.1.0
   camera: ^0.11.0+2
   permission_handler: ^11.3.1
   path_provider: ^2.1.4
@@ -32,7 +33,7 @@ dependencies:
 
   # State Management, Utilities & Social Sharing
   provider: ^6.1.2
-  shared_preferences: ^2.3.2
+  shared_preferences: ^2.5.2
   share_plus: ^10.1.2
   http: ^1.2.2
   uuid: ^4.5.1
@@ -46,3 +47,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+dependency_overrides:
+  shared_preferences_android: ^2.4.7

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'main.dart';
@@ -7,6 +8,7 @@ import 'lobby.dart';
 import 'webrtc_manager.dart';
 import 'late_night_vault.dart';
 import 'offline_manager.dart';
+import 'match_history_screen.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
@@ -132,6 +134,12 @@ class _LivingMarqueeDashboardScreenState
   // 4. Global Marquee Continuous Live Ticker Controller
   late final AnimationController _marqueeTickerController;
 
+  // 5. Game Show Background Music Loop Controller
+  late final AudioPlayer _audioPlayer;
+  bool _isMusicPlaying = true;
+  static const String _gameShowSoundtrackUrl =
+      'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+
   static const List<String> _liveMarqueeFeedItems = [
     'STAGE LIVE · ROOM #482910 PERFORMING "THE DARK KNIGHT (2008)" — 7 SPECTATORS ON SFU',
     'HIGH SCORE · @NAOMI_V HIT 98.4 COMPOSITE TRI-MODAL SCORE ON "WHIPLASH"',
@@ -164,9 +172,65 @@ class _LivingMarqueeDashboardScreenState
       duration: const Duration(seconds: 24),
     )..repeat();
 
+    _audioPlayer = AudioPlayer();
+    _initGameShowMusicLoop();
+
     OfflineManager.instance.ensureInitialized().then((_) {
       if (mounted) setState(() {});
     });
+  }
+
+  Future<void> _initGameShowMusicLoop() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(
+        UrlSource(_gameShowSoundtrackUrl),
+      );
+      if (mounted) {
+        setState(() {
+          _isMusicPlaying = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isMusicPlaying = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleBackgroundMusic() async {
+    try {
+      if (_isMusicPlaying) {
+        await _audioPlayer.pause();
+        if (mounted) {
+          setState(() {
+            _isMusicPlaying = false;
+          });
+        }
+      } else {
+        await _audioPlayer.resume();
+        if (mounted) {
+          setState(() {
+            _isMusicPlaying = true;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pauseMusicBeforeNavigation() async {
+    if (_isMusicPlaying) {
+      try {
+        await _audioPlayer.pause();
+      } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _isMusicPlaying = false;
+        });
+      }
+    }
   }
 
   void _onTicketScroll() {
@@ -183,6 +247,7 @@ class _LivingMarqueeDashboardScreenState
     _spotlightController.dispose();
     _clapperController.dispose();
     _marqueeTickerController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -205,6 +270,9 @@ class _LivingMarqueeDashboardScreenState
       _isClappingShut = false;
     });
 
+    await _pauseMusicBeforeNavigation();
+    if (!mounted) return;
+
     final selectedTicket = kSceneVaultTickets[_focusedTicketIndex];
     await Navigator.of(context).push(
       StageSharedTransitionRoute(
@@ -221,6 +289,9 @@ class _LivingMarqueeDashboardScreenState
   /// arc flight (`SceneHeroTags.ticketTag` + `StageSharedTransitionRoute`).
   Future<void> _launchDirectActingStage(MarqueeTicketSpec ticket) async {
     HapticFeedback.mediumImpact();
+    await _pauseMusicBeforeNavigation();
+    if (!mounted) return;
+
     final roomCode = LobbyRealtimeManager.generateSixDigitCode();
     final defaultPrompt = (kBuiltInSceneVault[ticket.category]?.first ??
         kBuiltInSceneVault[SceneCategory.era1970To1999]!.first);
@@ -738,6 +809,17 @@ class _LivingMarqueeDashboardScreenState
           ),
         ),
         IconButton(
+          onPressed: _toggleBackgroundMusic,
+          tooltip: _isMusicPlaying ? 'Mute Stage Music' : 'Unmute Stage Music',
+          icon: Icon(
+            _isMusicPlaying ? Icons.volume_up : Icons.volume_off,
+            color: _isMusicPlaying
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFF64748B),
+            size: 22,
+          ),
+        ),
+        IconButton(
           onPressed: _openCloudConfigBottomSheet,
           tooltip: 'Cloud API Settings',
           icon: const Icon(
@@ -1009,7 +1091,9 @@ class _LivingMarqueeDashboardScreenState
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   backgroundColor: const Color(0x990B0E17),
                 ),
-                onPressed: () {
+                onPressed: () async {
+                  await _pauseMusicBeforeNavigation();
+                  if (!mounted) return;
                   Navigator.of(context).push(
                     StageSharedTransitionRoute(
                       page: LobbyMatchmakingScreen(
@@ -1040,7 +1124,9 @@ class _LivingMarqueeDashboardScreenState
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   backgroundColor: const Color(0x990B0E17),
                 ),
-                onPressed: () {
+                onPressed: () async {
+                  await _pauseMusicBeforeNavigation();
+                  if (!mounted) return;
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const LateNightAfterHoursScreen(),
@@ -1068,7 +1154,15 @@ class _LivingMarqueeDashboardScreenState
             padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
             backgroundColor: const Color(0x990B0E17),
           ),
-          onPressed: _openCareerTrophyRoomDrawer,
+          onPressed: () async {
+            await _pauseMusicBeforeNavigation();
+            if (!mounted) return;
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const MatchHistoryScreen(),
+              ),
+            );
+          },
           icon: const Icon(Icons.emoji_events_outlined, size: 16),
           label: Text(
             'CAREER TROPHY ROOM · ${OfflineManager.instance.totalCareerWins} WINS · AVG ${OfflineManager.instance.averageFinalScore.toStringAsFixed(1)}',
@@ -1087,6 +1181,7 @@ class _LivingMarqueeDashboardScreenState
   /// dashboard without altering existing spotlight or ticket animations.
   Future<void> _openCareerTrophyRoomDrawer() async {
     HapticFeedback.mediumImpact();
+    await _pauseMusicBeforeNavigation();
     await OfflineManager.instance.refreshMatchHistoryFromSupabase();
     if (!mounted) return;
 
