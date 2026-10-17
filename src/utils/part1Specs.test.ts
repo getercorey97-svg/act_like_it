@@ -48,6 +48,17 @@ test('Supabase migration and seed files exist on disk and pass schema & category
   assert.ok(seedSql.includes('The Dark Knight (2008)'));
   assert.ok(seedSql.includes('Hidden Figures (2016)'));
   assert.ok(seedSql.includes('The Rocky Horror Picture Show (1975)'));
+
+  // Verify lib/webrtc_manager.dart has flutter_webrtc import and RTCVideoViewObjectFitCover
+  const webrtcDart = fs.readFileSync('lib/webrtc_manager.dart', 'utf8');
+  assert.ok(
+    webrtcDart.includes("import 'package:flutter_webrtc/flutter_webrtc.dart';")
+  );
+  assert.ok(
+    webrtcDart.includes('RTCVideoViewObjectFit.RTCVideoViewObjectFitCover')
+  );
+  assert.equal(webrtcDart.includes('VideoViewFit'), false);
+  assert.equal(webrtcDart.includes('toIso88601String'), false);
 });
 
 test('WORKSPACE_FILES entries pass structural validation', () => {

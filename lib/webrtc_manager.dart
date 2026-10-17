@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:camera/camera.dart' as hw_cam;
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'main.dart';
@@ -284,8 +285,8 @@ class WebRtcStageManager extends ChangeNotifier {
       await _startHardwareCameraAtIndex(_selectedCameraIdx);
     }
     _cameraPosition = _cameraPosition == CameraPosition.front
-        ? CameraPosition.back
-        : CameraPosition.front;
+      ? CameraPosition.back
+      : CameraPosition.front;
     notifyListeners();
   }
 
@@ -480,7 +481,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
         _stageManager.isCameraEnabled) {
       return VideoTrackRenderer(
         _stageManager.localVideoTrack!,
-        fit: VideoViewFit.cover,
+        fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
       );
     }
 

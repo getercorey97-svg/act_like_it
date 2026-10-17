@@ -276,10 +276,12 @@ class TriModalJudgingEngine extends ChangeNotifier {
     language: 'dart',
     part: 3,
     description:
-      'LiveKit WebRTC SFU camera/audio capture (WebRtcStageManager) with Dynacast + Simulcast for 2–8 remote players, role switching, and 1 Hz telemetrics frame sampling.',
-    lineCount: 515,
-    content: `import 'package:livekit_client/livekit_client.dart';
-// RoomOptions(adaptiveStream: true, dynacast: true, defaultVideoPublishOptions: VideoPublishOptions(simulcast: true))`,
+      'LiveKit WebRTC SFU camera/audio capture (WebRtcStageManager) with flutter_webrtc RTCVideoViewObjectFit.RTCVideoViewObjectFitCover, Dynacast + Simulcast for 2–8 remote players, and 1 Hz telemetrics frame sampling.',
+    lineCount: 662,
+    content: `import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:livekit_client/livekit_client.dart';
+// RoomOptions(adaptiveStream: true, dynacast: true, defaultVideoPublishOptions: VideoPublishOptions(simulcast: true))
+// VideoTrackRenderer(_stageManager.localVideoTrack!, fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)`,
   },
   {
     path: 'lib/lobby.dart',
