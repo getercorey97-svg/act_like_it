@@ -72,6 +72,29 @@ test('Supabase migration and seed files exist on disk and pass schema & category
       "sed -i 's/compileSdk = .*/compileSdk = 36/g' android/app/build.gradle.kts || true"
     )
   );
+
+  // Verify lib/dashboard_marquee.dart, lib/lobby.dart, and lib/webrtc_manager.dart Hero shared element transitions
+  const dashboardDart = fs.readFileSync('lib/dashboard_marquee.dart', 'utf8');
+  const lobbyDart = fs.readFileSync('lib/lobby.dart', 'utf8');
+  const mainDart = fs.readFileSync('lib/main.dart', 'utf8');
+  assert.ok(dashboardDart.includes('class LivingMarqueeDashboardScreen'));
+  assert.ok(dashboardDart.includes('RadialGradient'));
+  assert.ok(dashboardDart.includes('Transform.scale'));
+  assert.ok(dashboardDart.includes('CircularProgressIndicator'));
+  assert.ok(dashboardDart.includes('_ClapperZebraStripesPainter'));
+  assert.ok(dashboardDart.includes('_MovieTicketStubClipper'));
+  assert.ok(dashboardDart.includes('SceneHeroTags.ticketTag(ticket.category)'));
+  assert.ok(dashboardDart.includes('StageSharedTransitionRoute'));
+  assert.ok(lobbyDart.includes('class SceneHeroTags'));
+  assert.ok(lobbyDart.includes('class StageSharedTransitionRoute'));
+  assert.ok(lobbyDart.includes('MaterialRectCenterArcTween'));
+  assert.ok(
+    webrtcDart.includes(
+      'SceneHeroTags.ticketTag(widget.lobbySession.selectedCategory)'
+    )
+  );
+  assert.ok(mainDart.includes("import 'dashboard_marquee.dart';"));
+  assert.ok(mainDart.includes('home: const LivingMarqueeDashboardScreen()'));
 });
 
 test('WORKSPACE_FILES entries pass structural validation', () => {

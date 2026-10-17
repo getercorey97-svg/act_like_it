@@ -76,6 +76,76 @@ enum SceneCategory {
   }
 }
 
+/// Shared Element (Hero) tag registry and custom flight shuttle / route builder
+/// connecting the Movie Ticket Carousel (`lib/dashboard_marquee.dart`),
+/// Matchmaking Lobby (`lib/lobby.dart`), and Active Acting Screen (`lib/webrtc_manager.dart`).
+class SceneHeroTags {
+  static String ticketTag(SceneCategory category) =>
+      'scene_vault_ticket_${category.key}';
+
+  static RectTween createTicketArcTween(Rect? begin, Rect? end) {
+    return MaterialRectCenterArcTween(begin: begin, end: end);
+  }
+
+  static Widget buildTicketFlightShuttle(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection flightDirection,
+    BuildContext fromHeroContext,
+    BuildContext toHeroContext,
+  ) {
+    final Hero toHero = toHeroContext.widget as Hero;
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeInOutCubic,
+    );
+
+    return AnimatedBuilder(
+      animation: curved,
+      builder: (context, _) {
+        return Material(
+          type: MaterialType.transparency,
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: toHero.child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Smooth custom PageRouteBuilder that pairs with the Hero shared element flight
+/// between the Movie Ticket Carousel and the Active Acting Screen.
+class StageSharedTransitionRoute<T> extends PageRouteBuilder<T> {
+  StageSharedTransitionRoute({required Widget page})
+      : super(
+          transitionDuration: const Duration(milliseconds: 520),
+          reverseTransitionDuration: const Duration(milliseconds: 420),
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final fadeCurve = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            final scaleTween = Tween<double>(begin: 0.96, end: 1.0).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutQuart,
+              ),
+            );
+            return FadeTransition(
+              opacity: fadeCurve,
+              child: ScaleTransition(
+                scale: scaleTween,
+                child: child,
+              ),
+            );
+          },
+        );
+}
+
 class ScenePrompt {
   final String id;
   final String title;
@@ -873,6 +943,61 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        Hero(
+          tag: SceneHeroTags.ticketTag(_selectedCategory),
+          createRectTween: SceneHeroTags.createTicketArcTween,
+          flightShuttleBuilder: SceneHeroTags.buildTicketFlightShuttle,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              margin: const EdgeInsets.only(bottom: 18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF121722),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFF59E0B), width: 1.4),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.confirmation_number_outlined,
+                    color: Color(0xFFF59E0B),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'SELECTED SCENE VAULT TICKET',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFF59E0B),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _selectedCategory.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         Row(
           children: [
             Expanded(
@@ -1041,58 +1166,71 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
         ),
         const SizedBox(height: 20),
         if (activeScene != null) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE11D48)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ACTIVE SCENE PROMPT · ${activeScene.filmOrSeries} (${activeScene.releaseYear})',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFF59E0B),
-                  ),
+          Hero(
+            tag: SceneHeroTags.ticketTag(session.selectedCategory),
+            createRectTween: SceneHeroTags.createTicketArcTween,
+            flightShuttleBuilder: SceneHeroTags.buildTicketFlightShuttle,
+            child: Material(
+              type: MaterialType.transparency,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE11D48)),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${activeScene.characterName} — "${activeScene.promptScript}"',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ACTIVE SCENE PROMPT · ${activeScene.filmOrSeries} (${activeScene.releaseYear})',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFF59E0B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${activeScene.characterName} — "${activeScene.promptScript}"',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Director Cue: ${activeScene.directorCue} · Target: ${activeScene.emotionalTarget}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFCBD5E1),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            StageSharedTransitionRoute(
+                              page: LiveKitSoundstageScreen(
+                                lobbySession: session,
+                                localUserId: _lobbyManager.localUserId,
+                                localDisplayName:
+                                    _lobbyManager.localDisplayName,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.videocam, size: 18),
+                        label: const Text('Enter Soundstage & Start Camera'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Director Cue: ${activeScene.directorCue} · Target: ${activeScene.emotionalTarget}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LiveKitSoundstageScreen(
-                            lobbySession: session,
-                            localUserId: _lobbyManager.localUserId,
-                            localDisplayName: _lobbyManager.localDisplayName,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.videocam, size: 18),
-                    label: const Text('Enter Soundstage & Start Camera'),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 20),

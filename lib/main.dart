@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lobby.dart';
 import 'late_night_vault.dart';
+import 'dashboard_marquee.dart';
 
 /// Application Configuration Constants & Runtime Overrides.
 /// Supports both CI `--dart-define` secrets AND in-app configuration on the
@@ -175,7 +176,7 @@ class ActLikeItApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const SoundstageShellScreen(),
+      home: const LivingMarqueeDashboardScreen(),
     );
   }
 }

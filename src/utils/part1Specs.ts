@@ -64,6 +64,31 @@ export const BATCH_STAGES: BatchStage[] = [
 
 export const WORKSPACE_FILES: GeneratedFileRecord[] = [
   {
+    path: 'lib/dashboard_marquee.dart',
+    language: 'dart',
+    part: 1,
+    description:
+      'The Living Marquee & Neon Backstage home dashboard with Shared Element (Hero + StageSharedTransitionRoute) transitions flying each glowing Movie Ticket directly into the Matchmaking Lobby and Active Acting Screen teleprompter.',
+    lineCount: 1525,
+    content: `import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'main.dart';
+import 'lobby.dart';
+import 'webrtc_manager.dart';
+import 'late_night_vault.dart';
+
+class LivingMarqueeDashboardScreen extends StatefulWidget {
+  const LivingMarqueeDashboardScreen({super.key});
+  // 1. Dynamic RadialGradient Spotlights (Purple #A855F7, Cyan #06B6D4, Amber #F59E0B)
+  // 2. Animated Telemetrics HUD Circular Progress Gauges (AI, Peer, Social)
+  // 3. Physical Clapping Movie Clapperboard Primary CTA -> StageSharedTransitionRoute
+  // 4. Horizontally Scrolling Glowing Movie Tickets Carousel with Hero(tag: SceneHeroTags.ticketTag(ticket.category))
+  // 5. Continuous Global Marquee Live Ticker at Bottom
+}`,
+  },
+  {
     path: 'supabase/migrations/20261017000000_init_schema.sql',
     language: 'sql',
     part: 2,

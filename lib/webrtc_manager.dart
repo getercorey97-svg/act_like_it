@@ -532,50 +532,72 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
   Widget _buildTeleprompterOverlay(ScenePrompt scene) {
     return Align(
       alignment: Alignment.bottomCenter,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [
-              Color(0xEB0A0D14),
-              Color(0xAD0A0D14),
-              Colors.transparent,
-            ],
+      child: Hero(
+        tag: SceneHeroTags.ticketTag(widget.lobbySession.selectedCategory),
+        createRectTween: SceneHeroTags.createTicketArcTween,
+        flightShuttleBuilder: SceneHeroTags.buildTicketFlightShuttle,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Color(0xEB0A0D14),
+                  Color(0xAD0A0D14),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.confirmation_number_outlined,
+                      size: 14,
+                      color: Color(0xFFF59E0B),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${widget.lobbySession.selectedCategory.label.toUpperCase()} · ${scene.characterName} · ${scene.filmOrSeries} (${scene.releaseYear})',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '"${scene.promptScript}"',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Cue: ${scene.directorCue} · Target: ${scene.emotionalTarget}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFCBD5E1),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${scene.characterName} · ${scene.filmOrSeries} (${scene.releaseYear})',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFF59E0B),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '"${scene.promptScript}"',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Cue: ${scene.directorCue} · Target: ${scene.emotionalTarget}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFFCBD5E1),
-              ),
-            ),
-          ],
         ),
       ),
     );

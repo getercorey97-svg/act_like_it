@@ -65,7 +65,7 @@ const LATE_NIGHT_PROMPTS = [
 
 export default function App() {
   const [selectedFilePath, setSelectedFilePath] = useState<string>(
-    'supabase/migrations/20261017000000_init_schema.sql'
+    'lib/dashboard_marquee.dart'
   );
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'files' | 'late-night' | 'sync-guide'>('files');
@@ -179,10 +179,10 @@ export default function App() {
                 <span>All 5 Batches Complete</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Supabase Production Migration &amp; 37-Scene Seed Ready
+                Living Marquee &amp; Shared Element Stage Transitions Ready
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Generated <code className="font-mono text-amber-400">supabase/migrations/20261017000000_init_schema.sql</code> (<code className="font-mono text-amber-400">profiles</code>, <code className="font-mono text-amber-400">scenes</code>, <code className="font-mono text-amber-400">lobbies</code>, <code className="font-mono text-amber-400">lobby_players</code>, and 18+ <code className="font-mono text-amber-400">birth_year</code> RLS) and <code className="font-mono text-amber-400">supabase/seed.sql</code> (37 real movie scenes across all 9 categories).
+                Upgraded <code className="font-mono text-amber-400">lib/dashboard_marquee.dart</code>, <code className="font-mono text-amber-400">lib/lobby.dart</code>, and <code className="font-mono text-amber-400">lib/webrtc_manager.dart</code> with <code className="font-mono text-amber-400">Hero</code> shared element transitions (<code className="font-mono text-amber-400">SceneHeroTags</code>, <code className="font-mono text-amber-400">MaterialRectCenterArcTween</code>, and <code className="font-mono text-amber-400">StageSharedTransitionRoute</code>) connecting the Movie Ticket Carousel to the Active Acting Screen.
               </p>
             </div>
 
