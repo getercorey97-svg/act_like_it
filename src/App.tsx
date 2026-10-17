@@ -65,7 +65,7 @@ const LATE_NIGHT_PROMPTS = [
 
 export default function App() {
   const [selectedFilePath, setSelectedFilePath] = useState<string>(
-    'lib/dashboard_marquee.dart'
+    'supabase/migrations/20261017000001_match_history.sql'
   );
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'files' | 'late-night' | 'sync-guide'>('files');
@@ -179,10 +179,10 @@ export default function App() {
                 <span>All 5 Batches Complete</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Living Marquee &amp; Shared Element Stage Transitions Ready
+                Match History, Win Tracking &amp; Career Trophy Room Ready
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Upgraded <code className="font-mono text-amber-400">lib/dashboard_marquee.dart</code>, <code className="font-mono text-amber-400">lib/lobby.dart</code>, and <code className="font-mono text-amber-400">lib/webrtc_manager.dart</code> with <code className="font-mono text-amber-400">Hero</code> shared element transitions (<code className="font-mono text-amber-400">SceneHeroTags</code>, <code className="font-mono text-amber-400">MaterialRectCenterArcTween</code>, and <code className="font-mono text-amber-400">StageSharedTransitionRoute</code>) connecting the Movie Ticket Carousel to the Active Acting Screen.
+                Added <code className="font-mono text-amber-400">supabase/migrations/20261017000001_match_history.sql</code> with strict RLS, injected round auto-save into <code className="font-mono text-amber-400">lib/judging_engine.dart</code>, added offline Pass-and-Play match history queuing &amp; <code className="font-mono text-amber-400">connectivity_plus</code> auto-sync in <code className="font-mono text-amber-400">lib/offline_manager.dart</code>, and injected the expandable <code className="font-mono text-amber-400">Career Trophy Room</code> drawer on <code className="font-mono text-amber-400">lib/dashboard_marquee.dart</code>.
               </p>
             </div>
 

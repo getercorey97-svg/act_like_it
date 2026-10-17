@@ -6,6 +6,7 @@ import 'main.dart';
 import 'lobby.dart';
 import 'webrtc_manager.dart';
 import 'late_night_vault.dart';
+import 'offline_manager.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
@@ -162,6 +163,10 @@ class _LivingMarqueeDashboardScreenState
       vsync: this,
       duration: const Duration(seconds: 24),
     )..repeat();
+
+    OfflineManager.instance.ensureInitialized().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _onTicketScroll() {
@@ -991,66 +996,412 @@ class _LivingMarqueeDashboardScreenState
   }
 
   Widget _buildBackstageQuickBar() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF06B6D4),
-              side: const BorderSide(color: Color(0xFF06B6D4), width: 1.2),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              backgroundColor: const Color(0x990B0E17),
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                StageSharedTransitionRoute(
-                  page: LobbyMatchmakingScreen(
-                    initialCategory:
-                        kSceneVaultTickets[_focusedTicketIndex].category,
-                    startInJoinMode: true,
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF06B6D4),
+                  side: const BorderSide(color: Color(0xFF06B6D4), width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor: const Color(0x990B0E17),
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    StageSharedTransitionRoute(
+                      page: LobbyMatchmakingScreen(
+                        initialCategory:
+                            kSceneVaultTickets[_focusedTicketIndex].category,
+                        startInJoinMode: true,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.dialpad_rounded, size: 16),
+                label: const Text(
+                  'JOIN 6-DIGIT ROOM',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              );
-            },
-            icon: const Icon(Icons.dialpad_rounded, size: 16),
-            label: const Text(
-              'JOIN 6-DIGIT ROOM',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFF59E0B),
-              side: const BorderSide(color: Color(0xFFF59E0B), width: 1.2),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              backgroundColor: const Color(0x990B0E17),
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const LateNightAfterHoursScreen(),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF59E0B),
+                  side: const BorderSide(color: Color(0xFFF59E0B), width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor: const Color(0x990B0E17),
                 ),
-              );
-            },
-            icon: const Icon(Icons.lock_outline_rounded, size: 16),
-            label: const Text(
-              '18+ AFTER-HOURS',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const LateNightAfterHoursScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                label: const Text(
+                  '18+ AFTER-HOURS',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF10B981),
+            side: const BorderSide(color: Color(0xFF10B981), width: 1.2),
+            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+            backgroundColor: const Color(0x990B0E17),
+          ),
+          onPressed: _openCareerTrophyRoomDrawer,
+          icon: const Icon(Icons.emoji_events_outlined, size: 16),
+          label: Text(
+            'CAREER TROPHY ROOM · ${OfflineManager.instance.totalCareerWins} WINS · AVG ${OfflineManager.instance.averageFinalScore.toStringAsFixed(1)}',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// Career Trophy Room Drawer / Modal Sheet injected into the Living Marquee
+  /// dashboard without altering existing spotlight or ticket animations.
+  Future<void> _openCareerTrophyRoomDrawer() async {
+    HapticFeedback.mediumImpact();
+    await OfflineManager.instance.refreshMatchHistoryFromSupabase();
+    if (!mounted) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0A0D16),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.78,
+          minChildSize: 0.50,
+          maxChildSize: 0.94,
+          builder: (context, scrollController) {
+            return AnimatedBuilder(
+              animation: OfflineManager.instance,
+              builder: (context, _) {
+                final mgr = OfflineManager.instance;
+                final records = mgr.matchHistoryLog;
+                final totalMatches = records.length;
+                final totalWins = mgr.totalCareerWins;
+                final winRate = totalMatches == 0
+                    ? 0.0
+                    : (totalWins / totalMatches) * 100.0;
+
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF334155),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'CAREER TROPHY ROOM · MATCH HISTORY',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.1,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                'Win Tracking & Tri-Modal Ledger',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF10B981),
+                              side: const BorderSide(color: Color(0xFF10B981)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                            ),
+                            onPressed: () async {
+                              await mgr.refreshMatchHistoryFromSupabase();
+                            },
+                            icon: const Icon(Icons.sync_rounded, size: 15),
+                            label: Text(
+                              mgr.pendingMatchHistorySyncCount > 0
+                                  ? 'SYNC (${mgr.pendingMatchHistorySyncCount})'
+                                  : 'SYNCED',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _buildTrophyStatTile(
+                            label: 'TOTAL WINS',
+                            value: '$totalWins / $totalMatches',
+                            sublabel: '${winRate.toStringAsFixed(0)}% WIN RATE',
+                            accent: const Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildTrophyStatTile(
+                            label: 'AVG FINAL',
+                            value: mgr.averageFinalScore.toStringAsFixed(1),
+                            sublabel: 'COMPOSITE / 100',
+                            accent: const Color(0xFFF59E0B),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildTrophyStatTile(
+                            label: 'AVG AI / PEER',
+                            value:
+                                '${mgr.averageAiScore.toStringAsFixed(0)} / ${mgr.averagePeerScore.toStringAsFixed(0)}',
+                            sublabel: 'GEMINI · ROOM',
+                            accent: const Color(0xFFA855F7),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'PAST MATCH LOG (SUPABASE PUBLIC.MATCH_HISTORY)',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.9,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: records.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No matches recorded yet. Complete a stage round to populate your Trophy Room!',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: records.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (context, idx) {
+                                  final rec = records[idx];
+                                  return Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF111624),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: rec.isWin
+                                            ? const Color(0x6610B981)
+                                            : const Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                rec.sceneTitle,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 3,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: rec.isWin
+                                                    ? const Color(0x2610B981)
+                                                    : const Color(0x2664748B),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                rec.isWin
+                                                    ? 'TROPHY WIN'
+                                                    : 'COMPLETED',
+                                                style: TextStyle(
+                                                  fontFamily: 'monospace',
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: rec.isWin
+                                                      ? const Color(0xFF10B981)
+                                                      : const Color(0xFF94A3B8),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${rec.filmOrSeries} · ${rec.syncedToSupabase ? "Synced to Supabase" : "Queued Offline"}',
+                                          style: const TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 11,
+                                            color: Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'AI: ${rec.aiScore.toStringAsFixed(1)} · PEER: ${rec.peerScore.toStringAsFixed(1)} · SOCIAL: ${rec.socialScore.toStringAsFixed(1)}',
+                                              style: const TextStyle(
+                                                fontFamily: 'monospace',
+                                                fontSize: 11,
+                                                color: Color(0xFF06B6D4),
+                                              ),
+                                            ),
+                                            Text(
+                                              'FINAL: ${rec.finalScore.toStringAsFixed(1)}',
+                                              style: const TextStyle(
+                                                fontFamily: 'monospace',
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xFFF59E0B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTrophyStatTile({
+    required String label,
+    required String value,
+    required String sublabel,
+    required Color accent,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111624),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accent.withOpacity(0.45)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: accent,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              sublabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 8,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'main.dart';
 import 'lobby.dart';
 import 'webrtc_manager.dart';
+import 'offline_manager.dart';
 
 class AiTelemetricsReport {
   final double overallAiScore;
@@ -60,8 +61,12 @@ class TriModalJudgingEngine extends ChangeNotifier {
   int _externalShares = 0;
   int _externalReactions = 0;
   int _loopCompletions = 1;
+  bool _hasSavedMatchHistory = false;
+  bool _lastRoundWasWin = false;
 
   AiTelemetricsReport? get aiReport => _aiReport;
+  bool get hasSavedMatchHistory => _hasSavedMatchHistory;
+  bool get lastRoundWasWin => _lastRoundWasWin;
   VideoPlayerController? get loopController => _loopController;
   String? get supabaseLoopUrl => _supabaseLoopUrl;
   bool get isEvaluatingAi => _isEvaluatingAi;
@@ -257,6 +262,63 @@ Return strict JSON with keys:
     notifyListeners();
   }
 
+  /// Auto-saves the completed round's Tri-Modal scores (`ai_score`, `peer_score`,
+  /// `social_score`, `final_score`) and `is_win` status into the Supabase
+  /// `public.match_history` table (and queues via `OfflineManager` if offline).
+  Future<MatchHistoryRecord> saveRoundResultToMatchHistory({
+    required String playerId,
+    required ScenePrompt scene,
+    bool isOfflineLocalParty = false,
+    double winThreshold = 85.0,
+  }) async {
+    final finalComposite = compositeTriModalScore;
+    final isWin = finalComposite >= winThreshold;
+    _lastRoundWasWin = isWin;
+
+    bool insertedIntoSupabase = false;
+    final client = supabaseOrNull;
+
+    if (!isOfflineLocalParty && client != null) {
+      try {
+        final resolvedPlayerId = client.auth.currentUser?.id ?? playerId;
+        final validSceneUuid = RegExp(
+          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+        ).hasMatch(scene.id);
+
+        await client.from('match_history').insert({
+          'player_id': resolvedPlayerId,
+          if (validSceneUuid) 'scene_id': scene.id,
+          'ai_score': double.parse(aiScore.toStringAsFixed(2)),
+          'peer_score': double.parse(peerScore.toStringAsFixed(2)),
+          'social_score': double.parse(socialScore.toStringAsFixed(2)),
+          'final_score': double.parse(finalComposite.toStringAsFixed(2)),
+          'is_win': isWin,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+        insertedIntoSupabase = true;
+      } catch (_) {
+        // Fallback to OfflineManager Store & Forward queue if network or RLS rejects
+        insertedIntoSupabase = false;
+      }
+    }
+
+    final record = await OfflineManager.instance.queueOfflineMatchHistoryRecord(
+      id: 'mh_${scene.id}_${DateTime.now().millisecondsSinceEpoch}',
+      playerId: playerId,
+      scene: scene,
+      aiScore: aiScore,
+      peerScore: peerScore,
+      socialScore: socialScore,
+      finalScore: finalComposite,
+      isWin: isWin,
+      alreadySyncedToSupabase: insertedIntoSupabase,
+    );
+
+    _hasSavedMatchHistory = true;
+    notifyListeners();
+    return record;
+  }
+
   @override
   void dispose() {
     _loopController?.dispose();
@@ -271,6 +333,7 @@ class TriModalJudgingScreen extends StatefulWidget {
   final List<TelemetricsFrameSample> capturedSamples;
   final String? localRecordedVideoPath;
   final Uint8List? recordedMp4Bytes;
+  final bool isOfflineLocalParty;
 
   const TriModalJudgingScreen({
     super.key,
@@ -280,6 +343,7 @@ class TriModalJudgingScreen extends StatefulWidget {
     required this.capturedSamples,
     this.localRecordedVideoPath,
     this.recordedMp4Bytes,
+    this.isOfflineLocalParty = false,
   });
 
   @override
@@ -289,6 +353,9 @@ class TriModalJudgingScreen extends StatefulWidget {
 class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
   late final TriModalJudgingEngine _engine;
   double _peerSliderValue = 90.0;
+  int _selectedPassAndPlayRating1To10 = 9;
+  final List<int> _passAndPlayRatings1To10 = [9];
+  bool _queuedForOfflineAi = false;
 
   ScenePrompt get _scene =>
       widget.lobbySession.activeScene ??
@@ -300,10 +367,19 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
     _engine = TriModalJudgingEngine();
     _engine.addListener(_onEngineUpdated);
 
-    _engine.evaluatePerformanceWithGemini(
+    _engine
+        .evaluatePerformanceWithGemini(
       scene: _scene,
       samples: widget.capturedSamples,
-    );
+    )
+        .then((_) {
+      // Auto-save initial round result into `match_history` when evaluation completes
+      _engine.saveRoundResultToMatchHistory(
+        playerId: widget.performerUserId,
+        scene: _scene,
+        isOfflineLocalParty: widget.isOfflineLocalParty,
+      );
+    });
     _engine.uploadAndStartSupabaseVideoLoop(
       roomCode: widget.lobbySession.roomCode,
       userId: widget.performerUserId,
@@ -559,6 +635,84 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Pass-and-Play Local Room Peer Rating (1–10 Scale):',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: List.generate(10, (index) {
+                      final score1To10 = index + 1;
+                      final isSelected =
+                          _selectedPassAndPlayRating1To10 == score1To10;
+                      return ChoiceChip(
+                        label: Text('$score1To10'),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() {
+                            _selectedPassAndPlayRating1To10 = score1To10;
+                            _peerSliderValue = score1To10 * 10.0;
+                            _passAndPlayRatings1To10.add(score1To10);
+                          });
+                          _engine.submitPeerVote(
+                            lobbyId: widget.lobbySession.id,
+                            performerUserId: widget.performerUserId,
+                            voteScore: score1To10 * 10.0,
+                          );
+                        },
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF06B6D4),
+                        foregroundColor: const Color(0xFF0A0D14),
+                      ),
+                      onPressed: _queuedForOfflineAi
+                          ? null
+                          : () async {
+                              final item = await OfflineManager.instance
+                                  .enqueueOfflinePerformance(
+                                performerName: widget.performerDisplayName,
+                                category: widget.lobbySession.selectedCategory,
+                                scene: _scene,
+                                localVideoPath:
+                                    widget.localRecordedVideoPath ?? '',
+                                peerRatings1To10: _passAndPlayRatings1To10,
+                                socialScore100: _engine.socialScore,
+                              );
+                              if (!mounted) return;
+                              setState(() {
+                                _queuedForOfflineAi = true;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    item.status == 'finalized'
+                                        ? 'Online connection active: Finalized Tri-Modal Score ${item.finalizedCompositeScore?.toStringAsFixed(1)}/100!'
+                                        : 'Saved local video & 1–10 Peer Score to Offline Queue. Gemini AI will auto-process on reconnect.',
+                                  ),
+                                ),
+                              );
+                            },
+                      icon: const Icon(Icons.schedule_send_outlined, size: 18),
+                      label: Text(
+                        _queuedForOfflineAi
+                            ? 'Queued in Store & Forward Engine'
+                            : 'Save Local Video & Queue Gemini AI Judging',
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -608,6 +762,100 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                       icon: const Icon(Icons.share_outlined, size: 18),
                       label: const Text(
                         'Share Performance & Calculate Social Score',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF121722),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _engine.compositeTriModalScore >= 85.0
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFF59E0B),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '4. Match History & Win Tracking',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _engine.compositeTriModalScore >= 85.0
+                              ? const Color(0x2610B981)
+                              : const Color(0x26F59E0B),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _engine.compositeTriModalScore >= 85.0
+                              ? 'STAGE WIN (85+)'
+                              : 'ROUND COMPLETED',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: _engine.compositeTriModalScore >= 85.0
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _engine.hasSavedMatchHistory
+                        ? 'Auto-saved to match_history (Final: ${_engine.compositeTriModalScore.toStringAsFixed(1)}/100 · Win: ${_engine.compositeTriModalScore >= 85.0 ? "YES" : "NO"}).'
+                        : 'Saving final Tri-Modal result to match_history...',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final saved =
+                            await _engine.saveRoundResultToMatchHistory(
+                          playerId: widget.performerUserId,
+                          scene: _scene,
+                          isOfflineLocalParty: widget.isOfflineLocalParty,
+                        );
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              saved.syncedToSupabase
+                                  ? 'Synced Round Result (${saved.finalScore.toStringAsFixed(1)}/100) to Supabase match_history!'
+                                  : 'Queued Round Result (${saved.finalScore.toStringAsFixed(1)}/100) in Offline Match History Sync!',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.emoji_events_outlined, size: 18),
+                      label: const Text(
+                        'Update & Sync Final Result to Career Trophy Room',
                       ),
                     ),
                   ),

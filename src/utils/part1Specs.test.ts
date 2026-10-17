@@ -95,6 +95,45 @@ test('Supabase migration and seed files exist on disk and pass schema & category
   );
   assert.ok(mainDart.includes("import 'dashboard_marquee.dart';"));
   assert.ok(mainDart.includes('home: const LivingMarqueeDashboardScreen()'));
+
+  // Verify Store & Forward Offline Mode (pubspec.yaml, lib/offline_manager.dart, lib/lobby.dart, lib/judging_engine.dart)
+  const pubspecDisk = fs.readFileSync('pubspec.yaml', 'utf8');
+  const offlineDart = fs.readFileSync('lib/offline_manager.dart', 'utf8');
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  assert.ok(pubspecDisk.includes('connectivity_plus:'));
+  assert.ok(pubspecDisk.includes('path_provider:'));
+  assert.ok(offlineDart.includes('class OfflineManager'));
+  assert.ok(offlineDart.includes('class OfflineLocalPartyScreen'));
+  assert.ok(offlineDart.includes('downloadAndCacheScenePacks'));
+  assert.ok(offlineDart.includes('getTemporaryDirectory'));
+  assert.ok(offlineDart.includes('onConnectivityChanged'));
+  assert.ok(offlineDart.includes('processQueuedPerformancesWithGemini'));
+  assert.ok(lobbyDart.includes("import 'offline_manager.dart';"));
+  assert.ok(lobbyDart.includes('Offline Local Party'));
+  assert.ok(judgingDart.includes("import 'offline_manager.dart';"));
+  assert.ok(judgingDart.includes('enqueueOfflinePerformance'));
+
+  // Verify Match History & Win Tracking (supabase/migrations/20261017000001_match_history.sql, lib/judging_engine.dart, lib/offline_manager.dart, lib/dashboard_marquee.dart)
+  const matchHistorySql = fs.readFileSync(
+    'supabase/migrations/20261017000001_match_history.sql',
+    'utf8'
+  );
+  assert.ok(matchHistorySql.includes('create table if not exists public.match_history'));
+  assert.ok(matchHistorySql.includes('player_id uuid not null references public.profiles(id)'));
+  assert.ok(matchHistorySql.includes('scene_id uuid references public.scenes(id)'));
+  assert.ok(matchHistorySql.includes('ai_score'));
+  assert.ok(matchHistorySql.includes('peer_score'));
+  assert.ok(matchHistorySql.includes('social_score'));
+  assert.ok(matchHistorySql.includes('final_score'));
+  assert.ok(matchHistorySql.includes('is_win boolean'));
+  assert.ok(matchHistorySql.includes('enable row level security'));
+  assert.ok(judgingDart.includes('saveRoundResultToMatchHistory'));
+  assert.ok(judgingDart.includes("from('match_history').insert"));
+  assert.ok(offlineDart.includes('class MatchHistoryRecord'));
+  assert.ok(offlineDart.includes('queueOfflineMatchHistoryRecord'));
+  assert.ok(offlineDart.includes('syncPendingMatchHistoryToSupabase'));
+  assert.ok(dashboardDart.includes('CAREER TROPHY ROOM'));
+  assert.ok(dashboardDart.includes('_openCareerTrophyRoomDrawer'));
 });
 
 test('WORKSPACE_FILES entries pass structural validation', () => {

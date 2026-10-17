@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
 import 'webrtc_manager.dart';
+import 'offline_manager.dart';
 
 enum SceneCategory {
   era1970To1999(
@@ -745,10 +746,11 @@ class LobbyRealtimeManager extends ChangeNotifier {
     _setLoading(true);
 
     final category = _session!.selectedCategory;
-    final builtInList = kBuiltInSceneVault[category] ??
-        kBuiltInSceneVault[SceneCategory.era1970To1999]!;
+    await OfflineManager.instance.ensureInitialized();
+    final cachedList =
+        OfflineManager.instance.getCachedScenesForCategory(category);
     final random = Random.secure();
-    ScenePrompt chosenScene = builtInList[random.nextInt(builtInList.length)];
+    ScenePrompt chosenScene = cachedList[random.nextInt(cachedList.length)];
 
     final client = supabaseOrNull;
     if (client != null) {
@@ -892,6 +894,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
     _isJoinMode = widget.startInJoinMode;
     _lobbyManager = LobbyRealtimeManager();
     _lobbyManager.addListener(_onLobbyStateChanged);
+    OfflineManager.instance.ensureInitialized();
   }
 
   void _onLobbyStateChanged() {
@@ -1096,6 +1099,97 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
                 : (_isJoinMode
                     ? 'Join Remote Lobby'
                     : 'Generate 6-Digit Room Code'),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF121722),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF06B6D4), width: 1.2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    color: Color(0xFF06B6D4),
+                    size: 18,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'OFFLINE MODE · STORE & FORWARD PARTY',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF06B6D4),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Cache Scene Packs to device storage while online, then play Pass-and-Play Multiplayer offline using native 30s camera clips, local looped 1–10 Peer Judging, and connectivity_plus Queued Gemini AI Judging.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final count = await OfflineManager.instance
+                            .downloadAndCacheScenePacks();
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Cached $count scenes locally for Offline Play.',
+                            ),
+                          ),
+                        );
+                        setState(() {});
+                      },
+                      icon: const Icon(
+                        Icons.download_for_offline_outlined,
+                        size: 16,
+                      ),
+                      label: const Text('Cache Scene Packs'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF06B6D4),
+                        foregroundColor: const Color(0xFF0A0D14),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          StageSharedTransitionRoute(
+                            page: OfflineLocalPartyScreen(
+                              initialCategory: _selectedCategory,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.groups_2_outlined, size: 16),
+                      label: const Text('Offline Local Party'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],

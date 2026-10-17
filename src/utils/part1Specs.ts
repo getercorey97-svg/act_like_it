@@ -64,6 +64,59 @@ export const BATCH_STAGES: BatchStage[] = [
 
 export const WORKSPACE_FILES: GeneratedFileRecord[] = [
   {
+    path: 'supabase/migrations/20261017000001_match_history.sql',
+    language: 'sql',
+    part: 2,
+    description:
+      'Match History & Win Tracking Supabase migration creating public.match_history (id, player_id, scene_id, ai_score, peer_score, social_score, final_score, is_win, created_at) with strict Row Level Security (RLS) policies.',
+    lineCount: 55,
+    content: `-- ACT LIKE IT — MATCH HISTORY & WIN TRACKING MIGRATION
+-- File: supabase/migrations/20261017000001_match_history.sql
+
+create table if not exists public.match_history (
+  id uuid primary key default gen_random_uuid(),
+  player_id uuid not null references public.profiles(id) on delete cascade,
+  scene_id uuid references public.scenes(id) on delete set null,
+  ai_score numeric(5,2) not null default 0.00 check (ai_score >= 0 and ai_score <= 100),
+  peer_score numeric(5,2) not null default 0.00 check (peer_score >= 0 and peer_score <= 100),
+  social_score numeric(5,2) not null default 0.00 check (social_score >= 0 and social_score <= 100),
+  final_score numeric(5,2) not null default 0.00 check (final_score >= 0 and final_score <= 100),
+  is_win boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.match_history enable row level security;
+
+create policy "Users can read their own match history"
+  on public.match_history for select to authenticated
+  using (auth.uid() = player_id);
+
+create policy "Users can insert their own match history"
+  on public.match_history for insert to authenticated
+  with check (auth.uid() = player_id);`,
+  },
+  {
+    path: 'lib/offline_manager.dart',
+    language: 'dart',
+    part: 4,
+    description:
+      'Store & Forward Offline Manager: caches Supabase Scene Packs into SharedPreferences, records 30s Pass-and-Play clips to getTemporaryDirectory(), queues offline Gemini AI Judging, and queues/auto-syncs MatchHistoryRecord rows to public.match_history via connectivity_plus.',
+    lineCount: 1505,
+    content: `import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class OfflineManager extends ChangeNotifier {
+  static final OfflineManager instance = OfflineManager._internal();
+  // 1. Local Scene Caching: downloadAndCacheScenePacks() -> SharedPreferences
+  // 2. Pass-and-Play Local Temp Storage: saveLocalOfflineClipToTempDir() -> getTemporaryDirectory()
+  // 3. Queued Gemini AI Judging: enqueueOfflinePerformance() + connectivity_plus auto-flush
+}`,
+  },
+  {
     path: 'lib/dashboard_marquee.dart',
     language: 'dart',
     part: 1,
@@ -346,13 +399,15 @@ import 'package:livekit_client/livekit_client.dart';
     language: 'yaml',
     part: 1,
     description:
-      'Flutter manifest configuring supabase_flutter, livekit_client, flutter_webrtc, google_generative_ai, camera, and video_player.',
-    lineCount: 44,
+      'Flutter manifest configuring supabase_flutter, livekit_client, flutter_webrtc, google_generative_ai, camera, video_player, path_provider, and connectivity_plus.',
+    lineCount: 49,
     content: `name: act_like_it
 dependencies:
   supabase_flutter: ^2.8.0
   livekit_client: ^2.3.0
-  google_generative_ai: ^0.4.6`,
+  google_generative_ai: ^0.4.6
+  path_provider: ^2.1.4
+  connectivity_plus: ^6.1.0`,
   },
   {
     path: 'lib/main.dart',
