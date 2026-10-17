@@ -412,13 +412,26 @@ class LobbyPlayer {
     );
   }
 
-  factory LobbyPlayer.fromJson(Map<String, dynamic> json) {
+  factory LobbyPlayer.fromJson(
+    Map<String, dynamic> json, {
+    String? hostId,
+  }) {
+    final profileMap = json['profiles'] is Map
+        ? Map<String, dynamic>.from(json['profiles'] as Map)
+        : null;
+    final resolvedUserId = json['user_id']?.toString() ?? '';
+    final resolvedDisplayName = json['display_name']?.toString() ??
+        profileMap?['username']?.toString() ??
+        'Actor';
+    final resolvedIsHost = json['is_host'] == true ||
+        (hostId != null && hostId.isNotEmpty && resolvedUserId == hostId);
+
     return LobbyPlayer(
       id: json['id']?.toString() ?? '',
       lobbyId: json['lobby_id']?.toString() ?? '',
-      userId: json['user_id']?.toString() ?? '',
-      displayName: json['display_name']?.toString() ?? 'Actor',
-      isHost: json['is_host'] == true,
+      userId: resolvedUserId,
+      displayName: resolvedDisplayName,
+      isHost: resolvedIsHost,
       isReady: json['is_ready'] == true,
       aiTelemetricsScore:
           (json['ai_telemetrics_score'] as num?)?.toDouble() ?? 0,
@@ -461,6 +474,7 @@ class LobbySession {
     String? activeActorId,
     ScenePrompt? activeScene,
     int? roundNumber,
+    String? livekitRoomName,
   }) {
     return LobbySession(
       id: id,
@@ -473,28 +487,46 @@ class LobbySession {
       activeActorId: activeActorId ?? this.activeActorId,
       activeScene: activeScene ?? this.activeScene,
       roundNumber: roundNumber ?? this.roundNumber,
-      livekitRoomName: livekitRoomName,
+      livekitRoomName: livekitRoomName ?? this.livekitRoomName,
     );
   }
 
-  factory LobbySession.fromJson(Map<String, dynamic> json) {
-    final payload = json['active_scene_payload'];
+  factory LobbySession.fromJson(
+    Map<String, dynamic> json, {
+    SceneCategory? fallbackCategory,
+    ScenePrompt? fallbackScene,
+    String? fallbackActorId,
+  }) {
+    final roomCode = json['room_code']?.toString() ?? '000000';
+    final rawLiveKitRoom = json['livekit_room_name']?.toString() ?? '';
+    final payload = json['active_scene_payload'] ?? json['scenes'];
+
+    ScenePrompt? parsedScene = fallbackScene;
+    if (payload is Map) {
+      parsedScene = ScenePrompt.fromJson(Map<String, dynamic>.from(payload));
+    }
+
+    final rawCategory = json['selected_category']?.toString();
+    final resolvedCategory = (rawCategory != null && rawCategory.isNotEmpty)
+        ? SceneCategory.fromKey(rawCategory)
+        : (fallbackCategory ?? SceneCategory.era1970To1999);
+
     return LobbySession(
       id: json['id']?.toString() ?? '',
-      roomCode: json['room_code']?.toString() ?? '000000',
+      roomCode: roomCode,
       hostId: json['host_id']?.toString() ?? '',
-      selectedCategory: SceneCategory.fromKey(
-        json['selected_category']?.toString() ?? 'era_1970_1999',
-      ),
+      selectedCategory: resolvedCategory,
       status: json['status']?.toString() ?? 'waiting',
       minPlayers: (json['min_players'] as num?)?.toInt() ?? 2,
       maxPlayers: (json['max_players'] as num?)?.toInt() ?? 8,
-      activeActorId: json['active_actor_id']?.toString(),
-      activeScene: payload is Map<String, dynamic>
-          ? ScenePrompt.fromJson(payload)
-          : null,
+      activeActorId: json['active_actor_id']?.toString() ??
+          fallbackActorId ??
+          json['host_id']?.toString(),
+      activeScene: parsedScene,
       roundNumber: (json['round_number'] as num?)?.toInt() ?? 1,
-      livekitRoomName: json['livekit_room_name']?.toString() ?? '',
+      livekitRoomName: rawLiveKitRoom.isNotEmpty
+          ? rawLiveKitRoom
+          : 'act_like_it_$roomCode',
     );
   }
 }
@@ -504,31 +536,48 @@ class LobbyRealtimeManager extends ChangeNotifier {
   List<LobbyPlayer> _players = [];
   RealtimeChannel? _realtimeChannel;
   bool _isLoading = false;
+  bool _isDisposed = false;
   String? _errorMessage;
 
-  final String localUserId;
+  String _localUserId;
   String localDisplayName;
 
   LobbyRealtimeManager({
     String? userId,
     this.localDisplayName = 'Galaxy S26 Actor',
-  }) : localUserId = userId ??
+  }) : _localUserId = userId ??
             supabaseOrNull?.auth.currentUser?.id ??
             _generateEphemeralUuid();
 
+  String get localUserId => _localUserId;
   LobbySession? get session => _session;
   List<LobbyPlayer> get players => List.unmodifiable(_players);
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  bool get isHost => _session != null && _session!.hostId == localUserId;
+  bool get isHost => _session != null && _session!.hostId == _localUserId;
   bool get canStartMatch =>
       _players.length >= 2 &&
       _players.length <= 8 &&
       _players.every((p) => p.isReady || p.isHost);
 
+  static Random _safeRandom() {
+    try {
+      return Random.secure();
+    } catch (_) {
+      return Random();
+    }
+  }
+
+  static bool _isValidUuid(String? value) {
+    if (value == null || value.isEmpty) return false;
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value);
+  }
+
   static String _generateEphemeralUuid() {
-    final random = Random.secure();
+    final random = _safeRandom();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
@@ -541,9 +590,50 @@ class LobbyRealtimeManager extends ChangeNotifier {
   }
 
   static String generateSixDigitCode() {
-    final random = Random.secure();
+    final random = _safeRandom();
     final code = 100000 + random.nextInt(900000);
     return code.toString();
+  }
+
+  void _notifySafely() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  /// Ensures an authenticated Supabase user session and a corresponding row in
+  /// `public.profiles` exist before inserting into `lobbies` or `lobby_players`
+  /// (which enforce `auth.uid()` RLS policies and `references public.profiles(id)`).
+  Future<String?> _ensureAuthenticatedAndProfile(SupabaseClient client) async {
+    try {
+      var currentUser = client.auth.currentUser;
+      if (currentUser == null) {
+        final anonRes = await client.auth.signInAnonymously();
+        currentUser = anonRes.user;
+      }
+      if (currentUser == null) return null;
+
+      _localUserId = currentUser.id;
+      final cleanHandle = localDisplayName
+          .trim()
+          .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+          .toLowerCase();
+      final suffix = _localUserId.substring(0, 6);
+      final uniqueUsername =
+          '${cleanHandle.isEmpty ? 'actor' : cleanHandle}_$suffix';
+
+      await client.from('profiles').upsert(
+        {
+          'id': _localUserId,
+          'username': uniqueUsername,
+          'birth_year': 1998,
+        },
+        onConflict: 'id',
+      );
+      return _localUserId;
+    } catch (_) {
+      return client.auth.currentUser?.id;
+    }
   }
 
   Future<void> createLobby({
@@ -556,58 +646,77 @@ class LobbyRealtimeManager extends ChangeNotifier {
     localDisplayName =
         displayName.trim().isEmpty ? 'Galaxy S26 Host' : displayName.trim();
 
-    final roomCode = generateSixDigitCode();
-    final livekitRoomName = 'act_like_it_$roomCode';
+    String roomCode = generateSixDigitCode();
+    final defaultPrompt = preselectedPrompt ??
+        (kBuiltInSceneVault[category]?.first ??
+            kBuiltInSceneVault[SceneCategory.era1970To1999]!.first);
     final client = supabaseOrNull;
 
     if (client != null) {
       try {
-        final insertedLobby = await client
-            .from('lobbies')
-            .insert({
-              'room_code': roomCode,
-              'host_id': localUserId,
-              'selected_category': category.key,
-              'status': 'waiting',
-              'min_players': 2,
-              'max_players': 8,
-              'livekit_room_name': livekitRoomName,
-            })
-            .select()
-            .single();
+        final authedUserId = await _ensureAuthenticatedAndProfile(client);
+        if (authedUserId != null) {
+          Map<String, dynamic>? insertedLobby;
+          // Retry up to 3 times to prevent 6-digit room_code uniqueness collisions
+          for (int attempt = 0; attempt < 3; attempt++) {
+            roomCode = generateSixDigitCode();
+            try {
+              insertedLobby = await client
+                  .from('lobbies')
+                  .insert({
+                    'room_code': roomCode,
+                    'host_id': authedUserId,
+                    if (_isValidUuid(defaultPrompt.id))
+                      'active_scene_id': defaultPrompt.id,
+                    'status': 'waiting',
+                  })
+                  .select('*, scenes(*)')
+                  .single();
+              break;
+            } catch (_) {
+              if (attempt == 2) rethrow;
+            }
+          }
 
-        _session = LobbySession.fromJson(insertedLobby);
+          if (insertedLobby != null) {
+            _session = LobbySession.fromJson(
+              insertedLobby,
+              fallbackCategory: category,
+              fallbackScene: defaultPrompt,
+              fallbackActorId: authedUserId,
+            );
 
-        await client.from('lobby_players').insert({
-          'lobby_id': _session!.id,
-          'user_id': localUserId,
-          'display_name': localDisplayName,
-          'is_host': true,
-          'is_ready': true,
-        });
+            await client.from('lobby_players').upsert(
+              {
+                'lobby_id': _session!.id,
+                'user_id': authedUserId,
+                'is_ready': true,
+              },
+              onConflict: 'lobby_id,user_id',
+            );
 
-        await _refreshPlayers(_session!.id);
-        _subscribeToLobbyRealtime(_session!);
-        _setLoading(false);
-        return;
+            await _refreshPlayers(_session!.id);
+            _subscribeToLobbyRealtime(_session!);
+            _setLoading(false);
+            return;
+          }
+        }
       } catch (_) {
         // Fall through to standalone local lobby session
       }
     }
 
     // Standalone Instant Lobby Session (works immediately on S26 Ultra without cloud setup)
+    final livekitRoomName = 'act_like_it_$roomCode';
     final lobbyId = _generateEphemeralUuid();
-    final defaultPrompt = preselectedPrompt ??
-        (kBuiltInSceneVault[category]?.first ??
-            kBuiltInSceneVault[SceneCategory.era1970To1999]!.first);
 
     _session = LobbySession(
       id: lobbyId,
       roomCode: roomCode,
-      hostId: localUserId,
+      hostId: _localUserId,
       selectedCategory: category,
       status: 'performing',
-      activeActorId: localUserId,
+      activeActorId: _localUserId,
       activeScene: defaultPrompt,
       livekitRoomName: livekitRoomName,
     );
@@ -616,7 +725,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
       LobbyPlayer(
         id: 'p-host',
         lobbyId: lobbyId,
-        userId: localUserId,
+        userId: _localUserId,
         displayName: localDisplayName,
         isHost: true,
         isReady: true,
@@ -648,7 +757,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
     final sanitizedCode = roomCode.trim();
     if (!RegExp(r'^[0-9]{6}$').hasMatch(sanitizedCode)) {
       _errorMessage = 'Enter a valid 6-digit numeric lobby code.';
-      notifyListeners();
+      _notifySafely();
       return;
     }
 
@@ -660,20 +769,25 @@ class LobbyRealtimeManager extends ChangeNotifier {
     final client = supabaseOrNull;
     if (client != null) {
       try {
+        final authedUserId = await _ensureAuthenticatedAndProfile(client);
         final lobbyRecord = await client
             .from('lobbies')
-            .select()
+            .select('*, scenes(*)')
             .eq('room_code', sanitizedCode)
             .maybeSingle();
 
-        if (lobbyRecord != null) {
-          final lobby = LobbySession.fromJson(lobbyRecord);
+        if (lobbyRecord != null && authedUserId != null) {
+          final fallbackPrompt =
+              kBuiltInSceneVault[SceneCategory.era1970To1999]!.first;
+          final lobby = LobbySession.fromJson(
+            Map<String, dynamic>.from(lobbyRecord as Map),
+            fallbackCategory: SceneCategory.era1970To1999,
+            fallbackScene: fallbackPrompt,
+          );
           await client.from('lobby_players').upsert(
             {
               'lobby_id': lobby.id,
-              'user_id': localUserId,
-              'display_name': localDisplayName,
-              'is_host': lobby.hostId == localUserId,
+              'user_id': authedUserId,
               'is_ready': true,
             },
             onConflict: 'lobby_id,user_id',
@@ -692,10 +806,10 @@ class LobbyRealtimeManager extends ChangeNotifier {
     _session = LobbySession(
       id: lobbyId,
       roomCode: sanitizedCode,
-      hostId: localUserId,
+      hostId: _localUserId,
       selectedCategory: SceneCategory.era1970To1999,
       status: 'performing',
-      activeActorId: localUserId,
+      activeActorId: _localUserId,
       activeScene: kBuiltInSceneVault[SceneCategory.era1970To1999]!.first,
       livekitRoomName: 'act_like_it_$sanitizedCode',
     );
@@ -703,7 +817,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
       LobbyPlayer(
         id: 'p-1',
         lobbyId: lobbyId,
-        userId: localUserId,
+        userId: _localUserId,
         displayName: localDisplayName,
         isHost: true,
         isReady: true,
@@ -722,12 +836,12 @@ class LobbyRealtimeManager extends ChangeNotifier {
 
   Future<void> toggleReadyState() async {
     if (_session == null) return;
-    final idx = _players.indexWhere((p) => p.userId == localUserId);
+    final idx = _players.indexWhere((p) => p.userId == _localUserId);
     if (idx == -1) return;
 
     final nextReady = !_players[idx].isReady;
     _players[idx] = _players[idx].copyWith(isReady: nextReady);
-    notifyListeners();
+    _notifySafely();
 
     final client = supabaseOrNull;
     if (client != null) {
@@ -736,7 +850,20 @@ class LobbyRealtimeManager extends ChangeNotifier {
             .from('lobby_players')
             .update({'is_ready': nextReady})
             .eq('lobby_id', _session!.id)
-            .eq('user_id', localUserId);
+            .eq('user_id', _localUserId);
+      } catch (_) {}
+    }
+
+    // Also update Realtime Presence state so remote peers see ready toggle immediately
+    final channel = _realtimeChannel;
+    if (channel != null) {
+      try {
+        await channel.track({
+          'user_id': _localUserId,
+          'display_name': localDisplayName,
+          'is_host': isHost,
+          'is_ready': nextReady,
+        });
       } catch (_) {}
     }
   }
@@ -749,8 +876,10 @@ class LobbyRealtimeManager extends ChangeNotifier {
     await OfflineManager.instance.ensureInitialized();
     final cachedList =
         OfflineManager.instance.getCachedScenesForCategory(category);
-    final random = Random.secure();
-    ScenePrompt chosenScene = cachedList[random.nextInt(cachedList.length)];
+    final random = _safeRandom();
+    ScenePrompt chosenScene = cachedList.isNotEmpty
+        ? cachedList[random.nextInt(cachedList.length)]
+        : kBuiltInSceneVault[SceneCategory.era1970To1999]!.first;
 
     final client = supabaseOrNull;
     if (client != null) {
@@ -765,37 +894,155 @@ class LobbyRealtimeManager extends ChangeNotifier {
             Map<String, dynamic>.from(rows[random.nextInt(rows.length)] as Map),
           );
         }
+
+        final updatePayload = <String, dynamic>{
+          'status': 'performing',
+          if (_isValidUuid(chosenScene.id)) 'active_scene_id': chosenScene.id,
+        };
         await client
             .from('lobbies')
-            .update({
-              'active_scene_id': chosenScene.id,
-              'status': 'performing',
-            })
+            .update(updatePayload)
             .eq('id', _session!.id);
       } catch (_) {}
     }
 
+    if (_session == null || _isDisposed) return;
+
     _session = _session!.copyWith(
       status: 'performing',
-      activeActorId: localUserId,
+      activeActorId: _localUserId,
       activeScene: chosenScene,
     );
+
+    // Broadcast full round & scene state to all connected peers in the lobby channel
+    final channel = _realtimeChannel;
+    if (channel != null) {
+      try {
+        await channel.sendBroadcastMessage(
+          event: 'lobby_state_sync',
+          payload: {
+            'lobby_id': _session!.id,
+            'room_code': _session!.roomCode,
+            'selected_category': _session!.selectedCategory.key,
+            'status': 'performing',
+            'active_actor_id': _localUserId,
+            'active_scene_payload': chosenScene.toJson(),
+            'livekit_room_name': _session!.livekitRoomName,
+          },
+        );
+      } catch (_) {}
+    }
+
     _setLoading(false);
   }
 
   Future<void> _refreshPlayers(String lobbyId) async {
     final client = supabaseOrNull;
-    if (client == null) return;
-    final data = await client
-        .from('lobby_players')
-        .select()
-        .eq('lobby_id', lobbyId)
-        .order('joined_at', ascending: true);
+    if (client == null || _isDisposed) return;
+    try {
+      final data = await client
+          .from('lobby_players')
+          .select('*, profiles(username)')
+          .eq('lobby_id', lobbyId)
+          .order('joined_at', ascending: true);
 
-    _players = data
-        .map((row) => LobbyPlayer.fromJson(Map<String, dynamic>.from(row)))
-        .toList();
-    notifyListeners();
+      if (_isDisposed) return;
+      final hostId = _session?.hostId;
+      final fetchedPlayers = data.map((row) {
+        final map = Map<String, dynamic>.from(row as Map);
+        if (map['user_id']?.toString() == _localUserId &&
+            localDisplayName.isNotEmpty) {
+          map['display_name'] = localDisplayName;
+        }
+        return LobbyPlayer.fromJson(map, hostId: hostId);
+      }).toList();
+
+      if (fetchedPlayers.isNotEmpty) {
+        _players = fetchedPlayers;
+        _mergeRealtimePresence();
+        _notifySafely();
+      }
+    } catch (_) {}
+  }
+
+  /// Merges Supabase Realtime Presence metadata (`display_name`, `is_ready`, `is_host`)
+  /// into `_players` so live presence updates and custom stage names stay in sync.
+  void _mergeRealtimePresence() {
+    final channel = _realtimeChannel;
+    if (channel == null || _session == null) return;
+    try {
+      final presenceStates = channel.presenceState();
+      final Map<String, Map<String, dynamic>> presenceByUser = {};
+      for (final state in presenceStates) {
+        for (final presence in state.presences) {
+          final payload = Map<String, dynamic>.from(presence.payload);
+          final uid = payload['user_id']?.toString() ?? '';
+          if (uid.isNotEmpty) {
+            presenceByUser[uid] = payload;
+          }
+        }
+      }
+      if (presenceByUser.isEmpty) return;
+
+      for (int i = 0; i < _players.length; i++) {
+        final existing = _players[i];
+        final p = presenceByUser[existing.userId];
+        if (p != null) {
+          _players[i] = LobbyPlayer(
+            id: existing.id,
+            lobbyId: existing.lobbyId,
+            userId: existing.userId,
+            displayName: p['display_name']?.toString() ?? existing.displayName,
+            isHost: p['is_host'] == true || existing.isHost,
+            isReady: p['is_ready'] is bool
+                ? p['is_ready'] as bool
+                : existing.isReady,
+            aiTelemetricsScore: existing.aiTelemetricsScore,
+            peerScore: existing.peerScore,
+            socialScore: existing.socialScore,
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleLobbyPostgresChange(
+    Map<String, dynamic> newRecord,
+  ) async {
+    if (newRecord.isEmpty || _session == null || _isDisposed) return;
+
+    final current = _session!;
+    ScenePrompt? resolvedScene = current.activeScene;
+    final newSceneId = newRecord['active_scene_id']?.toString();
+
+    if (newSceneId != null &&
+        newSceneId.isNotEmpty &&
+        newSceneId != current.activeScene?.id) {
+      final client = supabaseOrNull;
+      if (client != null) {
+        try {
+          final sceneRow = await client
+              .from('scenes')
+              .select()
+              .eq('id', newSceneId)
+              .maybeSingle();
+          if (sceneRow != null) {
+            resolvedScene = ScenePrompt.fromJson(
+              Map<String, dynamic>.from(sceneRow as Map),
+            );
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (_isDisposed || _session == null) return;
+    _session = LobbySession.fromJson(
+      newRecord,
+      fallbackCategory: current.selectedCategory,
+      fallbackScene: resolvedScene,
+      fallbackActorId: current.activeActorId,
+    );
+    _notifySafely();
   }
 
   void _subscribeToLobbyRealtime(LobbySession lobby) {
@@ -819,10 +1066,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
             value: lobby.id,
           ),
           callback: (payload) {
-            if (payload.newRecord.isNotEmpty) {
-              _session = LobbySession.fromJson(payload.newRecord);
-              notifyListeners();
-            }
+            _handleLobbyPostgresChange(payload.newRecord);
           },
         )
         .onPostgresChanges(
@@ -838,26 +1082,71 @@ class LobbyRealtimeManager extends ChangeNotifier {
             _refreshPlayers(lobby.id);
           },
         )
-        .subscribe();
+        .onBroadcast(
+          event: 'lobby_state_sync',
+          callback: (payload) {
+            if (_session == null || _isDisposed) return;
+            _session = LobbySession.fromJson(
+              payload,
+              fallbackCategory: _session!.selectedCategory,
+              fallbackScene: _session!.activeScene,
+              fallbackActorId: _session!.activeActorId,
+            );
+            _notifySafely();
+          },
+        )
+        .onPresenceSync((_) {
+          if (_isDisposed) return;
+          _mergeRealtimePresence();
+          _notifySafely();
+        })
+        .subscribe((status, [error]) async {
+          if (status == RealtimeSubscribeStatus.subscribed && !_isDisposed) {
+            try {
+              await channel.track({
+                'user_id': _localUserId,
+                'display_name': localDisplayName,
+                'is_host': isHost,
+                'is_ready': true,
+              });
+            } catch (_) {}
+          }
+        });
 
     _realtimeChannel = channel;
   }
 
   Future<void> leaveLobby() async {
+    final client = supabaseOrNull;
+    final activeLobbyId = _session?.id;
+    if (client != null && activeLobbyId != null && _isValidUuid(activeLobbyId)) {
+      try {
+        await client
+            .from('lobby_players')
+            .delete()
+            .eq('lobby_id', activeLobbyId)
+            .eq('user_id', _localUserId);
+      } catch (_) {}
+    }
+
+    try {
+      await _realtimeChannel?.untrack();
+    } catch (_) {}
     await _realtimeChannel?.unsubscribe();
     _realtimeChannel = null;
     _session = null;
     _players = [];
-    notifyListeners();
+    _notifySafely();
   }
 
   void _setLoading(bool value) {
     _isLoading = value;
-    notifyListeners();
+    _notifySafely();
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _realtimeChannel?.unsubscribe();
     super.dispose();
   }

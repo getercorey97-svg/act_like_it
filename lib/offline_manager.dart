@@ -242,6 +242,7 @@ class OfflineManager extends ChangeNotifier {
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<dynamic>? _connectivitySubscription;
 
+  Future<void>? _initFuture;
   bool _isInitialized = false;
   bool _isOnline = true;
   bool _isCachingScenes = false;
@@ -295,50 +296,62 @@ class OfflineManager extends ChangeNotifier {
 
   /// Initializes local cache, loads queued performances, and subscribes to
   /// `connectivity_plus` network state changes for automatic Store & Forward syncing.
-  Future<void> ensureInitialized() async {
-    if (_isInitialized) return;
-    _isInitialized = true;
+  /// Uses a memoized `_initFuture` lock so concurrent callers never race while
+  /// awaiting SharedPreferences or connectivity checks.
+  Future<void> ensureInitialized() {
+    if (_isInitialized) return Future<void>.value();
+    return _initFuture ??= _performInitialization();
+  }
 
-    await _loadCachedScenePacksFromPrefs();
-    await _loadQueueFromPrefs();
-    await _loadMatchHistoryFromPrefs();
-
+  Future<void> _performInitialization() async {
     try {
-      final initialStatus = await _connectivity.checkConnectivity();
-      _isOnline = _evaluateConnectivityOnline(initialStatus);
-    } catch (_) {
-      _isOnline = true;
-    }
+      await _loadCachedScenePacksFromPrefs();
+      await _loadQueueFromPrefs();
+      await _loadMatchHistoryFromPrefs();
 
-    _connectivitySubscription?.cancel();
-    _connectivitySubscription =
-        _connectivity.onConnectivityChanged.listen((dynamic statusEvent) async {
-      final nowOnline = _evaluateConnectivityOnline(statusEvent);
-      final wasOffline = !_isOnline;
-      _isOnline = nowOnline;
+      try {
+        final initialStatus = await _connectivity.checkConnectivity();
+        _isOnline = _evaluateConnectivityOnline(initialStatus);
+      } catch (_) {
+        _isOnline = true;
+      }
+
+      await _connectivitySubscription?.cancel();
+      _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+        (dynamic statusEvent) async {
+          final nowOnline = _evaluateConnectivityOnline(statusEvent);
+          final wasOffline = !_isOnline;
+          _isOnline = nowOnline;
+          notifyListeners();
+
+          // Store & Forward trigger: once active internet connection is detected,
+          // automatically process queued videos through the Gemini AI API and
+          // push unsynced match_history records to Supabase.
+          if (nowOnline &&
+              (wasOffline ||
+                  pendingQueueCount > 0 ||
+                  pendingMatchHistorySyncCount > 0)) {
+            await processQueuedPerformancesWithGemini();
+            await syncPendingMatchHistoryToSupabase();
+          }
+        },
+      );
+
+      _isInitialized = true;
+
+      if (_isOnline) {
+        if (pendingQueueCount > 0) {
+          unawaited(processQueuedPerformancesWithGemini());
+        }
+        if (pendingMatchHistorySyncCount > 0) {
+          unawaited(syncPendingMatchHistoryToSupabase());
+        }
+      }
       notifyListeners();
-
-      // Store & Forward trigger: once active internet connection is detected,
-      // automatically process queued videos through the Gemini AI API and
-      // push unsynced match_history records to Supabase.
-      if (nowOnline &&
-          (wasOffline ||
-              pendingQueueCount > 0 ||
-              pendingMatchHistorySyncCount > 0)) {
-        await processQueuedPerformancesWithGemini();
-        await syncPendingMatchHistoryToSupabase();
-      }
-    });
-
-    if (_isOnline) {
-      if (pendingQueueCount > 0) {
-        unawaited(processQueuedPerformancesWithGemini());
-      }
-      if (pendingMatchHistorySyncCount > 0) {
-        unawaited(syncPendingMatchHistoryToSupabase());
-      }
+    } catch (e) {
+      _initFuture = null;
+      rethrow;
     }
-    notifyListeners();
   }
 
   /// Safely evaluates connectivity output across `connectivity_plus` versions
@@ -480,8 +493,16 @@ class OfflineManager extends ChangeNotifier {
 
   ScenePrompt drawRandomCachedScene(SceneCategory category) {
     final list = getCachedScenesForCategory(category);
-    final random = Random.secure();
-    return list[random.nextInt(list.length)];
+    if (list.isEmpty) {
+      return kBuiltInSceneVault[SceneCategory.era1970To1999]!.first;
+    }
+    Random rng;
+    try {
+      rng = Random.secure();
+    } catch (_) {
+      rng = Random();
+    }
+    return list[rng.nextInt(list.length)];
   }
 
   // --------------------------------------------------------------------------
@@ -576,28 +597,32 @@ class OfflineManager extends ChangeNotifier {
     _queue.insert(0, item);
     await _persistQueueToPrefs();
 
-    // Immediately queue a preliminary MatchHistoryRecord locally during Pass-and-Play mode
-    final provisionalComposite =
-        ((86.0 * 0.45) + (peerScore100 * 0.35) + (socialScore100 * 0.20))
-            .clamp(0.0, 100.0);
-    await queueOfflineMatchHistoryRecord(
-      id: 'mh_${item.id}',
-      playerId: performerName,
-      scene: scene,
-      aiScore: 86.0,
-      peerScore: peerScore100,
-      socialScore: socialScore100,
-      finalScore: provisionalComposite,
-      isWin: provisionalComposite >= 85.0,
-      alreadySyncedToSupabase: false,
-    );
-    notifyListeners();
+    // Check live connectivity first to avoid double-syncing a provisional record
+    // before Gemini AI finalizes the score when already online.
+    try {
+      final status = await _connectivity.checkConnectivity();
+      _isOnline = _evaluateConnectivityOnline(status);
+    } catch (_) {}
 
-    // Check live connectivity and flush immediately if online
-    final status = await _connectivity.checkConnectivity();
-    _isOnline = _evaluateConnectivityOnline(status);
     if (_isOnline) {
       await processQueuedPerformancesWithGemini();
+    } else {
+      // Queue preliminary MatchHistoryRecord locally during offline Pass-and-Play mode
+      final provisionalComposite =
+          ((86.0 * 0.45) + (peerScore100 * 0.35) + (socialScore100 * 0.20))
+              .clamp(0.0, 100.0);
+      await queueOfflineMatchHistoryRecord(
+        id: 'mh_${item.id}',
+        playerId: performerName,
+        scene: scene,
+        aiScore: 86.0,
+        peerScore: peerScore100,
+        socialScore: socialScore100,
+        finalScore: provisionalComposite,
+        isWin: provisionalComposite >= 85.0,
+        alreadySyncedToSupabase: false,
+      );
+      notifyListeners();
     }
 
     return _queue.firstWhere((e) => e.id == item.id, orElse: () => item);
@@ -669,9 +694,27 @@ Return strict JSON:
               }
             }
 
-            final response = await model.generateContent([Content.multi(parts)]);
-            final decoded =
-                jsonDecode(response.text ?? '{}') as Map<String, dynamic>;
+            final response = await model
+                .generateContent([Content.multi(parts)])
+                .timeout(const Duration(seconds: 20));
+            var rawJson = (response.text ?? '{}').trim();
+            if (rawJson.startsWith('```')) {
+              rawJson = rawJson
+                  .replaceFirst(
+                    RegExp(r'^```(?:json)?\s*', caseSensitive: false),
+                    '',
+                  )
+                  .replaceFirst(RegExp(r'\s*```$'), '')
+                  .trim();
+            }
+            final firstBrace = rawJson.indexOf('{');
+            final lastBrace = rawJson.lastIndexOf('}');
+            if (firstBrace >= 0 && lastBrace > firstBrace) {
+              rawJson = rawJson.substring(firstBrace, lastBrace + 1);
+            }
+            final decoded = Map<String, dynamic>.from(
+              jsonDecode(rawJson) as Map,
+            );
             final report = AiTelemetricsReport.fromJson(decoded);
             aiScore = report.overallAiScore;
             critique = report.directorCritique;
@@ -854,7 +897,33 @@ Return strict JSON:
     final client = supabaseOrNull;
     if (client == null || !_isOnline) return 0;
 
-    final authUserId = client.auth.currentUser?.id;
+    final hasUnsynced = _matchHistoryLog.any((e) => !e.syncedToSupabase);
+    if (!hasUnsynced) return 0;
+
+    var authUser = client.auth.currentUser;
+    if (authUser == null) {
+      try {
+        final anonRes = await client.auth.signInAnonymously();
+        authUser = anonRes.user;
+      } catch (_) {}
+    }
+
+    final authUserId = authUser?.id;
+    if (authUserId != null) {
+      try {
+        await client.from('profiles').upsert(
+          {
+            'id': authUserId,
+            'username':
+                'actor_${authUserId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch % 10000}',
+            'display_name': 'Stage Actor',
+          },
+          onConflict: 'id',
+          ignoreDuplicates: true,
+        );
+      } catch (_) {}
+    }
+
     int syncedCount = 0;
 
     for (int i = 0; i < _matchHistoryLog.length; i++) {
@@ -992,11 +1061,19 @@ class _OfflineLocalPartyScreenState extends State<OfflineLocalPartyScreen> {
         hw_cam.ResolutionPreset.high,
         enableAudio: true,
       );
-      _cameraController = controller;
       await controller.initialize();
-      if (mounted) setState(() {});
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      _cameraController = controller;
+      setState(() {});
     } catch (e) {
-      _statusBanner = 'Native camera notice: $e';
+      if (mounted) {
+        setState(() {
+          _statusBanner = 'Native camera notice: $e';
+        });
+      }
     }
   }
 

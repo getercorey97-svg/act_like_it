@@ -49,12 +49,16 @@ class AiTelemetricsReport {
 
 class TriModalJudgingEngine extends ChangeNotifier {
   static const String storageBucket = 'performance-loops';
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
 
   AiTelemetricsReport? _aiReport;
   VideoPlayerController? _loopController;
   String? _supabaseLoopUrl;
   bool _isEvaluatingAi = false;
   bool _isUploadingLoop = false;
+  bool _isDisposed = false;
   String? _errorMessage;
 
   final List<double> _peerVotes = [88.0];
@@ -62,16 +66,45 @@ class TriModalJudgingEngine extends ChangeNotifier {
   int _externalReactions = 0;
   int _loopCompletions = 1;
   bool _hasSavedMatchHistory = false;
+  bool _hasSyncedRoundToSupabase = false;
   bool _lastRoundWasWin = false;
+  String? _roundHistoryId;
 
   AiTelemetricsReport? get aiReport => _aiReport;
   bool get hasSavedMatchHistory => _hasSavedMatchHistory;
   bool get lastRoundWasWin => _lastRoundWasWin;
+  String? get roundHistoryId => _roundHistoryId;
   VideoPlayerController? get loopController => _loopController;
   String? get supabaseLoopUrl => _supabaseLoopUrl;
   bool get isEvaluatingAi => _isEvaluatingAi;
   bool get isUploadingLoop => _isUploadingLoop;
   String? get errorMessage => _errorMessage;
+
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  static Map<String, dynamic> _extractJsonObject(String raw) {
+    var cleaned = raw.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned
+          .replaceFirst(RegExp(r'^```(?:json)?\s*', caseSensitive: false), '')
+          .replaceFirst(RegExp(r'\s*```$'), '')
+          .trim();
+    }
+    final firstBrace = cleaned.indexOf('{');
+    final lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    final decoded = jsonDecode(cleaned);
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+    throw const FormatException('Gemini response was not a JSON object.');
+  }
 
   double get aiScore => _aiReport?.overallAiScore ?? 0.0;
 
@@ -98,9 +131,18 @@ class TriModalJudgingEngine extends ChangeNotifier {
     required ScenePrompt scene,
     required List<TelemetricsFrameSample> samples,
   }) async {
+    if (_isDisposed) {
+      return const AiTelemetricsReport(
+        overallAiScore: 88.0,
+        facialExpressionScore: 88.0,
+        vocalCadenceScore: 88.0,
+        directorCueFidelity: 88.0,
+        directorCritique: 'Evaluation skipped after stage disposal.',
+      );
+    }
     _isEvaluatingAi = true;
     _errorMessage = null;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final avgDecibels = samples.isEmpty
@@ -108,8 +150,10 @@ class TriModalJudgingEngine extends ChangeNotifier {
           : samples.fold<double>(0.0, (a, b) => a + b.audioDecibels) /
               samples.length;
 
-      if (AppConfig.geminiApiKey.isEmpty) {
-        throw Exception('No runtime GEMINI_API_KEY configured.');
+      if (AppConfig.geminiApiKey.isEmpty || !OfflineManager.instance.isOnline) {
+        throw Exception(
+          'Runtime GEMINI_API_KEY unavailable or device is currently offline.',
+        );
       }
 
       final model = GenerativeModel(
@@ -150,9 +194,11 @@ Return strict JSON with keys:
         }
       }
 
-      final response = await model.generateContent([Content.multi(parts)]);
+      final response = await model
+          .generateContent([Content.multi(parts)])
+          .timeout(const Duration(seconds: 15));
       final rawText = response.text ?? '{}';
-      final decoded = jsonDecode(rawText) as Map<String, dynamic>;
+      final decoded = _extractJsonObject(rawText);
       _aiReport = AiTelemetricsReport.fromJson(decoded);
       return _aiReport!;
     } catch (_) {
@@ -168,7 +214,7 @@ Return strict JSON with keys:
       return _aiReport!;
     } finally {
       _isEvaluatingAi = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -181,25 +227,47 @@ Return strict JSON with keys:
     String? localFilePath,
     Uint8List? recordedMp4Bytes,
   }) async {
+    if (_isDisposed) return;
     _isUploadingLoop = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       // 1. If a local camera recording exists on the S26 Ultra, play it immediately in a loop
-      if (localFilePath != null && File(localFilePath).existsSync()) {
-        await _loopController?.dispose();
+      if (localFilePath != null &&
+          localFilePath.isNotEmpty &&
+          File(localFilePath).existsSync()) {
+        final previousCtrl = _loopController;
+        _loopController = null;
+        _safeNotifyListeners();
+        try {
+          await previousCtrl?.dispose();
+        } catch (_) {}
+
         final fileCtrl = VideoPlayerController.file(File(localFilePath));
-        _loopController = fileCtrl;
-        await fileCtrl.initialize();
-        await fileCtrl.setLooping(true);
-        await fileCtrl.play();
+        try {
+          await fileCtrl.initialize();
+          if (_isDisposed) {
+            await fileCtrl.dispose();
+            return;
+          }
+          await fileCtrl.setLooping(true);
+          await fileCtrl.play();
+          _loopController = fileCtrl;
+          _safeNotifyListeners();
+        } catch (_) {
+          try {
+            await fileCtrl.dispose();
+          } catch (_) {}
+        }
       }
 
       // 2. If Supabase Cloud is configured, upload the MP4 binary to `performance-loops`
       final client = supabaseOrNull;
       if (client != null &&
+          OfflineManager.instance.isOnline &&
           recordedMp4Bytes != null &&
-          recordedMp4Bytes.isNotEmpty) {
+          recordedMp4Bytes.isNotEmpty &&
+          !_isDisposed) {
         final storagePath = '$roomCode/${userId}_round_$roundNumber.mp4';
         await client.storage.from(storageBucket).uploadBinary(
               storagePath,
@@ -212,12 +280,35 @@ Return strict JSON with keys:
             );
         _supabaseLoopUrl =
             client.storage.from(storageBucket).getPublicUrl(storagePath);
+
+        // If local file playback wasn't available (e.g. remote spectator), loop the public URL
+        if (_loopController == null &&
+            _supabaseLoopUrl != null &&
+            !_isDisposed) {
+          final netCtrl = VideoPlayerController.networkUrl(
+            Uri.parse(_supabaseLoopUrl!),
+          );
+          try {
+            await netCtrl.initialize();
+            if (_isDisposed) {
+              await netCtrl.dispose();
+              return;
+            }
+            await netCtrl.setLooping(true);
+            await netCtrl.play();
+            _loopController = netCtrl;
+          } catch (_) {
+            try {
+              await netCtrl.dispose();
+            } catch (_) {}
+          }
+        }
       }
     } catch (_) {
       // Continue with local looped playback
     } finally {
       _isUploadingLoop = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -226,11 +317,15 @@ Return strict JSON with keys:
     required String performerUserId,
     required double voteScore,
   }) async {
+    if (_isDisposed) return;
     _peerVotes.add(voteScore.clamp(0.0, 100.0));
-    notifyListeners();
+    _safeNotifyListeners();
 
     final client = supabaseOrNull;
-    if (client != null) {
+    if (client != null &&
+        OfflineManager.instance.isOnline &&
+        _uuidRegex.hasMatch(lobbyId) &&
+        _uuidRegex.hasMatch(performerUserId)) {
       try {
         await client
             .from('lobby_players')
@@ -249,6 +344,7 @@ Return strict JSON with keys:
     required ScenePrompt scene,
     required String actorDisplayName,
   }) async {
+    if (_isDisposed) return;
     final shareUrl = _supabaseLoopUrl ?? 'https://github.com/act_like_it';
     try {
       await Share.share(
@@ -259,12 +355,14 @@ Return strict JSON with keys:
     _externalShares += 1;
     _externalReactions += 4;
     _loopCompletions += 6;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   /// Auto-saves the completed round's Tri-Modal scores (`ai_score`, `peer_score`,
   /// `social_score`, `final_score`) and `is_win` status into the Supabase
   /// `public.match_history` table (and queues via `OfflineManager` if offline).
+  /// Uses a deterministic per-round ID so re-saving after Peer/Social updates
+  /// never creates duplicate rows.
   Future<MatchHistoryRecord> saveRoundResultToMatchHistory({
     required String playerId,
     required ScenePrompt scene,
@@ -274,28 +372,58 @@ Return strict JSON with keys:
     final finalComposite = compositeTriModalScore;
     final isWin = finalComposite >= winThreshold;
     _lastRoundWasWin = isWin;
+    _roundHistoryId ??=
+        'mh_${scene.id}_${DateTime.now().millisecondsSinceEpoch}';
 
-    bool insertedIntoSupabase = false;
+    bool insertedIntoSupabase = _hasSyncedRoundToSupabase;
     final client = supabaseOrNull;
 
-    if (!isOfflineLocalParty && client != null) {
+    if (!isOfflineLocalParty &&
+        !insertedIntoSupabase &&
+        client != null &&
+        OfflineManager.instance.isOnline) {
       try {
-        final resolvedPlayerId = client.auth.currentUser?.id ?? playerId;
-        final validSceneUuid = RegExp(
-          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-        ).hasMatch(scene.id);
+        var authUser = client.auth.currentUser;
+        if (authUser == null) {
+          try {
+            final anonRes = await client.auth.signInAnonymously();
+            authUser = anonRes.user;
+          } catch (_) {}
+        }
 
-        await client.from('match_history').insert({
-          'player_id': resolvedPlayerId,
-          if (validSceneUuid) 'scene_id': scene.id,
-          'ai_score': double.parse(aiScore.toStringAsFixed(2)),
-          'peer_score': double.parse(peerScore.toStringAsFixed(2)),
-          'social_score': double.parse(socialScore.toStringAsFixed(2)),
-          'final_score': double.parse(finalComposite.toStringAsFixed(2)),
-          'is_win': isWin,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        });
-        insertedIntoSupabase = true;
+        final resolvedPlayerId = authUser?.id ?? playerId;
+        if (_uuidRegex.hasMatch(resolvedPlayerId)) {
+          // Ensure public.profiles row exists to satisfy match_history_player_id_fkey
+          if (authUser != null) {
+            try {
+              await client.from('profiles').upsert(
+                {
+                  'id': authUser.id,
+                  'username':
+                      'actor_${authUser.id.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch % 10000}',
+                  'display_name': 'Stage Actor',
+                },
+                onConflict: 'id',
+                ignoreDuplicates: true,
+              );
+            } catch (_) {}
+          }
+
+          final validSceneUuid = _uuidRegex.hasMatch(scene.id);
+
+          await client.from('match_history').insert({
+            'player_id': resolvedPlayerId,
+            if (validSceneUuid) 'scene_id': scene.id,
+            'ai_score': double.parse(aiScore.toStringAsFixed(2)),
+            'peer_score': double.parse(peerScore.toStringAsFixed(2)),
+            'social_score': double.parse(socialScore.toStringAsFixed(2)),
+            'final_score': double.parse(finalComposite.toStringAsFixed(2)),
+            'is_win': isWin,
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          });
+          insertedIntoSupabase = true;
+          _hasSyncedRoundToSupabase = true;
+        }
       } catch (_) {
         // Fallback to OfflineManager Store & Forward queue if network or RLS rejects
         insertedIntoSupabase = false;
@@ -303,7 +431,7 @@ Return strict JSON with keys:
     }
 
     final record = await OfflineManager.instance.queueOfflineMatchHistoryRecord(
-      id: 'mh_${scene.id}_${DateTime.now().millisecondsSinceEpoch}',
+      id: _roundHistoryId,
       playerId: playerId,
       scene: scene,
       aiScore: aiScore,
@@ -314,14 +442,21 @@ Return strict JSON with keys:
       alreadySyncedToSupabase: insertedIntoSupabase,
     );
 
+    if (record.syncedToSupabase) {
+      _hasSyncedRoundToSupabase = true;
+    }
+
     _hasSavedMatchHistory = true;
-    notifyListeners();
+    _safeNotifyListeners();
     return record;
   }
 
   @override
   void dispose() {
-    _loopController?.dispose();
+    _isDisposed = true;
+    final ctrl = _loopController;
+    _loopController = null;
+    ctrl?.dispose();
     super.dispose();
   }
 }
@@ -373,6 +508,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
       samples: widget.capturedSamples,
     )
         .then((_) {
+      if (!mounted) return;
       // Auto-save initial round result into `match_history` when evaluation completes
       _engine.saveRoundResultToMatchHistory(
         playerId: widget.performerUserId,

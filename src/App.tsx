@@ -65,7 +65,7 @@ const LATE_NIGHT_PROMPTS = [
 
 export default function App() {
   const [selectedFilePath, setSelectedFilePath] = useState<string>(
-    'supabase/migrations/20261017000001_match_history.sql'
+    'lib/judging_engine.dart'
   );
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'files' | 'late-night' | 'sync-guide'>('files');
@@ -179,10 +179,10 @@ export default function App() {
                 <span>All 5 Batches Complete</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Match History, Win Tracking &amp; Career Trophy Room Ready
+                QA Logic Audit All 4 Phases Complete: judging_engine.dart
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Added <code className="font-mono text-amber-400">supabase/migrations/20261017000001_match_history.sql</code> with strict RLS, injected round auto-save into <code className="font-mono text-amber-400">lib/judging_engine.dart</code>, added offline Pass-and-Play match history queuing &amp; <code className="font-mono text-amber-400">connectivity_plus</code> auto-sync in <code className="font-mono text-amber-400">lib/offline_manager.dart</code>, and injected the expandable <code className="font-mono text-amber-400">Career Trophy Room</code> drawer on <code className="font-mono text-amber-400">lib/dashboard_marquee.dart</code>.
+                Completed Phase 4 (final phase) of the sequential logic audit in <code className="font-mono text-amber-400">lib/judging_engine.dart</code> and <code className="font-mono text-amber-400">lib/offline_manager.dart</code>: added <code className="font-mono text-amber-400">_extractJsonObject()</code> markdown fence sanitization &amp; 15s timeout for Gemini 2.5 Flash telemetrics, detached <code className="font-mono text-amber-400">VideoPlayerController</code> prior to disposal, enforced anonymous auth + <code className="font-mono text-amber-400">public.profiles</code> upsert before <code className="font-mono text-amber-400">public.match_history</code> inserts, and deduplicated per-round history records via <code className="font-mono text-amber-400">_roundHistoryId</code>.
               </p>
             </div>
 

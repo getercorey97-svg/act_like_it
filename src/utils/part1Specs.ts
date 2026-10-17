@@ -414,11 +414,18 @@ dependencies:
     language: 'dart',
     part: 1,
     description:
-      'Foundational entry point initializing Supabase (10 EPS Realtime) and routing SoundstageShellScreen to LobbyMatchmakingScreen and LateNightAfterHoursScreen.',
-    lineCount: 302,
-    content: `import 'package:flutter/material.dart';
+      'Safe Boot entry point wrapping main() in runZonedGuarded, FlutterError.onError, PlatformDispatcher.instance.onError, custom release ErrorWidget.builder, timeout-guarded AppConfig/Supabase initialization, and SafeBootErrorBoundary.',
+    lineCount: 954,
+    content: `import 'dart:async';
+import 'dart:ui';
+import 'package:flutter/material.dart';
 import 'lobby.dart';
-import 'late_night_vault.dart';`,
+import 'late_night_vault.dart';
+import 'dashboard_marquee.dart';
+
+// SafeBootDiagnostics + runZonedGuarded + FlutterError.onError + PlatformDispatcher.instance.onError
+// Custom ErrorWidget.builder replaces release-mode blank white screen with visual stack-trace card
+// SafeBootErrorBoundary + SafeBootEmergencyApp`,
   },
 ];
 

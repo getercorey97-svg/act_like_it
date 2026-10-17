@@ -1,10 +1,67 @@
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lobby.dart';
 import 'late_night_vault.dart';
 import 'dashboard_marquee.dart';
+import 'offline_manager.dart';
+
+/// Captures startup, plugin, and widget build exceptions in Release APKs so the
+/// app never fails silently with a blank white screen on Android devices.
+class SafeBootDiagnostics {
+  static Object? bootException;
+  static StackTrace? bootStackTrace;
+  static final List<String> bootLogs = <String>[];
+  static final ValueNotifier<FlutterErrorDetails?> latestWidgetError =
+      ValueNotifier<FlutterErrorDetails?>(null);
+
+  static void log(String message) {
+    final timestamp = DateTime.now().toIso8601String();
+    bootLogs.add('[$timestamp] $message');
+  }
+
+  static void recordException(
+    Object error,
+    StackTrace? stack, {
+    String phase = 'BOOT',
+  }) {
+    bootException ??= error;
+    bootStackTrace ??= stack;
+    log('[$phase ERROR] $error');
+    final details = FlutterErrorDetails(
+      exception: error,
+      stack: stack,
+      library: 'act_like_it/$phase',
+      context: ErrorDescription('Captured during $phase'),
+    );
+
+    // Prevent "setState() or markNeedsBuild() called during build" when
+    // FlutterError.onError fires synchronously inside a widget build/layout pass.
+    try {
+      final schedulerPhase = SchedulerBinding.instance.schedulerPhase;
+      if (schedulerPhase == SchedulerPhase.persistentCallbacks ||
+          schedulerPhase == SchedulerPhase.midFrameMicrotasks) {
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          latestWidgetError.value = details;
+        });
+      } else {
+        latestWidgetError.value = details;
+      }
+    } catch (_) {
+      latestWidgetError.value = details;
+    }
+  }
+
+  static void clearErrors() {
+    bootException = null;
+    bootStackTrace = null;
+    latestWidgetError.value = null;
+  }
+}
 
 /// Application Configuration Constants & Runtime Overrides.
 /// Supports both CI `--dart-define` secrets AND in-app configuration on the
@@ -33,18 +90,31 @@ class AppConfig {
   static String _runtimeGeminiApiKey = '';
   static bool _supabaseInitialized = false;
 
-  static String get supabaseUrl =>
-      _runtimeSupabaseUrl.isNotEmpty ? _runtimeSupabaseUrl : _envSupabaseUrl;
+  static String _sanitizeDefine(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.length >= 2 &&
+        ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+            (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
+      return trimmed.substring(1, trimmed.length - 1).trim();
+    }
+    return trimmed;
+  }
+
+  static String get supabaseUrl => _runtimeSupabaseUrl.isNotEmpty
+      ? _runtimeSupabaseUrl
+      : _sanitizeDefine(_envSupabaseUrl);
 
   static String get supabaseAnonKey => _runtimeSupabaseAnonKey.isNotEmpty
       ? _runtimeSupabaseAnonKey
-      : _envSupabaseAnonKey;
+      : _sanitizeDefine(_envSupabaseAnonKey);
 
-  static String get liveKitUrl =>
-      _runtimeLiveKitUrl.isNotEmpty ? _runtimeLiveKitUrl : _envLiveKitUrl;
+  static String get liveKitUrl => _runtimeLiveKitUrl.isNotEmpty
+      ? _runtimeLiveKitUrl
+      : _sanitizeDefine(_envLiveKitUrl);
 
-  static String get geminiApiKey =>
-      _runtimeGeminiApiKey.isNotEmpty ? _runtimeGeminiApiKey : _envGeminiApiKey;
+  static String get geminiApiKey => _runtimeGeminiApiKey.isNotEmpty
+      ? _runtimeGeminiApiKey
+      : _sanitizeDefine(_envGeminiApiKey);
 
   static bool get hasCloudSupabase =>
       supabaseUrl.startsWith('https://') &&
@@ -57,25 +127,72 @@ class AppConfig {
       !liveKitUrl.contains('act-like-it-sfu.livekit.cloud');
 
   static Future<void> loadSavedConfig() async {
-    final prefs = await SharedPreferences.getInstance();
-    _runtimeSupabaseUrl = prefs.getString('cfg_supabase_url') ?? '';
-    _runtimeSupabaseAnonKey = prefs.getString('cfg_supabase_anon_key') ?? '';
-    _runtimeLiveKitUrl = prefs.getString('cfg_livekit_url') ?? '';
-    _runtimeGeminiApiKey = prefs.getString('cfg_gemini_api_key') ?? '';
+    SafeBootDiagnostics.log('Loading SharedPreferences runtime config...');
+    try {
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(seconds: 4),
+      );
+      _runtimeSupabaseUrl = (prefs.getString('cfg_supabase_url') ?? '').trim();
+      _runtimeSupabaseAnonKey =
+          (prefs.getString('cfg_supabase_anon_key') ?? '').trim();
+      _runtimeLiveKitUrl = (prefs.getString('cfg_livekit_url') ?? '').trim();
+      _runtimeGeminiApiKey =
+          (prefs.getString('cfg_gemini_api_key') ?? '').trim();
+      SafeBootDiagnostics.log('SharedPreferences loaded successfully.');
+    } catch (e, st) {
+      SafeBootDiagnostics.log('SharedPreferences warning (non-fatal): $e');
+      SafeBootDiagnostics.recordException(
+        e,
+        st,
+        phase: 'SHARED_PREFS_INIT',
+      );
+    }
 
-    if (supabaseUrl.startsWith('https://') && supabaseAnonKey.isNotEmpty) {
+    final parsedSupabaseUri = Uri.tryParse(supabaseUrl);
+    final hasValidSupabaseUri = parsedSupabaseUri != null &&
+        parsedSupabaseUri.scheme == 'https' &&
+        parsedSupabaseUri.host.isNotEmpty &&
+        !parsedSupabaseUri.host.contains('your-project-id');
+
+    if (!_supabaseInitialized &&
+        hasValidSupabaseUri &&
+        supabaseAnonKey.isNotEmpty) {
       try {
+        SafeBootDiagnostics.log('Initializing Supabase client...');
         await Supabase.initialize(
           url: supabaseUrl,
           anonKey: supabaseAnonKey,
           realtimeClientOptions: const RealtimeClientOptions(
             eventsPerSecond: 10,
           ),
-        );
+        ).timeout(const Duration(seconds: 5));
         _supabaseInitialized = true;
-      } catch (_) {
+        SafeBootDiagnostics.log('Supabase initialized successfully.');
+      } catch (e, st) {
         _supabaseInitialized = false;
+        SafeBootDiagnostics.log('Supabase init warning (falling back): $e');
+        SafeBootDiagnostics.recordException(
+          e,
+          st,
+          phase: 'SUPABASE_INIT',
+        );
       }
+    } else {
+      SafeBootDiagnostics.log(
+        'No valid SUPABASE_URL configured; booting in standalone/offline-ready mode.',
+      );
+    }
+
+    // Warm up OfflineManager local scene cache & connectivity listener with timeout guard
+    try {
+      await OfflineManager.instance
+          .ensureInitialized()
+          .timeout(const Duration(seconds: 4));
+      SafeBootDiagnostics.log(
+        'OfflineManager initialized (${OfflineManager.instance.cachedSceneCount} cached scenes).',
+      );
+    } catch (e) {
+      SafeBootDiagnostics.log('OfflineManager warm-up notice: $e');
     }
   }
 
@@ -108,27 +225,490 @@ class AppConfig {
           ),
         );
         _supabaseInitialized = true;
-      } catch (_) {}
+      } catch (e, st) {
+        SafeBootDiagnostics.recordException(
+          e,
+          st,
+          phase: 'SUPABASE_RUNTIME_SAVE',
+        );
+      }
     }
   }
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  await runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      SafeBootDiagnostics.log('WidgetsFlutterBinding initialized.');
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+      // 1. Catch all Flutter framework build/layout/paint errors
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        SafeBootDiagnostics.recordException(
+          details.exception,
+          details.stack,
+          phase: 'FLUTTER_FRAMEWORK',
+        );
+      };
 
-  await AppConfig.loadSavedConfig();
+      // 2. Catch uncaught asynchronous platform/isolate errors
+      PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+        SafeBootDiagnostics.recordException(
+          error,
+          stack,
+          phase: 'PLATFORM_DISPATCHER',
+        );
+        return true; // Prevent native Android crash / white screen
+      };
 
-  runApp(const ActLikeItApp());
+      // 3. Replace Release Mode's blank white/grey ErrorWidget with a visual Safe Boot UI
+      ErrorWidget.builder = (FlutterErrorDetails details) {
+        return Material(
+          color: const Color(0xFF0A0D14),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1016),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFE11D48),
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Color(0xFFE11D48),
+                          size: 22,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'SAFE BOOT · WIDGET RENDER EXCEPTION',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFE11D48),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SelectableText(
+                      details.exceptionAsString(),
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (details.stack != null) ...[
+                      const SizedBox(height: 8),
+                      SelectableText(
+                        details.stack.toString(),
+                        maxLines: 12,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      };
+
+      // 4. Safely configure portrait orientation without blocking boot on failure
+      try {
+        await SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]).timeout(const Duration(seconds: 2));
+      } catch (e, st) {
+        SafeBootDiagnostics.recordException(
+          e,
+          st,
+          phase: 'SYSTEM_CHROME_ORIENTATION',
+        );
+      }
+
+      // 5. Safely load saved config & Supabase with timeouts
+      try {
+        await AppConfig.loadSavedConfig();
+      } catch (e, st) {
+        SafeBootDiagnostics.recordException(
+          e,
+          st,
+          phase: 'APP_CONFIG_LOAD',
+        );
+      }
+
+      // 6. Mount the root application wrapped in the SafeBootErrorBoundary
+      runApp(const SafeBootErrorBoundary(child: ActLikeItApp()));
+    },
+    (Object error, StackTrace stackTrace) {
+      SafeBootDiagnostics.recordException(
+        error,
+        stackTrace,
+        phase: 'RUN_ZONED_GUARDED',
+      );
+      runApp(
+        SafeBootEmergencyApp(
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      );
+    },
+  );
 }
 
 /// Safe accessor for Supabase client when cloud mode is configured.
-SupabaseClient? get supabaseOrNull =>
-    AppConfig.hasCloudSupabase ? Supabase.instance.client : null;
+SupabaseClient? get supabaseOrNull {
+  if (!AppConfig.hasCloudSupabase) return null;
+  try {
+    return Supabase.instance.client;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Top-level visual Safe Boot wrapper that surfaces any initialization or
+/// runtime exceptions in an interactive diagnostic banner/modal rather than
+/// allowing a blank white screen.
+class SafeBootErrorBoundary extends StatefulWidget {
+  final Widget child;
+
+  const SafeBootErrorBoundary({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  State<SafeBootErrorBoundary> createState() => _SafeBootErrorBoundaryState();
+}
+
+class _SafeBootErrorBoundaryState extends State<SafeBootErrorBoundary> {
+  bool _dismissedDiagnosticBanner = false;
+  bool _useSafeModeFallbackShell = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_useSafeModeFallbackShell) {
+      return MaterialApp(
+        title: 'Act Like It (Safe Mode)',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark(useMaterial3: true),
+        home: const SoundstageShellScreen(),
+      );
+    }
+
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          widget.child,
+          ValueListenableBuilder<FlutterErrorDetails?>(
+            valueListenable: SafeBootDiagnostics.latestWidgetError,
+            builder: (context, errorDetails, _) {
+              final hasError =
+                  errorDetails != null || SafeBootDiagnostics.bootException != null;
+              if (!hasError || _dismissedDiagnosticBanner) {
+                return const SizedBox.shrink();
+              }
+
+              final errorText = errorDetails?.exceptionAsString() ??
+                  SafeBootDiagnostics.bootException.toString();
+              final stackText = (errorDetails?.stack ??
+                      SafeBootDiagnostics.bootStackTrace)
+                  ?.toString() ??
+                  'No stack trace available.';
+
+              return SafeArea(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Material(
+                      color: const Color(0xF5140C14),
+                      elevation: 16,
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        constraints: const BoxConstraints(maxHeight: 360),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFFE11D48),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.bug_report_rounded,
+                                  color: Color(0xFFE11D48),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'SAFE BOOT DIAGNOSTIC INTERCEPTOR',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFFF59E0B),
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _dismissedDiagnosticBanner = true;
+                                    });
+                                  },
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      color: Colors.white70,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Flexible(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SelectableText(
+                                      errorText,
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    SelectableText(
+                                      stackText,
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      Clipboard.setData(
+                                        ClipboardData(
+                                          text: '$errorText\n\n$stackText',
+                                        ),
+                                      );
+                                    },
+                                    child: const Text(
+                                      'COPY ERROR',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      SafeBootDiagnostics.clearErrors();
+                                      setState(() {
+                                        _useSafeModeFallbackShell = true;
+                                      });
+                                    },
+                                    child: const Text(
+                                      'BOOT SAFE SHELL',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Emergency standalone application mounted if an unhandled fatal exception
+/// occurs inside `runZonedGuarded` before `ActLikeItApp` can mount.
+class SafeBootEmergencyApp extends StatelessWidget {
+  final Object error;
+  final StackTrace stackTrace;
+
+  const SafeBootEmergencyApp({
+    super.key,
+    required this.error,
+    required this.stackTrace,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Act Like It · Safe Boot Recovery',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark(useMaterial3: true),
+      home: Builder(
+        builder: (ctx) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF0A0D14),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF140C14),
+              title: const Text(
+                'SAFE BOOT · INITIALIZATION ERROR',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFFE11D48),
+                ),
+              ),
+            ),
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1016),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE11D48)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'EXCEPTION MESSAGE:',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SelectableText(
+                            error.toString(),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF121722),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF1E293B)),
+                        ),
+                        child: SingleChildScrollView(
+                          child: SelectableText(
+                            'BOOT LOGS:\n${SafeBootDiagnostics.bootLogs.join('\n')}\n\nSTACK TRACE:\n$stackTrace',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: const Color(0xFF05060A),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () {
+                        SafeBootDiagnostics.clearErrors();
+                        Navigator.of(ctx).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => const LivingMarqueeDashboardScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text(
+                        'CONTINUE TO LIVING MARQUEE DASHBOARD',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class ActLikeItApp extends StatelessWidget {
   const ActLikeItApp({super.key});

@@ -134,6 +134,26 @@ test('Supabase migration and seed files exist on disk and pass schema & category
   assert.ok(offlineDart.includes('syncPendingMatchHistoryToSupabase'));
   assert.ok(dashboardDart.includes('CAREER TROPHY ROOM'));
   assert.ok(dashboardDart.includes('_openCareerTrophyRoomDrawer'));
+
+  // Verify Safe Boot Visual Error Handler in lib/main.dart & Phase 1/2/3/4 Logic Audit
+  assert.ok(mainDart.includes('class SafeBootDiagnostics'));
+  assert.ok(mainDart.includes('runZonedGuarded'));
+  assert.ok(mainDart.includes('ErrorWidget.builder'));
+  assert.ok(mainDart.includes('PlatformDispatcher.instance.onError'));
+  assert.ok(mainDart.includes('class SafeBootErrorBoundary'));
+  assert.ok(mainDart.includes('SchedulerBinding.instance.schedulerPhase'));
+  assert.ok(offlineDart.includes('Future<void>? _initFuture;'));
+  assert.ok(lobbyDart.includes('_ensureAuthenticatedAndProfile'));
+  assert.ok(lobbyDart.includes('onPresenceSync'));
+  assert.ok(lobbyDart.includes("event: 'lobby_state_sync'"));
+  assert.ok(lobbyDart.includes('_handleLobbyPostgresChange'));
+  assert.ok(webrtcDart.includes('_bindRoomListeners'));
+  assert.ok(webrtcDart.includes('resumeStageAfterJudging'));
+  assert.ok(webrtcDart.includes('cam.resumePreview()'));
+  assert.ok(webrtcDart.includes('cam.pausePreview()'));
+  assert.ok(judgingDart.includes('_extractJsonObject'));
+  assert.ok(judgingDart.includes('_hasSyncedRoundToSupabase'));
+  assert.ok(judgingDart.includes('_roundHistoryId'));
 });
 
 test('WORKSPACE_FILES entries pass structural validation', () => {
