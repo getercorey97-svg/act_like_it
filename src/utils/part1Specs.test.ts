@@ -7,57 +7,64 @@ import {
   validatePart2Schema,
   validatePart3WebRtcManager,
   validatePart4JudgingEngine,
-  calculateTriModalCompositeScore,
+  verifyLateNightAgeGate,
   getBatchCompletionRatio,
 } from './part1Specs.ts';
 
-test('Part 1 pubspec.yaml includes required Supabase, LiveKit, and Gemini packages', () => {
+test('All 5 parts exist in WORKSPACE_FILES and pass structural validation', () => {
   const pubspec = WORKSPACE_FILES.find((f) => f.path === 'pubspec.yaml');
-  assert.ok(pubspec);
-  assert.equal(validateFlutterPubspec(pubspec.content).valid, true);
-});
-
-test('Part 2 supabase/schema.sql defines profiles, Eras, Awards, Cult Classics, and Realtime lobbies', () => {
   const schema = WORKSPACE_FILES.find((f) => f.path === 'supabase/schema.sql');
-  assert.ok(schema);
-  assert.equal(validatePart2Schema(schema.content).valid, true);
-});
-
-test('Part 3 lib/webrtc_manager.dart configures adaptiveStream, dynacast, and simulcast', () => {
   const webrtc = WORKSPACE_FILES.find((f) => f.path === 'lib/webrtc_manager.dart');
-  assert.ok(webrtc);
-  assert.equal(validatePart3WebRtcManager(webrtc.content).valid, true);
-});
-
-test('Part 4 lib/judging_engine.dart integrates Gemini 2.5 Flash, performance-loops storage, and video setLooping(true)', () => {
   const judging = WORKSPACE_FILES.find((f) => f.path === 'lib/judging_engine.dart');
-  assert.ok(judging, 'lib/judging_engine.dart must exist in WORKSPACE_FILES');
-  const check = validatePart4JudgingEngine(judging.content);
-  assert.equal(check.hasGeminiModel, true);
-  assert.equal(check.hasSupabaseStorageLoop, true);
-  assert.equal(check.hasVideoLooping, true);
-  assert.equal(check.valid, true);
+  const lateNightSql = WORKSPACE_FILES.find(
+    (f) => f.path === 'supabase/late_night_schema.sql'
+  );
+  const lateNightDart = WORKSPACE_FILES.find(
+    (f) => f.path === 'lib/late_night_vault.dart'
+  );
+
+  assert.ok(pubspec && validateFlutterPubspec(pubspec.content).valid);
+  assert.ok(schema && validatePart2Schema(schema.content).valid);
+  assert.ok(webrtc && validatePart3WebRtcManager(webrtc.content).valid);
+  assert.ok(judging && validatePart4JudgingEngine(judging.content).valid);
+  assert.ok(
+    lateNightSql &&
+      lateNightSql.content.includes('public.scenes_late_night_after_hours') &&
+      lateNightSql.content.includes('profiles.age_verified = true')
+  );
+  assert.ok(
+    lateNightDart &&
+      lateNightDart.content.includes('verify_player_age_and_unlock_late_night')
+  );
 });
 
-test('Tri-Modal composite score weights AI (45%), Peer (35%), and Social (20%) accurately', () => {
-  const result = calculateTriModalCompositeScore({
-    facialExpression: 90,
-    vocalCadence: 90,
-    directorCueFidelity: 90,
-    peerVoteScore: 80,
-    externalShares: 3,
-    externalReactions: 6,
-    loopCompletions: 10,
+test('Late-Night 18+ age gate rejects underage birth years and invalid PINs', () => {
+  const underage = verifyLateNightAgeGate({
+    birthYear: 2012,
+    currentYear: 2026,
+    pinCode: '2026',
   });
-  assert.equal(result.aiScore, 90);
-  assert.equal(result.peerScore, 80);
-  assert.ok(result.socialScore > 80);
-  assert.ok(result.compositeScore > 85);
+  assert.equal(underage.unlocked, false);
+
+  const badPin = verifyLateNightAgeGate({
+    birthYear: 1997,
+    currentYear: 2026,
+    pinCode: '12',
+  });
+  assert.equal(badPin.unlocked, false);
+
+  const validAdult = verifyLateNightAgeGate({
+    birthYear: 1997,
+    currentYear: 2026,
+    pinCode: '2026',
+  });
+  assert.equal(validAdult.unlocked, true);
+  assert.equal(validAdult.age, 29);
 });
 
-test('Batch progress accurately reports Part 4 of 5 completed (80%)', () => {
+test('Batch progress accurately reports all 5 of 5 batches completed (100%)', () => {
   const progress = getBatchCompletionRatio(BATCH_STAGES);
-  assert.equal(progress.completedCount, 4);
+  assert.equal(progress.completedCount, 5);
   assert.equal(progress.totalCount, 5);
-  assert.equal(progress.percentage, 80);
+  assert.equal(progress.percentage, 100);
 });

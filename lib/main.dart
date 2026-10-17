@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lobby.dart';
+import 'late_night_vault.dart';
 
 /// Application Configuration Constants
 /// Configured via --dart-define during cloud CI/CD or runtime environment injection.
@@ -411,6 +412,13 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
               setState(() {
                 _lateNightUnlocked = val;
               });
+              if (val) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const LateNightAfterHoursScreen(),
+                  ),
+                );
+              }
             },
           ),
         ],
