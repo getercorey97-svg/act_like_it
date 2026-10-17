@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'lobby.dart';
 
 /// Application Configuration Constants
 /// Configured via --dart-define during cloud CI/CD or runtime environment injection.
@@ -106,12 +107,7 @@ class ActLikeItApp extends StatelessWidget {
   }
 }
 
-/// Foundational Shell Screen for Part 1 Initialization.
-/// Subsequent batches (Part 2–Part 5) bind into this shell:
-/// - Part 2: lib/lobby.dart (6-Digit Matchmaking & Supabase Realtime)
-/// - Part 3: lib/webrtc_manager.dart (LiveKit SFU 2-8 Player Video Routing)
-/// - Part 4: lib/judging_engine.dart (Tri-Modal AI Telemetrics, Peer & Social Judging)
-/// - Part 5: Late-Night After-Hours Age-Gated Vault
+/// Foundational Shell Screen connected to Part 2 Matchmaking (lib/lobby.dart).
 class SoundstageShellScreen extends StatefulWidget {
   const SoundstageShellScreen({super.key});
 
@@ -120,7 +116,7 @@ class SoundstageShellScreen extends StatefulWidget {
 }
 
 class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
-  String _selectedCategoryGroup = 'Eras (1970–2026)';
+  String _selectedCategoryGroup = 'Eras (1970–1999)';
   bool _lateNightUnlocked = false;
 
   static const List<Map<String, String>> _coreCategories = [
@@ -217,10 +213,10 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Lobby & Supabase Realtime module attaches in Part 2 (lib/lobby.dart).',
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const LobbyMatchmakingScreen(
+                          startInJoinMode: false,
                         ),
                       ),
                     );
@@ -232,10 +228,10 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'LiveKit SFU Spectator & Stage attaches in Part 3 (lib/webrtc_manager.dart).',
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const LobbyMatchmakingScreen(
+                          startInJoinMode: true,
                         ),
                       ),
                     );

@@ -1,32 +1,109 @@
 import React, { useState } from 'react';
 import {
-  CheckCircle2,
   Copy,
   Check,
   FileCode2,
-  GitBranch,
-  Smartphone,
-  Layers,
-  Film,
-  Radio,
-  Database,
-  ShieldAlert,
+  Users,
+  RefreshCw,
+  Play,
+  UserPlus,
 } from 'lucide-react';
 import {
   BATCH_STAGES,
-  PART_1_FILES,
+  WORKSPACE_FILES,
   getBatchCompletionRatio,
+  isSixDigitLobbyCode,
 } from './utils/part1Specs';
 
+interface SimulatedPlayer {
+  id: string;
+  name: string;
+  isHost: boolean;
+  isReady: boolean;
+}
+
+const SCENE_SAMPLES: Record<
+  string,
+  { title: string; film: string; year: number; character: string; line: string; cue: string }
+> = {
+  'Eras: 1970–1999': {
+    title: 'Tears in Rain',
+    film: 'Blade Runner',
+    year: 1982,
+    character: 'Roy Batty',
+    line: "I have seen things you people wouldn't believe. Attack ships on fire off the shoulder of Orion. All those moments will be lost in time, like tears in rain.",
+    cue: 'Maintain steady eye contact with the lens and release a quiet breath on the final phrase.',
+  },
+  'Eras: 2000–2026': {
+    title: 'Not Quite My Tempo',
+    film: 'Whiplash',
+    year: 2014,
+    character: 'Terence Fletcher',
+    line: 'Were you rushing or were you dragging? If you deliberately sabotage my band, I will gut you like a pig.',
+    cue: 'Whisper the opening question with razor-sharp stillness, then snap into sudden percussive intensity.',
+  },
+  'Awards: Best Actor': {
+    title: 'I Drink Your Milkshake',
+    film: 'There Will Be Blood',
+    year: 2007,
+    character: 'Daniel Plainview',
+    line: 'If you have a milkshake, and I have a milkshake, and I have a straw... my straw reaches across the room. I drink your milkshake!',
+    cue: 'Lean forward into the frame and build rhythmic cadence.',
+  },
+  'Awards: Best Actress': {
+    title: 'Dinner Table Monologue',
+    film: 'Hereditary',
+    year: 2018,
+    character: 'Annie Graham',
+    line: 'All I do is worry and slave and defend you, and all I get back is that face on your face!',
+    cue: 'Hold trembling composure for two beats before letting raw grief overtake the line.',
+  },
+  'Awards: Best Villain': {
+    title: 'Call It, Friendo',
+    film: 'No Country for Old Men',
+    year: 2007,
+    character: 'Anton Chigurh',
+    line: "What's the most you ever lost on a coin toss? Don't put it in your pocket. It's your lucky quarter.",
+    cue: 'Zero blinking, flat deadpan cadence, chin tilted slightly down.',
+  },
+  'Awards: Emmy Vault': {
+    title: 'I Am the One Who Knocks',
+    film: 'Breaking Bad',
+    year: 2011,
+    character: 'Walter White',
+    line: "You clearly don't know who you're talking to, so let me clue you in. I am not in danger, Skyler. I am the danger.",
+    cue: 'Drop vocal pitch half an octave on the final five words.',
+  },
+  'Specialty: Cult Classics': {
+    title: 'Coffee Is for Closers',
+    film: 'Glengarry Glen Ross',
+    year: 1992,
+    character: 'Blake',
+    line: "Coffee's for closers only. You think I'm messing with you? Always be closing.",
+    cue: 'Snap fingers once and deliver with rapid-fire boardroom swagger.',
+  },
+};
+
 export default function App() {
-  const [selectedFilePath, setSelectedFilePath] = useState<string>('pubspec.yaml');
+  const [selectedFilePath, setSelectedFilePath] = useState<string>('supabase/schema.sql');
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'files' | 'sync-guide' | 'preview'>('files');
-  const [previewCategory, setPreviewCategory] = useState<string>('Eras (1970–1999)');
-  const [lateNightPreviewToggle, setLateNightPreviewToggle] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'files' | 'lobby-sim' | 'sync-guide'>('files');
+
+  // Interactive Part 2 Lobby Simulator State
+  const [roomCode, setRoomCode] = useState<string>('482910');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Eras: 1970–1999');
+  const [joinCodeInput, setJoinCodeInput] = useState<string>('');
+  const [newPlayerName, setNewPlayerName] = useState<string>('');
+  const [lobbyError, setLobbyError] = useState<string | null>(null);
+  const [roundActive, setRoundActive] = useState<boolean>(false);
+  const [players, setPlayers] = useState<SimulatedPlayer[]>([
+    { id: 'p1', name: 'Galaxy S26 Host', isHost: true, isReady: true },
+    { id: 'p2', name: 'Elena (Remote SFU #2)', isHost: false, isReady: true },
+    { id: 'p3', name: 'Marcus (Remote SFU #3)', isHost: false, isReady: true },
+  ]);
 
   const selectedFile =
-    PART_1_FILES.find((f) => f.path === selectedFilePath) ?? PART_1_FILES[0];
+    WORKSPACE_FILES.find((f) => f.path === selectedFilePath) ?? WORKSPACE_FILES[0];
   const progress = getBatchCompletionRatio(BATCH_STAGES);
 
   const handleCopyCode = async (path: string, content: string) => {
@@ -39,6 +116,50 @@ export default function App() {
       setTimeout(() => setCopiedPath(null), 2000);
     }
   };
+
+  const handleGenerateNewRoomCode = () => {
+    const nextCode = String(100000 + Math.floor(Math.random() * 900000));
+    setRoomCode(nextCode);
+    setRoundActive(false);
+    setLobbyError(null);
+  };
+
+  const handleAddRemotePlayer = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLobbyError(null);
+    const trimmedName = newPlayerName.trim();
+    if (!trimmedName) {
+      setLobbyError('Enter a stage display name to add a remote player.');
+      return;
+    }
+    if (joinCodeInput.trim() && !isSixDigitLobbyCode(joinCodeInput)) {
+      setLobbyError('Room code must be an exact 6-digit number.');
+      return;
+    }
+    if (players.length >= 8) {
+      setLobbyError('Lobby has reached the maximum capacity of 8 remote LiveKit SFU players.');
+      return;
+    }
+    setPlayers((prev) => [
+      ...prev,
+      {
+        id: `p-${Date.now()}`,
+        name: trimmedName,
+        isHost: false,
+        isReady: true,
+      },
+    ]);
+    setNewPlayerName('');
+    setJoinCodeInput('');
+  };
+
+  const togglePlayerReady = (id: string) => {
+    setPlayers((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, isReady: !p.isReady } : p))
+    );
+  };
+
+  const activeScene = SCENE_SAMPLES[selectedCategory] ?? SCENE_SAMPLES['Eras: 1970–1999'];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif] flex flex-col">
@@ -62,7 +183,16 @@ export default function App() {
               activeTab === 'files' ? 'text-white underline underline-offset-8' : ''
             }`}
           >
-            Part 1 Files
+            Part 1 & 2 Files
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('lobby-sim')}
+            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
+              activeTab === 'lobby-sim' ? 'text-white underline underline-offset-8' : ''
+            }`}
+          >
+            6-Digit Lobby Simulator
           </button>
           <button
             type="button"
@@ -73,15 +203,6 @@ export default function App() {
           >
             GitHub Sync Protocol
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('preview')}
-            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'preview' ? 'text-white underline underline-offset-8' : ''
-            }`}
-          >
-            Soundstage Shell Preview
-          </button>
         </nav>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -90,7 +211,7 @@ export default function App() {
             onClick={() => setActiveTab('sync-guide')}
             className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition-colors whitespace-nowrap shrink-0"
           >
-            GitHub Push Instructions
+            Push Part 2 to GitHub
           </button>
         </div>
       </header>
@@ -106,16 +227,13 @@ export default function App() {
                 <span aria-hidden="true"> · </span>
                 <span>Zero Local Storage</span>
                 <span aria-hidden="true"> · </span>
-                <span>Batch 1 of 5 Ready</span>
+                <span>Batch 2 of 5 Ready</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Part 1: Initialization & Dependencies Generated
+                Part 2: Database & Matchmaking Generated
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                The root Flutter directory structure (<code className="font-mono text-amber-400">pubspec.yaml</code>,{' '}
-                <code className="font-mono text-amber-400">analysis_options.yaml</code>, and{' '}
-                <code className="font-mono text-amber-400">lib/main.dart</code>) has been written directly to this
-                AI Studio workspace for direct GitHub synchronization.
+                Generated <code className="font-mono text-amber-400">supabase/schema.sql</code> (PostgreSQL tables & RLS for User Profiles, Eras 1970–1999 & 2000–2026, Awards Vault, Cult Classics, and 2–8 player Realtime Lobbies) and <code className="font-mono text-amber-400">lib/lobby.dart</code> (6-digit matchmaking & Supabase Realtime synchronization).
               </p>
             </div>
 
@@ -140,7 +258,18 @@ export default function App() {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Part 1 Files
+              Part 2 Files
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('lobby-sim')}
+              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+                activeTab === 'lobby-sim'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              6-Digit Lobby
             </button>
             <button
               type="button"
@@ -153,17 +282,6 @@ export default function App() {
             >
               GitHub Sync
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('preview')}
-              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                activeTab === 'preview'
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Shell Preview
-            </button>
           </div>
         </section>
 
@@ -174,10 +292,10 @@ export default function App() {
             <div className="lg:col-span-4 space-y-6">
               <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-4">
                 <h2 className="text-base font-semibold text-white">
-                  Part 1 Workspace Files
+                  Generated Workspace Files
                 </h2>
                 <div className="space-y-2">
-                  {PART_1_FILES.map((file) => {
+                  {WORKSPACE_FILES.map((file) => {
                     const isSelected = file.path === selectedFile.path;
                     return (
                       <button
@@ -195,7 +313,7 @@ export default function App() {
                           <span className="font-mono text-xs truncate">{file.path}</span>
                         </div>
                         <span className="font-mono text-xs text-slate-400 tabular-nums shrink-0">
-                          {file.lineCount} lines
+                          Part {file.part} · {file.lineCount}L
                         </span>
                       </button>
                     );
@@ -267,182 +385,217 @@ export default function App() {
           </section>
         )}
 
-        {/* Tab 2: GitHub Sync Guide for Galaxy S26 Ultra */}
-        {activeTab === 'sync-guide' && (
-          <section className="p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-6">
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-white">
-                GitHub Sync Workflow (Samsung Galaxy S26 Ultra — Zero Local Storage)
-              </h2>
-              <p className="text-sm text-slate-300">
-                Follow these steps inside the Google AI Studio interface to push Part 1 directly to your remote GitHub repository without downloading files or opening a terminal:
-              </p>
+        {/* Tab 2: Interactive 6-Digit Lobby & Supabase Realtime Simulator */}
+        {activeTab === 'lobby-sim' && (
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-5 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
+              <div className="space-y-1">
+                <h2 className="text-lg font-bold text-white">
+                  6-Digit Matchmaking & Realtime Controls
+                </h2>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Mirrors <code className="font-mono text-amber-400">LobbyRealtimeManager</code> in{' '}
+                  <code className="font-mono text-amber-400">lib/lobby.dart</code> and the PostgreSQL trigger enforcing 2–8 remote players.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-xs text-slate-400">Active 6-Digit Room Code</div>
+                  <div className="text-2xl font-bold font-mono tabular-nums tracking-widest text-amber-400">
+                    {roomCode}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateNewRoomCode}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>New 6-Digit Code</span>
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="category-select"
+                  className="block text-xs font-semibold text-slate-300"
+                >
+                  Supabase Scene Category Table
+                </label>
+                <select
+                  id="category-select"
+                  value={selectedCategory}
+                  onChange={(e) => {
+                    setSelectedCategory(e.target.value);
+                    setRoundActive(false);
+                  }}
+                  className="w-full px-3 py-2.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white"
+                >
+                  {Object.keys(SCENE_SAMPLES).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <form onSubmit={handleAddRemotePlayer} className="space-y-3 pt-2 border-t border-slate-800">
+                <div className="text-xs font-semibold text-slate-300">
+                  Simulate Remote Player Joining via 6-Digit Code ({players.length}/8 Slots)
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="player-name-input" className="sr-only">
+                      Remote Player Name
+                    </label>
+                    <input
+                      id="player-name-input"
+                      type="text"
+                      value={newPlayerName}
+                      onChange={(e) => setNewPlayerName(e.target.value)}
+                      placeholder="Stage Name (e.g. Devon)"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="join-code-input" className="sr-only">
+                      6-Digit Room Code
+                    </label>
+                    <input
+                      id="join-code-input"
+                      type="text"
+                      maxLength={6}
+                      value={joinCodeInput}
+                      onChange={(e) => setJoinCodeInput(e.target.value)}
+                      placeholder={`Room Code (${roomCode})`}
+                      className="w-full px-3 py-2 text-xs font-mono rounded-lg bg-slate-950 border border-slate-800 text-white"
+                    />
+                  </div>
+                </div>
+                {lobbyError && (
+                  <p className="text-xs text-rose-400">{lobbyError}</p>
+                )}
+                <button
+                  type="submit"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Join Remote Player to Channel</span>
+                </button>
+              </form>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-amber-400">01. Open Settings Toolbar</div>
-                <h3 className="text-base font-semibold text-white">
-                  Navigate to the GitHub Tab
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Tap the Settings icon in the top toolbar of Google AI Studio on your Galaxy S26 Ultra browser and select the GitHub integration tab.
-                </p>
+            <div className="lg:col-span-7 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Realtime Channel: <code className="font-mono text-amber-400">lobby:{roomCode}</code>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    LiveKit SFU Room: <code className="font-mono">act_like_it_{roomCode}</code> · {players.length} / 8 Remote Players
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRoundActive(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors whitespace-nowrap shrink-0"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Draw Scene & Broadcast</span>
+                </button>
               </div>
 
-              <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-amber-400">02. Provision Repository</div>
-                <h3 className="text-base font-semibold text-white">
-                  Create Private Repo: act_like_it
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Create a new private repository named <code className="font-mono text-white">act_like_it</code> directly from the GitHub tab and bind this workspace.
-                </p>
-              </div>
+              {roundActive && (
+                <div className="p-4 rounded-lg bg-slate-950 border border-rose-500 space-y-2">
+                  <div className="text-xs font-mono text-amber-400">
+                    BROADCAST EVENT: round_started · {selectedCategory} · {activeScene.film} ({activeScene.year})
+                  </div>
+                  <div className="text-sm font-semibold text-white">
+                    {activeScene.character}: &ldquo;{activeScene.line}&rdquo;
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Director Cue: {activeScene.cue}
+                  </div>
+                </div>
+              )}
 
-              <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-amber-400">03. Push Batch 1</div>
-                <h3 className="text-base font-semibold text-white">
-                  Stage & Push Initial Files
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Tap &ldquo;Push Changes&rdquo; (Sync to GitHub) to commit <code className="font-mono text-white">pubspec.yaml</code>, <code className="font-mono text-white">analysis_options.yaml</code>, and <code className="font-mono text-white">lib/main.dart</code>, then reply in chat to proceed to Part 2.
-                </p>
+              <div className="space-y-2">
+                {players.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-3 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Users className="w-4 h-4 text-slate-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-white truncate">
+                          {p.name}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {p.isHost ? 'Lobby Host' : 'Remote SFU Performer / Spectator'}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => togglePlayerReady(p.id)}
+                      className={`px-3 py-1 text-xs font-mono font-semibold rounded transition-colors whitespace-nowrap shrink-0 ${
+                        p.isReady
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                          : 'bg-amber-950 text-amber-300 border border-amber-800'
+                      }`}
+                    >
+                      {p.isReady ? 'READY' : 'WAITING'}
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
         )}
 
-        {/* Tab 3: Interactive Preview of SoundstageShellScreen (lib/main.dart) */}
-        {activeTab === 'preview' && (
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-5 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-4">
-              <h2 className="text-lg font-bold text-white">
-                Flutter SoundstageShellScreen Preview
+        {/* Tab 3: GitHub Sync Guide for Part 2 */}
+        {activeTab === 'sync-guide' && (
+          <section className="p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-6">
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white">
+                Push Part 2 Changes to GitHub (act_like_it)
               </h2>
-              <p className="text-sm text-slate-300 leading-relaxed">
-                This interactive preview mirrors the widget hierarchy defined in{' '}
-                <code className="font-mono text-amber-400">lib/main.dart</code>: portrait stage lock, Supabase 10 EPS Realtime initialization, Tri-Modal Judging architecture overview, and the scene category vault selectors.
+              <p className="text-sm text-slate-300">
+                Commit and push the newly generated database schema and matchmaking synchronization files directly from AI Studio:
               </p>
-              <div className="space-y-2 pt-2 text-xs text-slate-400">
-                <div>
-                  <strong className="text-slate-200">Selected Vault:</strong> {previewCategory}
-                </div>
-                <div>
-                  <strong className="text-slate-200">Late-Night 18+ Vault Gate:</strong>{' '}
-                  {lateNightPreviewToggle ? 'Unlocked (Ready for Part 5 RLS)' : 'Locked'}
-                </div>
-              </div>
             </div>
 
-            <div className="lg:col-span-7 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <span className="text-base font-bold text-white">Act Like It</span>
-                <span className="text-xs text-slate-400">
-                  SFU 2–8 Players · Tri-Modal Judging
-                </span>
-              </div>
-
-              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-3">
-                <h3 className="text-lg font-bold text-white">
-                  Live Soundstage & Telemetrics Engine
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                <div className="text-xs font-mono text-amber-400">01. Open GitHub Tab</div>
+                <h3 className="text-base font-semibold text-white">
+                  Verify Staged Part 2 Files
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Enter a 6-digit lobby code or host a remote 2–8 player LiveKit SFU room. Perform iconic cinema prompts live while Gemini Multimodal AI and peers score your emotional cadence.
+                  Confirm that <code className="font-mono text-white">supabase/schema.sql</code>, <code className="font-mono text-white">lib/lobby.dart</code>, and the updated <code className="font-mono text-white">lib/main.dart</code> appear in your GitHub sync list.
                 </p>
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('files')}
-                    className="px-4 py-2.5 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition-colors whitespace-nowrap shrink-0"
-                  >
-                    Create 6-Digit Lobby
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('files')}
-                    className="px-4 py-2.5 text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
-                  >
-                    Join Room Code
-                  </button>
-                </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-slate-300">
-                  Supabase Scene Vaults
-                </div>
-                {[
-                  {
-                    group: 'Eras (1970–1999)',
-                    subtitle: 'New Hollywood & Blockbuster Golden Age',
-                    table: 'scenes_era_1970_1999',
-                  },
-                  {
-                    group: 'Eras (2000–2026)',
-                    subtitle: 'Modern Prestige Cinema & Streaming Defining Moments',
-                    table: 'scenes_era_2000_2026',
-                  },
-                  {
-                    group: 'Awards Vault',
-                    subtitle: 'Best Actor · Best Actress · Best Villain · Emmy Vault',
-                    table: 'scenes_awards_vault',
-                  },
-                  {
-                    group: 'Specialty',
-                    subtitle: 'Cult Classics & Unforgettable Monologues',
-                    table: 'scenes_cult_classics',
-                  },
-                ].map((item) => {
-                  const active = previewCategory === item.group;
-                  return (
-                    <button
-                      key={item.group}
-                      type="button"
-                      onClick={() => setPreviewCategory(item.group)}
-                      className={`w-full text-left p-3 rounded-lg border transition-colors flex items-center justify-between gap-4 ${
-                        active
-                          ? 'bg-slate-800 border-rose-500'
-                          : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div>
-                        <div className="text-xs font-semibold text-white">
-                          {item.group}
-                        </div>
-                        <div className="text-xs text-slate-400">{item.subtitle}</div>
-                      </div>
-                      <span className="font-mono text-xs text-amber-400 shrink-0">
-                        {item.table}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                <div className="text-xs font-mono text-amber-400">02. Sync to GitHub</div>
+                <h3 className="text-base font-semibold text-white">
+                  Tap &ldquo;Push Changes&rdquo;
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Push the commit directly to your private <code className="font-mono text-white">act_like_it</code> repository from your Galaxy S26 Ultra browser.
+                </p>
               </div>
 
-              <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-white">
-                    Late-Night After-Hours Vault (18+)
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Hidden, age-gated Supabase table configured in Part 5.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={lateNightPreviewToggle}
-                  aria-label="Toggle Late-Night After-Hours Vault preview"
-                  onClick={() => setLateNightPreviewToggle((prev) => !prev)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                    lateNightPreviewToggle
-                      ? 'bg-rose-600 text-white'
-                      : 'bg-slate-800 text-slate-300'
-                  }`}
-                >
-                  {lateNightPreviewToggle ? 'Unlocked' : 'Locked'}
-                </button>
+              <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                <div className="text-xs font-mono text-amber-400">03. Advance to Part 3</div>
+                <h3 className="text-base font-semibold text-white">
+                  Confirm Completion
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Once pushed, instruct me to proceed to Part 3 (<code className="font-mono text-white">lib/webrtc_manager.dart</code> for LiveKit WebRTC camera capture and SFU broadcast routing).
+                </p>
               </div>
             </div>
           </section>
