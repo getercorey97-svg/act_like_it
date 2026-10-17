@@ -1,0 +1,6 @@
+{
+  "name": "Act Like It",
+  "description": "Full-Stack Flutter & Real-Time WebRTC Multiplayer Acting & AI Telemetrics Judging Application (Supabase + LiveKit + Gemini API).",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

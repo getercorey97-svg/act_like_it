@@ -1,0 +1,47 @@
+name: act_like_it
+description: >-
+  Act Like It — A full-stack real-time multiplayer acting and performance game
+  powered by Supabase (PostgreSQL, Realtime Channels, Edge Storage), LiveKit
+  WebRTC SFU (2-8 remote players), and Google Gemini Multimodal AI Telemetrics.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Backend, PostgreSQL Database, Realtime State Sync & Edge Storage
+  supabase_flutter: ^2.8.0
+
+  # Real-Time Video/Audio WebRTC SFU Routing (2-8 Remote Players)
+  livekit_client: ^2.3.0
+  flutter_webrtc: ^0.12.0
+
+  # Multimodal AI Telemetrics Judging (Video/Audio Frame Evaluation)
+  google_generative_ai: ^0.4.6
+
+  # Media Playback, Camera Capture & Device Permissions
+  video_player: ^2.9.2
+  camera: ^0.11.0+2
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.5
+
+  # State Management, Utilities & Social Sharing
+  provider: ^6.1.2
+  shared_preferences: ^2.3.2
+  share_plus: ^10.1.2
+  http: ^1.2.2
+  uuid: ^4.5.1
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
