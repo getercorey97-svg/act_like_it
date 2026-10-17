@@ -64,7 +64,9 @@ const LATE_NIGHT_PROMPTS = [
 ];
 
 export default function App() {
-  const [selectedFilePath, setSelectedFilePath] = useState<string>('lib/late_night_vault.dart');
+  const [selectedFilePath, setSelectedFilePath] = useState<string>(
+    'supabase/migrations/20261017000000_init_schema.sql'
+  );
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'files' | 'late-night' | 'sync-guide'>('files');
 
@@ -177,10 +179,10 @@ export default function App() {
                 <span>All 5 Batches Complete</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Part 5: Late-Night After-Hours Module Generated
+                Supabase Production Migration &amp; 37-Scene Seed Ready
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Generated <code className="font-mono text-amber-400">supabase/late_night_schema.sql</code> (hidden <code className="font-mono text-amber-400">scenes_late_night_after_hours</code> table with strict 18+ RLS policy) and <code className="font-mono text-amber-400">lib/late_night_vault.dart</code> (18+ age/PIN verification, Spice Tiers 1–3, and the 15s Mid-Take Improvisation Twist mechanic).
+                Generated <code className="font-mono text-amber-400">supabase/migrations/20261017000000_init_schema.sql</code> (<code className="font-mono text-amber-400">profiles</code>, <code className="font-mono text-amber-400">scenes</code>, <code className="font-mono text-amber-400">lobbies</code>, <code className="font-mono text-amber-400">lobby_players</code>, and 18+ <code className="font-mono text-amber-400">birth_year</code> RLS) and <code className="font-mono text-amber-400">supabase/seed.sql</code> (37 real movie scenes across all 9 categories).
               </p>
             </div>
 
@@ -504,46 +506,46 @@ export default function App() {
           </section>
         )}
 
-        {/* Tab 3: Final GitHub Sync Guide for Part 5 */}
+        {/* Tab 3: S26 Ultra APK Download & GitHub Actions Artifact Guide */}
         {activeTab === 'sync-guide' && (
           <section className="p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-6">
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-white">
-                Final GitHub Sync — Push Part 5 (100% Architecture Complete)
+                Download &amp; Install the APK on Your Samsung Galaxy S26 Ultra
               </h2>
               <p className="text-sm text-slate-300">
-                All 5 batches of <strong className="text-white">Act Like It</strong> have been generated in your cloud workspace. Push the final Late-Night After-Hours module directly to GitHub:
+                Configured <code className="font-mono text-amber-400">.github/workflows/build_apk.yml</code> (<code className="font-mono text-white">Build and Release APK</code>) with Zulu Java 17, Flutter stable, <code className="font-mono text-amber-400">--dart-define</code> secret injection, and <code className="font-mono text-amber-400">actions/upload-artifact@v4</code>:
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-amber-400">01. Open GitHub Tab</div>
+                <div className="text-xs font-mono text-amber-400">01. Push Workflow to GitHub</div>
                 <h3 className="text-base font-semibold text-white">
-                  Verify Staged Part 5 Files
+                  Tap &ldquo;Push Changes&rdquo; in AI Studio
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Verify that <code className="font-mono text-white">supabase/late_night_schema.sql</code>, <code className="font-mono text-white">lib/late_night_vault.dart</code>, and the updated <code className="font-mono text-white">lib/main.dart</code> are staged.
+                  Open the Settings &rarr; GitHub tab in AI Studio and push to your <code className="font-mono text-white">main</code> branch. Pushing triggers <code className="font-mono text-white">.github/workflows/build_apk.yml</code> on GitHub Actions.
                 </p>
               </div>
 
               <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-amber-400">02. Sync to GitHub</div>
+                <div className="text-xs font-mono text-amber-400">02. Open GitHub Actions</div>
                 <h3 className="text-base font-semibold text-white">
-                  Tap &ldquo;Push Changes&rdquo;
+                  Download act-like-it-apk
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Push the final commit from your Samsung Galaxy S26 Ultra browser to complete the <code className="font-mono text-white">act_like_it</code> repository.
+                  Open your <code className="font-mono text-white">act_like_it</code> repo on your S26 Ultra browser, tap the <strong className="text-white">Actions</strong> tab, select the completed <strong className="text-white">Build and Release APK</strong> run, and download <code className="font-mono text-white">act-like-it-apk</code> (<code className="font-mono text-white">app-release.apk</code>).
                 </p>
               </div>
 
               <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-emerald-400">03. Cloud Deployment Ready</div>
+                <div className="text-xs font-mono text-emerald-400">03. Secrets &amp; Standalone Ready</div>
                 <h3 className="text-base font-semibold text-white">
-                  Free-Tier Stack Complete
+                  100% Functional on Galaxy S26 Ultra
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Run <code className="font-mono text-white">supabase/schema.sql</code> and <code className="font-mono text-white">supabase/late_night_schema.sql</code> in your Supabase SQL Editor and connect your LiveKit Cloud & Gemini API keys.
+                  Add <code className="font-mono text-white">SUPABASE_URL</code>, <code className="font-mono text-white">SUPABASE_ANON_KEY</code>, <code className="font-mono text-white">LIVEKIT_URL</code>, and <code className="font-mono text-white">GEMINI_API_KEY</code> in GitHub Settings &rarr; Secrets &rarr; Actions (or configure them live inside the app).
                 </p>
               </div>
             </div>

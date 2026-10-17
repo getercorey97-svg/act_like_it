@@ -58,35 +58,46 @@ class LateNightPrompt extends ScenePrompt {
   });
 
   factory LateNightPrompt.fromJson(Map<String, dynamic> json) {
+    final targetEmotion = (json['target_emotion'] ??
+            json['emotional_target'] ??
+            'High-Tension Romantic Drama')
+        .toString();
     return LateNightPrompt(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'After-Hours Scene',
-      filmOrSeries: json['film_or_series']?.toString() ?? 'Midnight Feature',
-      releaseYear: (json['release_year'] as num?)?.toInt() ?? 2019,
+      filmOrSeries:
+          (json['actor_name'] ?? json['film_or_series'] ?? 'Featured Lead')
+              .toString(),
+      releaseYear: (json['release_year'] as num?)?.toInt() ?? 2004,
       characterName: json['character_name']?.toString() ?? 'Lead',
-      promptScript: json['prompt_script']?.toString() ?? '',
-      directorCue: json['director_cue']?.toString() ?? '',
-      emotionalTarget: json['emotional_target']?.toString() ?? 'High Tension',
+      promptScript:
+          (json['script_excerpt'] ?? json['prompt_script'] ?? '').toString(),
+      directorCue: (json['director_cue'] ??
+              'Hold intense eye contact with the lens and channel $targetEmotion.')
+          .toString(),
+      emotionalTarget: targetEmotion,
       durationSeconds: (json['duration_seconds'] as num?)?.toInt() ?? 35,
       difficultyTier: (json['difficulty_tier'] as num?)?.toInt() ?? 4,
-      spiceTier: (json['spice_tier'] as num?)?.toInt() ?? 2,
-      contentAdvisory:
-          json['content_advisory']?.toString() ?? '18+ Mature Dialogue',
-      improvisationTwist: json['improvisation_twist']?.toString() ??
-          'TWIST AT 15s: Invert your vocal volume on the final sentence.',
+      spiceTier: (json['spice_tier'] as num?)?.toInt() ?? 3,
+      contentAdvisory: (json['content_advisory'] ??
+              '18+ High-Tension Romantic & Dramatic Dialogue')
+          .toString(),
+      improvisationTwist: (json['improvisation_twist'] ??
+              'TWIST AT 15s: Drop your voice to an intimate whisper on the final two lines.')
+          .toString(),
     );
   }
 }
 
 /// Manages 18+ Age Verification, 4-digit PIN session locking, Supabase RLS
-/// unlocking (`verify_player_age_and_unlock_late_night`), and the Mid-Take Twist timer.
+/// unlocking (`public.profiles.birth_year`), and the Mid-Take Twist timer.
 class LateNightVaultGateController extends ChangeNotifier {
   static const String _prefKeyVerified = 'act_like_it_18_plus_verified';
 
   bool _isUnlocked = false;
   bool _isVerifying = false;
   String? _errorMessage;
-  LateNightSpiceTier _selectedTier = LateNightSpiceTier.uncensoredPrestige;
+  LateNightSpiceTier _selectedTier = LateNightSpiceTier.afterHoursDoubleDare;
   List<LateNightPrompt> _prompts = [];
   bool _midTakeTwistTriggered = false;
   Timer? _twistTimer;
@@ -100,81 +111,100 @@ class LateNightVaultGateController extends ChangeNotifier {
 
   static const List<LateNightPrompt> _builtInFallbackPrompts = [
     LateNightPrompt(
-      id: 'ln-uncut-gems',
-      title: 'This Is How I Win',
-      filmOrSeries: 'Uncut Gems',
-      releaseYear: 2019,
-      characterName: 'Howard Ratner',
-      spiceTier: 1,
-      contentAdvisory: '18+ Language & High-Anxiety Gambling Spiral',
-      promptScript:
-          "You're having a good time, right? Look at this parlay. I disagree, Gary! This is how I win!",
-      directorCue:
-          'Speak at 1.4x speed with manic grinning confidence while pretending to lock the security door.',
-      emotionalTarget: 'Manic Euphoria & Desperation',
-      improvisationTwist:
-          'TWIST AT 15s: The security buzzer jams—deliver the final line in a claustrophobic whisper.',
-      durationSeconds: 35,
-      difficultyTier: 4,
-    ),
-    LateNightPrompt(
-      id: 'ln-pulp-fiction',
-      title: 'The Adrenaline Shot Count',
-      filmOrSeries: 'Pulp Fiction',
-      releaseYear: 1994,
-      characterName: 'Vincent Vega',
-      spiceTier: 2,
-      contentAdvisory: '18+ Mature Themes & Dark Panic Comedy',
-      promptScript:
-          "I'm gonna count to three, and when I count three, you plunge that needle straight down. One... two...",
-      directorCue:
-          'Hold an imaginary marker poised inches above the camera lens, eyes wide with sweat-drenched hesitation.',
-      emotionalTarget: 'Hysterical Hesitation',
-      improvisationTwist:
-          'TWIST AT 15s: Switch roles mid-sentence and react as if you just woke up from a dead faint.',
-      durationSeconds: 35,
-      difficultyTier: 4,
-    ),
-    LateNightPrompt(
-      id: 'ln-wolf-wall-street',
-      title: "I'm Not Leaving",
-      filmOrSeries: 'The Wolf of Wall Street',
-      releaseYear: 2013,
-      characterName: 'Jordan Belfort',
-      spiceTier: 2,
-      contentAdvisory: '18+ Explicit Trading Floor Tirade',
-      promptScript:
-          "I'm not leaving! The show goes on! They're gonna need a wrecking ball to take me out of here!",
-      directorCue:
-          'Begin with quiet, defeated posture, then slam your palm into the frame and roar into the mic.',
-      emotionalTarget: 'Unhinged Defiance',
-      improvisationTwist:
-          'TWIST AT 15s: Deliver the climax as if your microphone just cut out and you must mime half the words.',
-      durationSeconds: 40,
-      difficultyTier: 5,
-    ),
-    LateNightPrompt(
       id: 'ln-eyes-wide-shut',
-      title: 'The Masked Confession',
-      filmOrSeries: 'Eyes Wide Shut',
+      title: 'Eyes Wide Shut (1999)',
+      filmOrSeries: 'Nicole Kidman',
       releaseYear: 1999,
-      characterName: 'Alice & Bill Harford',
+      characterName: 'Alice Harford',
       spiceTier: 3,
-      contentAdvisory: '18+ Psychological Intimacy & After-Hours Tension',
+      contentAdvisory: '18+ Erotic Candor & Psychological Intimacy',
       promptScript:
-          'If you men only knew... There is something very important that we need to do as soon as possible.',
+          "Do you really think you know everything that goes through my head when we're lying in the dark, Bill?\nLast summer at Cape Cod, there was a naval officer at the next table. He glanced at me for three seconds, and I couldn't breathe.\nIf he had wanted me—even for one single night—I was ready to give up everything. You, Helena, my whole life.\nAnd yet at the very same moment, you were dearer to me than ever. If you men only knew...",
       directorCue:
           'Slow cadence to half-speed, hold an unblinking gaze three inches from the front camera.',
-      emotionalTarget: 'Hypnotic Vulnerability',
+      emotionalTarget: 'Hypnotic Erotic Candor & Jealousy',
       improvisationTwist:
           'TWIST AT 15s: Break into a sudden, unsettling laugh before snapping back to deadpan seriousness.',
       durationSeconds: 40,
       difficultyTier: 5,
     ),
+    LateNightPrompt(
+      id: 'ln-closer',
+      title: 'Closer (2004)',
+      filmOrSeries: 'Clive Owen & Natalie Portman',
+      releaseYear: 2004,
+      characterName: 'Larry Gray',
+      spiceTier: 3,
+      contentAdvisory: '18+ Scorching Romantic Obsession & Betrayal',
+      promptScript:
+          "Don't give me that innocent stare—tell me the truth! You think honesty is just a weapon you pull out when you want to break someone?\nDid you enjoy it? Look me in the eyes and tell me what you whispered to him when the hotel door closed.\nYou want raw, unfiltered passion, Anna, yet the second somebody touches your actual pulse, you bolt for the exit.\nGive it to me—because everyone else falls in love with your fantasy, and I'm the only man in this room who knows what you really are.",
+      directorCue:
+          'Begin with quiet, wounded disbelief, then step toward the microphone with scorching intensity.',
+      emotionalTarget: 'Scorching Romantic Obsession & Betrayal',
+      improvisationTwist:
+          'TWIST AT 15s: Deliver the final line with an eerie, heartbroken smile.',
+      durationSeconds: 40,
+      difficultyTier: 5,
+    ),
+    LateNightPrompt(
+      id: 'ln-basic-instinct',
+      title: 'Basic Instinct (1992)',
+      filmOrSeries: 'Sharon Stone',
+      releaseYear: 1992,
+      characterName: 'Catherine Tramell',
+      spiceTier: 2,
+      contentAdvisory: '18+ Seductive Interrogation Tension',
+      promptScript:
+          "What are you going to do, Nick? Charge me with smoking in an interrogation room?\nYou read every page of my novel before you walked in here, and now you're terrified that I know exactly how your mind works.\nMaybe I loved him, or maybe I just liked watching a dangerous man lose his nerve between the sheets.\nKeep staring at me like that, Detective, and we both know you won't make it to the end of this investigation alive.",
+      directorCue:
+          'Tilt your chin slightly up, never break eye contact, and speak with velvet composure.',
+      emotionalTarget: 'Seductive Cat-and-Mouse Dominance',
+      improvisationTwist:
+          'TWIST AT 15s: Pause for two full seconds of dead silence before whispering the final threat.',
+      durationSeconds: 35,
+      difficultyTier: 4,
+    ),
+    LateNightPrompt(
+      id: 'ln-challengers',
+      title: 'Challengers (2024)',
+      filmOrSeries: 'Zendaya',
+      releaseYear: 2024,
+      characterName: 'Tashi Duncan',
+      spiceTier: 2,
+      contentAdvisory: '18+ High-Tension Hotel Room Power Play',
+      promptScript:
+          "Don't act like you came up to my hotel room tonight just to talk about your backhand.\nYou two have been orbiting each other for thirteen years, using me as the net so you don't have to admit what you actually want.\nLook at me—if you step onto that court tomorrow and play like a coward, don't bother coming back to my bed.\nI don't want a polite husband or a nostalgic ex-lover. I want to watch two people tear each other apart for one point.",
+      directorCue:
+          'Command the frame with razor-sharp poise and unapologetic magnetism.',
+      emotionalTarget: 'Intoxicating Power Play & Desire',
+      improvisationTwist:
+          'TWIST AT 15s: Switch from icy detachment to breathless urgency on the final sentence.',
+      durationSeconds: 35,
+      difficultyTier: 4,
+    ),
+    LateNightPrompt(
+      id: 'ln-fatal-attraction',
+      title: 'Fatal Attraction (1987)',
+      filmOrSeries: 'Glenn Close',
+      releaseYear: 1987,
+      characterName: 'Alex Forrest',
+      spiceTier: 1,
+      contentAdvisory: '18+ Obsessive Romantic Confrontation',
+      promptScript:
+          "You think you can spend an entire weekend tangled in my sheets and then erase me on Monday morning like a business expense?\nI am not going to be ignored, Dan! Do you hear me?\nYou walked into my apartment, you held my face in your hands, and now you're hiding behind a picket fence like nothing happened.\nI'm part of your life now, whether you lock your front door or not—and we are far from finished.",
+      directorCue:
+          'Start with trembling vulnerability, then erupt on the second line before dropping to a chilling promise.',
+      emotionalTarget: 'Feverish Obsessive Passion & Threat',
+      improvisationTwist:
+          'TWIST AT 15s: Deliver the final line as if you are calmly leaving a voicemail.',
+      durationSeconds: 35,
+      difficultyTier: 4,
+    ),
   ];
 
   /// Validates that the player's birth year is >= 18 years ago and that a 4-digit
-  /// session PIN is provided, then invokes the Supabase RLS verification RPC.
+  /// session PIN is provided, then updates `public.profiles.birth_year` so the
+  /// PostgreSQL RLS policy on `public.scenes (is_late_night = true)` grants access.
   Future<bool> verifyAgeAndUnlockVault({
     required int birthYear,
     required String fourDigitPin,
@@ -199,16 +229,16 @@ class LateNightVaultGateController extends ChangeNotifier {
         return false;
       }
 
-      try {
-        await supabase.rpc(
-          'verify_player_age_and_unlock_late_night',
-          params: {
-            'p_birth_year': birthYear,
-            'p_session_pin': fourDigitPin.trim(),
-          },
-        );
-      } catch (_) {
-        // Proceed with local session verification if offline/unauthenticated
+      final client = supabaseOrNull;
+      final currentUser = client?.auth.currentUser;
+      if (client != null && currentUser != null) {
+        try {
+          await client.from('profiles').upsert({
+            'id': currentUser.id,
+            'username': 'actor_${currentUser.id.substring(0, 6)}',
+            'birth_year': birthYear,
+          });
+        } catch (_) {}
       }
 
       final prefs = await SharedPreferences.getInstance();
@@ -223,34 +253,34 @@ class LateNightVaultGateController extends ChangeNotifier {
     }
   }
 
-  /// Queries `public.scenes_late_night_after_hours` filtered by the selected Spice Tier.
+  /// Queries `public.scenes` where `is_late_night = true` (gated by PostgreSQL 18+ RLS).
   Future<void> fetchLateNightPrompts({LateNightSpiceTier? tier}) async {
     if (tier != null) {
       _selectedTier = tier;
     }
     if (!_isUnlocked) return;
 
-    try {
-      final rows = await supabase
-          .from('scenes_late_night_after_hours')
-          .select()
-          .lte('spice_tier', _selectedTier.tier)
-          .order('spice_tier', ascending: false);
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        final rows = await client
+            .from('scenes')
+            .select()
+            .eq('is_late_night', true);
 
-      if (rows.isNotEmpty) {
-        _prompts = rows
-            .map((r) => LateNightPrompt.fromJson(Map<String, dynamic>.from(r)))
-            .toList();
-      } else {
-        _prompts = _builtInFallbackPrompts
-            .where((p) => p.spiceTier <= _selectedTier.tier)
-            .toList();
-      }
-    } catch (_) {
-      _prompts = _builtInFallbackPrompts
-          .where((p) => p.spiceTier <= _selectedTier.tier)
-          .toList();
+        if (rows.isNotEmpty) {
+          _prompts = rows
+              .map((r) => LateNightPrompt.fromJson(Map<String, dynamic>.from(r)))
+              .toList();
+          notifyListeners();
+          return;
+        }
+      } catch (_) {}
     }
+
+    _prompts = _builtInFallbackPrompts
+        .where((p) => p.spiceTier <= _selectedTier.tier)
+        .toList();
     notifyListeners();
   }
 
@@ -539,6 +569,24 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                       fontSize: 12,
                       color: Color(0xFFF59E0B),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LobbyMatchmakingScreen(
+                            startInJoinMode: false,
+                            initialPromptOverride: prompt,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.videocam_outlined, size: 16),
+                    label: const Text('Perform This After-Hours Scene'),
                   ),
                 ),
               ],

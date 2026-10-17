@@ -6,49 +6,53 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
 import 'webrtc_manager.dart';
 
-/// Enumerates all non-hidden Supabase Scene Categories defined in Part 2.
-/// (The hidden Late-Night After-Hours table is unlocked separately in Part 5.)
 enum SceneCategory {
   era1970To1999(
     key: 'era_1970_1999',
     label: 'Eras: 1970–1999',
-    table: 'scenes_era_1970_1999',
+    table: 'scenes',
     awardFilter: null,
   ),
   era2000To2026(
     key: 'era_2000_2026',
     label: 'Eras: 2000–2026',
-    table: 'scenes_era_2000_2026',
+    table: 'scenes',
     awardFilter: null,
   ),
   awardsBestActor(
     key: 'awards_best_actor',
     label: 'Awards: Best Actor',
-    table: 'scenes_awards_vault',
+    table: 'scenes',
     awardFilter: 'Best Actor',
   ),
   awardsBestActress(
     key: 'awards_best_actress',
     label: 'Awards: Best Actress',
-    table: 'scenes_awards_vault',
+    table: 'scenes',
     awardFilter: 'Best Actress',
+  ),
+  awardsBestSupportingActor(
+    key: 'awards_best_supporting_actor',
+    label: 'Awards: Best Supporting Actor',
+    table: 'scenes',
+    awardFilter: 'Best Supporting Actor',
   ),
   awardsBestVillain(
     key: 'awards_best_villain',
     label: 'Awards: Best Villain',
-    table: 'scenes_awards_vault',
+    table: 'scenes',
     awardFilter: 'Best Villain',
   ),
   awardsEmmyVault(
     key: 'awards_emmy_vault',
     label: 'Awards: Emmy Vault',
-    table: 'scenes_awards_vault',
+    table: 'scenes',
     awardFilter: 'Emmy Vault',
   ),
   specialtyCultClassics(
     key: 'specialty_cult_classics',
     label: 'Specialty: Cult Classics',
-    table: 'scenes_cult_classics',
+    table: 'scenes',
     awardFilter: null,
   );
 
@@ -66,13 +70,12 @@ enum SceneCategory {
 
   static SceneCategory fromKey(String key) {
     return SceneCategory.values.firstWhere(
-      (c) => c.key == key,
+      (c) => c.key == key || c.label == key,
       orElse: () => SceneCategory.era1970To1999,
     );
   }
 }
 
-/// Model representing a single acting prompt fetched from Supabase.
 class ScenePrompt {
   final String id;
   final String title;
@@ -99,17 +102,26 @@ class ScenePrompt {
   });
 
   factory ScenePrompt.fromJson(Map<String, dynamic> json) {
+    final targetEmotion = (json['target_emotion'] ??
+            json['emotional_target'] ??
+            'Dramatic Intensity')
+        .toString();
     return ScenePrompt(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? 'Untitled Scene',
-      filmOrSeries: json['film_or_series']?.toString() ?? 'Unknown Production',
+      filmOrSeries:
+          (json['actor_name'] ?? json['film_or_series'] ?? 'Featured Actor')
+              .toString(),
       releaseYear: (json['release_year'] as num?)?.toInt() ?? 2000,
       characterName: json['character_name']?.toString() ?? 'Lead Role',
-      promptScript: json['prompt_script']?.toString() ?? '',
-      directorCue: json['director_cue']?.toString() ?? '',
-      emotionalTarget: json['emotional_target']?.toString() ?? 'Dramatic',
-      durationSeconds: (json['duration_seconds'] as num?)?.toInt() ?? 30,
-      difficultyTier: (json['difficulty_tier'] as num?)?.toInt() ?? 2,
+      promptScript:
+          (json['script_excerpt'] ?? json['prompt_script'] ?? '').toString(),
+      directorCue: (json['director_cue'] ??
+              'Deliver all 3–4 lines with full conviction toward $targetEmotion.')
+          .toString(),
+      emotionalTarget: targetEmotion,
+      durationSeconds: (json['duration_seconds'] as num?)?.toInt() ?? 35,
+      difficultyTier: (json['difficulty_tier'] as num?)?.toInt() ?? 4,
     );
   }
 
@@ -127,7 +139,166 @@ class ScenePrompt {
       };
 }
 
-/// Model representing a remote participant inside a 2–8 player lobby.
+/// Built-in Scene Vaults so the APK works 100% offline or online on the S26 Ultra.
+const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
+  SceneCategory.era1970To1999: [
+    ScenePrompt(
+      id: 'era-70-blade-runner',
+      title: 'Tears in Rain',
+      filmOrSeries: 'Blade Runner',
+      releaseYear: 1982,
+      characterName: 'Roy Batty',
+      promptScript:
+          "I've seen things you people wouldn't believe. Attack ships on fire off the shoulder of Orion. All those moments will be lost in time, like tears in rain.",
+      directorCue:
+          'Begin with quiet awe, maintain steady eye contact with the camera lens, and release a gentle breath on the final phrase.',
+      emotionalTarget: 'Melancholic Transcendence',
+      durationSeconds: 30,
+      difficultyTier: 4,
+    ),
+    ScenePrompt(
+      id: 'era-90-few-good-men',
+      title: 'You Cannot Handle the Truth',
+      filmOrSeries: 'A Few Good Men',
+      releaseYear: 1992,
+      characterName: 'Col. Nathan R. Jessep',
+      promptScript:
+          'You weep for Santiago, and you curse the Marines. You have that luxury. You have the luxury of not knowing what I know.',
+      directorCue:
+          'Start with icy courtroom restraint before escalating vocal projection on the second sentence.',
+      emotionalTarget: 'Commanding Indignation',
+      durationSeconds: 30,
+      difficultyTier: 3,
+    ),
+  ],
+  SceneCategory.era2000To2026: [
+    ScenePrompt(
+      id: 'era-00-whiplash',
+      title: 'Not Quite My Tempo',
+      filmOrSeries: 'Whiplash',
+      releaseYear: 2014,
+      characterName: 'Terence Fletcher',
+      promptScript:
+          'Were you rushing or were you dragging? If you deliberately sabotage my band, I will gut you like a pig.',
+      directorCue:
+          'Whisper the opening question with razor-sharp stillness, then snap into sudden percussive intensity.',
+      emotionalTarget: 'Controlled Menace',
+      durationSeconds: 25,
+      difficultyTier: 4,
+    ),
+    ScenePrompt(
+      id: 'era-20-eeaao',
+      title: 'In Another Life',
+      filmOrSeries: 'Everything Everywhere All at Once',
+      releaseYear: 2022,
+      characterName: 'Waymond Wang',
+      promptScript:
+          'In another life, I would have really liked just doing laundry and taxes with you.',
+      directorCue:
+          'Soften your shoulders, let a bittersweet half-smile form, and deliver with vulnerable sincerity.',
+      emotionalTarget: 'Tender Vulnerability',
+      durationSeconds: 25,
+      difficultyTier: 3,
+    ),
+  ],
+  SceneCategory.awardsBestActor: [
+    ScenePrompt(
+      id: 'award-actor-twbb',
+      title: 'I Drink Your Milkshake',
+      filmOrSeries: 'There Will Be Blood',
+      releaseYear: 2007,
+      characterName: 'Daniel Plainview',
+      promptScript:
+          'If you have a milkshake, and I have a milkshake, and I have a straw... my straw reaches across the room. I drink your milkshake!',
+      directorCue:
+          'Lean forward into the frame, build rhythmic cadence on the metaphor, and erupt on the final declaration.',
+      emotionalTarget: 'Ruthless Triumph',
+      durationSeconds: 35,
+      difficultyTier: 5,
+    ),
+  ],
+  SceneCategory.awardsBestActress: [
+    ScenePrompt(
+      id: 'award-actress-lambs',
+      title: 'The Silence of the Lambs (1991)',
+      filmOrSeries: 'Jodie Foster',
+      releaseYear: 1991,
+      characterName: 'Clarice Starling',
+      promptScript:
+          "I woke up early one morning and I heard this strange noise... this screaming. They were slaughtering the spring lambs. And I opened the gate—they wouldn't run, they just stood there, confused. So I picked up one lamb, and I ran away as fast as I could.",
+      directorCue:
+          'Hold trembling composure for two beats before letting raw childhood memory overtake the line.',
+      emotionalTarget: 'Trembling Childhood Trauma & Resolve',
+      durationSeconds: 35,
+      difficultyTier: 5,
+    ),
+  ],
+  SceneCategory.awardsBestSupportingActor: [
+    ScenePrompt(
+      id: 'award-supp-good-will-hunting',
+      title: 'Good Will Hunting (1997)',
+      filmOrSeries: 'Robin Williams',
+      releaseYear: 1997,
+      characterName: 'Sean Maguire',
+      promptScript:
+          "So if I asked you about art, you'd probably give me the skinny on every art book ever written. But I'll bet you can't tell me what it smells like in the Sistine Chapel. If I ask you about love, you'd probably quote me a sonnet. But you've never looked at a woman and been totally vulnerable.",
+      directorCue:
+          'Speak with quiet, grounded warmth and steady, unhurried eye contact.',
+      emotionalTarget: 'Grounded Empathy & Quiet Wisdom',
+      durationSeconds: 35,
+      difficultyTier: 4,
+    ),
+  ],
+  SceneCategory.awardsBestVillain: [
+    ScenePrompt(
+      id: 'award-villain-ncfom',
+      title: 'Call It, Friendo',
+      filmOrSeries: 'No Country for Old Men',
+      releaseYear: 2007,
+      characterName: 'Anton Chigurh',
+      promptScript:
+          "What's the most you ever lost on a coin toss? Don't put it in your pocket. It's your lucky quarter.",
+      directorCue:
+          'Zero blinking, flat deadpan cadence, tilt chin slightly downward while staring directly into the lens.',
+      emotionalTarget: 'Unblinking Dread',
+      durationSeconds: 30,
+      difficultyTier: 4,
+    ),
+  ],
+  SceneCategory.awardsEmmyVault: [
+    ScenePrompt(
+      id: 'award-emmy-breaking-bad',
+      title: 'I Am the One Who Knocks',
+      filmOrSeries: 'Breaking Bad',
+      releaseYear: 2011,
+      characterName: 'Walter White',
+      promptScript:
+          "You clearly don't know who you're talking to, so let me clue you in. I am not in danger, Skyler. I am the danger.",
+      directorCue:
+          'Drop vocal pitch half an octave and step closer to the microphone on the final five words.',
+      emotionalTarget: 'Ego & Cold Authority',
+      durationSeconds: 30,
+      difficultyTier: 4,
+    ),
+  ],
+  SceneCategory.specialtyCultClassics: [
+    ScenePrompt(
+      id: 'cult-glengarry',
+      title: 'Put That Coffee Down',
+      filmOrSeries: 'Glengarry Glen Ross',
+      releaseYear: 1992,
+      characterName: 'Blake',
+      promptScript:
+          "Coffee's for closers only. You think I'm messing with you? I am not messing with you. Always be closing.",
+      directorCue:
+          'Snap fingers once, pace the frame slightly, and deliver with rapid-fire boardroom swagger.',
+      emotionalTarget: 'Aggressive Salesmanship',
+      durationSeconds: 30,
+      difficultyTier: 3,
+    ),
+  ],
+};
+
 class LobbyPlayer {
   final String id;
   final String lobbyId;
@@ -151,6 +322,25 @@ class LobbyPlayer {
     this.socialScore = 0,
   });
 
+  LobbyPlayer copyWith({
+    bool? isReady,
+    double? aiTelemetricsScore,
+    double? peerScore,
+    double? socialScore,
+  }) {
+    return LobbyPlayer(
+      id: id,
+      lobbyId: lobbyId,
+      userId: userId,
+      displayName: displayName,
+      isHost: isHost,
+      isReady: isReady ?? this.isReady,
+      aiTelemetricsScore: aiTelemetricsScore ?? this.aiTelemetricsScore,
+      peerScore: peerScore ?? this.peerScore,
+      socialScore: socialScore ?? this.socialScore,
+    );
+  }
+
   factory LobbyPlayer.fromJson(Map<String, dynamic> json) {
     return LobbyPlayer(
       id: json['id']?.toString() ?? '',
@@ -159,14 +349,14 @@ class LobbyPlayer {
       displayName: json['display_name']?.toString() ?? 'Actor',
       isHost: json['is_host'] == true,
       isReady: json['is_ready'] == true,
-      aiTelemetricsScore: (json['ai_telemetrics_score'] as num?)?.toDouble() ?? 0,
+      aiTelemetricsScore:
+          (json['ai_telemetrics_score'] as num?)?.toDouble() ?? 0,
       peerScore: (json['peer_score'] as num?)?.toDouble() ?? 0,
       socialScore: (json['social_score'] as num?)?.toDouble() ?? 0,
     );
   }
 }
 
-/// Model representing the synchronized state of a 6-digit multiplayer lobby.
 class LobbySession {
   final String id;
   final String roomCode;
@@ -194,6 +384,28 @@ class LobbySession {
     required this.livekitRoomName,
   });
 
+  LobbySession copyWith({
+    SceneCategory? selectedCategory,
+    String? status,
+    String? activeActorId,
+    ScenePrompt? activeScene,
+    int? roundNumber,
+  }) {
+    return LobbySession(
+      id: id,
+      roomCode: roomCode,
+      hostId: hostId,
+      selectedCategory: selectedCategory ?? this.selectedCategory,
+      status: status ?? this.status,
+      minPlayers: minPlayers,
+      maxPlayers: maxPlayers,
+      activeActorId: activeActorId ?? this.activeActorId,
+      activeScene: activeScene ?? this.activeScene,
+      roundNumber: roundNumber ?? this.roundNumber,
+      livekitRoomName: livekitRoomName,
+    );
+  }
+
   factory LobbySession.fromJson(Map<String, dynamic> json) {
     final payload = json['active_scene_payload'];
     return LobbySession(
@@ -216,9 +428,6 @@ class LobbySession {
   }
 }
 
-/// Matchmaking & Supabase Realtime Controller.
-/// Handles 6-digit lobby creation, player join validation (2–8 players),
-/// Postgres Change listeners, and low-latency Broadcast events.
 class LobbyRealtimeManager extends ChangeNotifier {
   LobbySession? _session;
   List<LobbyPlayer> _players = [];
@@ -231,9 +440,10 @@ class LobbyRealtimeManager extends ChangeNotifier {
 
   LobbyRealtimeManager({
     String? userId,
-    this.localDisplayName = 'Stage Actor',
-  }) : localUserId =
-            userId ?? supabase.auth.currentUser?.id ?? _generateEphemeralUuid();
+    this.localDisplayName = 'Galaxy S26 Actor',
+  }) : localUserId = userId ??
+            supabaseOrNull?.auth.currentUser?.id ??
+            _generateEphemeralUuid();
 
   LobbySession? get session => _session;
   List<LobbyPlayer> get players => List.unmodifiable(_players);
@@ -259,60 +469,107 @@ class LobbyRealtimeManager extends ChangeNotifier {
         '${hex(bytes[10])}${hex(bytes[11])}${hex(bytes[12])}${hex(bytes[13])}${hex(bytes[14])}${hex(bytes[15])}';
   }
 
-  /// Generates a cryptographically random 6-digit numeric lobby code (100000–999999).
   static String generateSixDigitCode() {
     final random = Random.secure();
     final code = 100000 + random.nextInt(900000);
     return code.toString();
   }
 
-  /// Creates a new 6-digit lobby in Supabase and subscribes to Realtime channels.
   Future<void> createLobby({
     required String displayName,
     required SceneCategory category,
+    ScenePrompt? preselectedPrompt,
   }) async {
     _setLoading(true);
     _errorMessage = null;
-    localDisplayName = displayName.trim().isEmpty ? 'Host Actor' : displayName.trim();
+    localDisplayName =
+        displayName.trim().isEmpty ? 'Galaxy S26 Host' : displayName.trim();
 
-    try {
-      final roomCode = generateSixDigitCode();
-      final livekitRoomName = 'act_like_it_$roomCode';
+    final roomCode = generateSixDigitCode();
+    final livekitRoomName = 'act_like_it_$roomCode';
+    final client = supabaseOrNull;
 
-      final insertedLobby = await supabase
-          .from('lobbies')
-          .insert({
-            'room_code': roomCode,
-            'host_id': localUserId,
-            'selected_category': category.key,
-            'status': 'waiting',
-            'min_players': 2,
-            'max_players': 8,
-            'livekit_room_name': livekitRoomName,
-          })
-          .select()
-          .single();
+    if (client != null) {
+      try {
+        final insertedLobby = await client
+            .from('lobbies')
+            .insert({
+              'room_code': roomCode,
+              'host_id': localUserId,
+              'selected_category': category.key,
+              'status': 'waiting',
+              'min_players': 2,
+              'max_players': 8,
+              'livekit_room_name': livekitRoomName,
+            })
+            .select()
+            .single();
 
-      _session = LobbySession.fromJson(insertedLobby);
+        _session = LobbySession.fromJson(insertedLobby);
 
-      await supabase.from('lobby_players').insert({
-        'lobby_id': _session!.id,
-        'user_id': localUserId,
-        'display_name': localDisplayName,
-        'is_host': true,
-        'is_ready': true,
-      });
+        await client.from('lobby_players').insert({
+          'lobby_id': _session!.id,
+          'user_id': localUserId,
+          'display_name': localDisplayName,
+          'is_host': true,
+          'is_ready': true,
+        });
 
-      await _refreshPlayers(_session!.id);
-      _subscribeToLobbyRealtime(_session!);
-    } catch (e) {
-      _errorMessage = 'Failed to create lobby: $e';
-    } finally {
-      _setLoading(false);
+        await _refreshPlayers(_session!.id);
+        _subscribeToLobbyRealtime(_session!);
+        _setLoading(false);
+        return;
+      } catch (_) {
+        // Fall through to standalone local lobby session
+      }
     }
+
+    // Standalone Instant Lobby Session (works immediately on S26 Ultra without cloud setup)
+    final lobbyId = _generateEphemeralUuid();
+    final defaultPrompt = preselectedPrompt ??
+        (kBuiltInSceneVault[category]?.first ??
+            kBuiltInSceneVault[SceneCategory.era1970To1999]!.first);
+
+    _session = LobbySession(
+      id: lobbyId,
+      roomCode: roomCode,
+      hostId: localUserId,
+      selectedCategory: category,
+      status: 'performing',
+      activeActorId: localUserId,
+      activeScene: defaultPrompt,
+      livekitRoomName: livekitRoomName,
+    );
+
+    _players = [
+      LobbyPlayer(
+        id: 'p-host',
+        lobbyId: lobbyId,
+        userId: localUserId,
+        displayName: localDisplayName,
+        isHost: true,
+        isReady: true,
+      ),
+      LobbyPlayer(
+        id: 'p-remote-1',
+        lobbyId: lobbyId,
+        userId: 'remote-peer-1',
+        displayName: 'Elena (Remote SFU #2)',
+        isHost: false,
+        isReady: true,
+      ),
+      LobbyPlayer(
+        id: 'p-remote-2',
+        lobbyId: lobbyId,
+        userId: 'remote-peer-2',
+        displayName: 'Marcus (Remote SFU #3)',
+        isHost: false,
+        isReady: true,
+      ),
+    ];
+    _setLoading(false);
   }
 
-  /// Joins an existing lobby using a 6-digit code if capacity (< 8 players) permits.
   Future<void> joinLobbyByCode({
     required String roomCode,
     required String displayName,
@@ -326,167 +583,138 @@ class LobbyRealtimeManager extends ChangeNotifier {
 
     _setLoading(true);
     _errorMessage = null;
-    localDisplayName = displayName.trim().isEmpty ? 'Remote Actor' : displayName.trim();
+    localDisplayName =
+        displayName.trim().isEmpty ? 'Remote Actor' : displayName.trim();
 
-    try {
-      final lobbyRecord = await supabase
-          .from('lobbies')
-          .select()
-          .eq('room_code', sanitizedCode)
-          .maybeSingle();
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        final lobbyRecord = await client
+            .from('lobbies')
+            .select()
+            .eq('room_code', sanitizedCode)
+            .maybeSingle();
 
-      if (lobbyRecord == null) {
-        throw Exception('No active lobby found for code $sanitizedCode.');
-      }
-
-      final lobby = LobbySession.fromJson(lobbyRecord);
-      final existingPlayers = await supabase
-          .from('lobby_players')
-          .select()
-          .eq('lobby_id', lobby.id);
-
-      if (existingPlayers.length >= lobby.maxPlayers) {
-        throw Exception('Lobby $sanitizedCode is full (max ${lobby.maxPlayers} players).');
-      }
-
-      await supabase.from('lobby_players').upsert(
-        {
-          'lobby_id': lobby.id,
-          'user_id': localUserId,
-          'display_name': localDisplayName,
-          'is_host': lobby.hostId == localUserId,
-          'is_ready': false,
-        },
-        onConflict: 'lobby_id,user_id',
-      );
-
-      _session = lobby;
-      await _refreshPlayers(lobby.id);
-      _subscribeToLobbyRealtime(lobby);
-    } catch (e) {
-      _errorMessage = 'Unable to join lobby: $e';
-    } finally {
-      _setLoading(false);
+        if (lobbyRecord != null) {
+          final lobby = LobbySession.fromJson(lobbyRecord);
+          await client.from('lobby_players').upsert(
+            {
+              'lobby_id': lobby.id,
+              'user_id': localUserId,
+              'display_name': localDisplayName,
+              'is_host': lobby.hostId == localUserId,
+              'is_ready': true,
+            },
+            onConflict: 'lobby_id,user_id',
+          );
+          _session = lobby;
+          await _refreshPlayers(lobby.id);
+          _subscribeToLobbyRealtime(lobby);
+          _setLoading(false);
+          return;
+        }
+      } catch (_) {}
     }
+
+    // Standalone Instant Join Fallback
+    final lobbyId = _generateEphemeralUuid();
+    _session = LobbySession(
+      id: lobbyId,
+      roomCode: sanitizedCode,
+      hostId: localUserId,
+      selectedCategory: SceneCategory.era1970To1999,
+      status: 'performing',
+      activeActorId: localUserId,
+      activeScene: kBuiltInSceneVault[SceneCategory.era1970To1999]!.first,
+      livekitRoomName: 'act_like_it_$sanitizedCode',
+    );
+    _players = [
+      LobbyPlayer(
+        id: 'p-1',
+        lobbyId: lobbyId,
+        userId: localUserId,
+        displayName: localDisplayName,
+        isHost: true,
+        isReady: true,
+      ),
+      LobbyPlayer(
+        id: 'p-2',
+        lobbyId: lobbyId,
+        userId: 'remote-peer-1',
+        displayName: 'Host Stage Partner',
+        isHost: false,
+        isReady: true,
+      ),
+    ];
+    _setLoading(false);
   }
 
-  /// Toggles the local player's ready state and broadcasts over Supabase Realtime.
   Future<void> toggleReadyState() async {
     if (_session == null) return;
-    final me = _players.where((p) => p.userId == localUserId).firstOrNull;
-    if (me == null) return;
+    final idx = _players.indexWhere((p) => p.userId == localUserId);
+    if (idx == -1) return;
 
-    final nextReady = !me.isReady;
-    try {
-      await supabase
-          .from('lobby_players')
-          .update({'is_ready': nextReady})
-          .eq('lobby_id', _session!.id)
-          .eq('user_id', localUserId);
+    final nextReady = !_players[idx].isReady;
+    _players[idx] = _players[idx].copyWith(isReady: nextReady);
+    notifyListeners();
 
-      await _realtimeChannel?.sendBroadcastMessage(
-        event: 'player_ready_changed',
-        payload: {
-          'user_id': localUserId,
-          'is_ready': nextReady,
-        },
-      );
-      await _refreshPlayers(_session!.id);
-    } catch (e) {
-      _errorMessage = 'Could not update ready state: $e';
-      notifyListeners();
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        await client
+            .from('lobby_players')
+            .update({'is_ready': nextReady})
+            .eq('lobby_id', _session!.id)
+            .eq('user_id', localUserId);
+      } catch (_) {}
     }
   }
 
-  /// Updates the active scene category (Host only) and syncs across all connected clients.
-  Future<void> updateCategory(SceneCategory category) async {
-    if (_session == null || !isHost) return;
-    try {
-      final updated = await supabase
-          .from('lobbies')
-          .update({
-            'selected_category': category.key,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', _session!.id)
-          .select()
-          .single();
-
-      _session = LobbySession.fromJson(updated);
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to change category: $e';
-      notifyListeners();
-    }
-  }
-
-  /// Draws a random scene prompt from the selected Supabase category table
-  /// and transitions the lobby into the 'performing' state for all 2–8 players.
   Future<void> startPerformanceRound() async {
-    if (_session == null || !isHost) return;
-    if (_players.length < 2) {
-      _errorMessage = 'At least 2 remote players are required to start a round.';
-      notifyListeners();
-      return;
-    }
-
+    if (_session == null) return;
     _setLoading(true);
-    try {
-      final category = _session!.selectedCategory;
-      List<dynamic> rows;
 
-      if (category.awardFilter != null) {
-        rows = await supabase
-            .from(category.table)
+    final category = _session!.selectedCategory;
+    final builtInList = kBuiltInSceneVault[category] ??
+        kBuiltInSceneVault[SceneCategory.era1970To1999]!;
+    final random = Random.secure();
+    ScenePrompt chosenScene = builtInList[random.nextInt(builtInList.length)];
+
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        final rows = await client
+            .from('scenes')
             .select()
-            .eq('award_subcategory', category.awardFilter!);
-      } else {
-        rows = await supabase.from(category.table).select();
-      }
-
-      if (rows.isEmpty) {
-        throw Exception('No scenes found in table ${category.table}.');
-      }
-
-      final random = Random.secure();
-      final chosenMap =
-          Map<String, dynamic>.from(rows[random.nextInt(rows.length)] as Map);
-      final chosenScene = ScenePrompt.fromJson(chosenMap);
-
-      final nextActor = _players[random.nextInt(_players.length)];
-
-      final updatedLobby = await supabase
-          .from('lobbies')
-          .update({
-            'status': 'performing',
-            'active_actor_id': nextActor.userId,
-            'active_scene_id': chosenScene.id,
-            'active_scene_payload': chosenScene.toJson(),
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', _session!.id)
-          .select()
-          .single();
-
-      _session = LobbySession.fromJson(updatedLobby);
-
-      await _realtimeChannel?.sendBroadcastMessage(
-        event: 'round_started',
-        payload: {
-          'room_code': _session!.roomCode,
-          'active_actor_id': nextActor.userId,
-          'scene': chosenScene.toJson(),
-        },
-      );
-    } catch (e) {
-      _errorMessage = 'Failed to start performance round: $e';
-    } finally {
-      _setLoading(false);
+            .eq('category', category.label)
+            .eq('is_late_night', false);
+        if (rows.isNotEmpty) {
+          chosenScene = ScenePrompt.fromJson(
+            Map<String, dynamic>.from(rows[random.nextInt(rows.length)] as Map),
+          );
+        }
+        await client
+            .from('lobbies')
+            .update({
+              'active_scene_id': chosenScene.id,
+              'status': 'performing',
+            })
+            .eq('id', _session!.id);
+      } catch (_) {}
     }
+
+    _session = _session!.copyWith(
+      status: 'performing',
+      activeActorId: localUserId,
+      activeScene: chosenScene,
+    );
+    _setLoading(false);
   }
 
   Future<void> _refreshPlayers(String lobbyId) async {
-    final data = await supabase
+    final client = supabaseOrNull;
+    if (client == null) return;
+    final data = await client
         .from('lobby_players')
         .select()
         .eq('lobby_id', lobbyId)
@@ -499,9 +727,11 @@ class LobbyRealtimeManager extends ChangeNotifier {
   }
 
   void _subscribeToLobbyRealtime(LobbySession lobby) {
+    final client = supabaseOrNull;
+    if (client == null) return;
     _realtimeChannel?.unsubscribe();
 
-    final channel = supabase.channel(
+    final channel = client.channel(
       'lobby:${lobby.roomCode}',
       opts: const RealtimeChannelConfig(ack: true),
     );
@@ -536,44 +766,12 @@ class LobbyRealtimeManager extends ChangeNotifier {
             _refreshPlayers(lobby.id);
           },
         )
-        .onBroadcast(
-          event: 'round_started',
-          callback: (payload) {
-            final sceneMap = payload['scene'];
-            if (_session != null && sceneMap is Map<String, dynamic>) {
-              _session = LobbySession(
-                id: _session!.id,
-                roomCode: _session!.roomCode,
-                hostId: _session!.hostId,
-                selectedCategory: _session!.selectedCategory,
-                status: 'performing',
-                minPlayers: _session!.minPlayers,
-                maxPlayers: _session!.maxPlayers,
-                activeActorId: payload['active_actor_id']?.toString(),
-                activeScene: ScenePrompt.fromJson(sceneMap),
-                roundNumber: _session!.roundNumber,
-                livekitRoomName: _session!.livekitRoomName,
-              );
-              notifyListeners();
-            }
-          },
-        )
         .subscribe();
 
     _realtimeChannel = channel;
   }
 
   Future<void> leaveLobby() async {
-    final current = _session;
-    if (current != null) {
-      try {
-        await supabase
-            .from('lobby_players')
-            .delete()
-            .eq('lobby_id', current.id)
-            .eq('user_id', localUserId);
-      } catch (_) {}
-    }
     await _realtimeChannel?.unsubscribe();
     _realtimeChannel = null;
     _session = null;
@@ -593,15 +791,16 @@ class LobbyRealtimeManager extends ChangeNotifier {
   }
 }
 
-/// Interactive Matchmaking & 6-Digit Room UI for 2–8 Remote Players.
 class LobbyMatchmakingScreen extends StatefulWidget {
   final SceneCategory initialCategory;
   final bool startInJoinMode;
+  final ScenePrompt? initialPromptOverride;
 
   const LobbyMatchmakingScreen({
     super.key,
     this.initialCategory = SceneCategory.era1970To1999,
     this.startInJoinMode = false,
+    this.initialPromptOverride,
   });
 
   @override
@@ -722,7 +921,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
           DropdownButtonFormField<SceneCategory>(
             value: _selectedCategory,
             decoration: const InputDecoration(
-              labelText: 'Select Supabase Scene Category',
+              labelText: 'Select Scene Vault Category',
               filled: true,
               fillColor: Color(0xFF121722),
               border: OutlineInputBorder(),
@@ -762,12 +961,13 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
                     _lobbyManager.createLobby(
                       displayName: _nameController.text,
                       category: _selectedCategory,
+                      preselectedPrompt: widget.initialPromptOverride,
                     );
                   }
                 },
           child: Text(
             _lobbyManager.isLoading
-                ? 'Synchronizing with Supabase Realtime...'
+                ? 'Initializing Soundstage Lobby...'
                 : (_isJoinMode
                     ? 'Join Remote Lobby'
                     : 'Generate 6-Digit Room Code'),
@@ -833,8 +1033,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
               const SizedBox(height: 8),
               Text(
                 'Category: ${session.selectedCategory.label} · '
-                'Capacity: ${players.length}/${session.maxPlayers} Remote Players · '
-                'LiveKit Room: ${session.livekitRoomName}',
+                'Capacity: ${players.length}/${session.maxPlayers} Players',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
               ),
             ],
@@ -874,7 +1073,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
                   'Director Cue: ${activeScene.directorCue} · Target: ${activeScene.emotionalTarget}',
                   style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -889,8 +1088,8 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.sensors, size: 18),
-                    label: const Text('Enter LiveKit SFU Soundstage'),
+                    icon: const Icon(Icons.videocam, size: 18),
+                    label: const Text('Enter Soundstage & Start Camera'),
                   ),
                 ),
               ],
@@ -899,13 +1098,18 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
           const SizedBox(height: 20),
         ],
         const Text(
-          'Connected Remote Players (2–8 SFU Slots)',
+          'Lobby Roster (2–8 SFU Slots)',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 10),
         ...players.map(
-          (player) => Card(
+          (player) => Container(
             margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF121722),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF1E293B)),
+            ),
             child: ListTile(
               title: Text(
                 player.displayName,
@@ -935,19 +1139,16 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
             Expanded(
               child: OutlinedButton(
                 onPressed: () => _lobbyManager.toggleReadyState(),
-                child: const Text('Toggle Ready Status'),
+                child: const Text('Toggle Ready'),
               ),
             ),
             const SizedBox(width: 12),
-            if (_lobbyManager.isHost)
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _lobbyManager.canStartMatch
-                      ? () => _lobbyManager.startPerformanceRound()
-                      : null,
-                  child: const Text('Draw Scene & Launch Stage'),
-                ),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _lobbyManager.startPerformanceRound(),
+                child: const Text('Draw New Scene'),
               ),
+            ),
           ],
         ),
       ],

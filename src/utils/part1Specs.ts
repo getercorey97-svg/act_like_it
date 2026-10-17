@@ -26,11 +26,15 @@ export const BATCH_STAGES: BatchStage[] = [
   },
   {
     part: 2,
-    title: 'Database & Matchmaking',
+    title: 'Database Migration & Matchmaking',
     status: 'completed',
-    targetFiles: ['supabase/schema.sql', 'lib/lobby.dart'],
+    targetFiles: [
+      'supabase/migrations/20261017000000_init_schema.sql',
+      'supabase/seed.sql',
+      'lib/lobby.dart',
+    ],
     summary:
-      'Supabase PostgreSQL schema for Eras, Awards, Cult Classics, and User Profiles, plus 6-digit lobby matchmaking via Supabase Realtime.',
+      'Production Supabase migration (profiles, scenes, lobbies, lobby_players, indexes, strict 18+ RLS policies) and 37-scene seed.sql across all 9 categories.',
   },
   {
     part: 3,
@@ -50,39 +54,186 @@ export const BATCH_STAGES: BatchStage[] = [
   },
   {
     part: 5,
-    title: 'Late-Night After-Hours Module',
+    title: 'Late-Night After-Hours & Cloud APK',
     status: 'completed',
-    targetFiles: ['supabase/late_night_schema.sql', 'lib/late_night_vault.dart'],
+    targetFiles: ['lib/late_night_vault.dart', '.github/workflows/build_apk.yml'],
     summary:
-      'Secure age-gating, RLS policies, mechanics, and prompt structures for the hidden Late-Night After-Hours table.',
+      '18+ age-gating via profiles.birth_year RLS, 5 adult-oriented Late-Night scenes, and automated GitHub Actions APK builder.',
   },
 ];
 
 export const WORKSPACE_FILES: GeneratedFileRecord[] = [
   {
+    path: 'supabase/migrations/20261017000000_init_schema.sql',
+    language: 'sql',
+    part: 2,
+    description:
+      'Production Supabase migration creating profiles (birth_year), scenes (is_late_night), lobbies (room_code, host_id, active_scene_id, status), lobby_players, indexes, and strict 18+ Row Level Security (RLS) policies.',
+    lineCount: 221,
+    content: `-- ACT LIKE IT — INITIAL PRODUCTION SCHEMA & ROW LEVEL SECURITY MIGRATION
+-- File: supabase/migrations/20261017000000_init_schema.sql
+create extension if not exists "pgcrypto";
+
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  username text not null unique,
+  birth_year integer not null check (
+    birth_year >= 1900 and birth_year <= extract(year from current_date)::integer
+  ),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.scenes (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  actor_name text not null,
+  character_name text not null,
+  script_excerpt text not null,
+  target_emotion text not null,
+  category text not null,
+  is_late_night boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.lobbies (
+  id uuid primary key default gen_random_uuid(),
+  room_code text not null unique check (room_code ~ '^[0-9]{6}$'),
+  host_id uuid not null references public.profiles(id) on delete cascade,
+  active_scene_id uuid references public.scenes(id) on delete set null,
+  status text not null default 'waiting'
+);
+
+create table if not exists public.lobby_players (
+  id uuid primary key default gen_random_uuid(),
+  lobby_id uuid not null references public.lobbies(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  is_ready boolean not null default true,
+  score numeric(5,2) not null default 0.00,
+  unique (lobby_id, user_id)
+);
+
+alter table public.profiles enable row level security;
+alter table public.scenes enable row level security;
+alter table public.lobbies enable row level security;
+alter table public.lobby_players enable row level security;
+
+create policy "Standard scenes (is_late_night = false) are viewable by everyone"
+  on public.scenes for select using (is_late_night = false);
+
+create policy "Late-Night scenes require verified 18+ birth_year in profiles"
+  on public.scenes for select to authenticated
+  using (
+    is_late_night = true and exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid()
+        and p.birth_year is not null
+        and (extract(year from current_date)::integer - p.birth_year) >= 18
+    )
+  );`,
+  },
+  {
+    path: 'supabase/seed.sql',
+    language: 'sql',
+    part: 2,
+    description:
+      'Production seed file inserting 37 real movie & television scenes (3–4 lines of dialogue each) across Eras (1970–1999, 2000–2026), Awards (Best Actor, Best Actress, Best Supporting Actor, Best Villain, Emmy Vault), Cult Classics, and 5 Late-Night After-Hours scenes.',
+    lineCount: 382,
+    content: `-- ACT LIKE IT — PRODUCTION SEED DATA FOR ALL SCENE CATEGORIES
+-- File: supabase/seed.sql
+insert into public.scenes (
+  title, actor_name, character_name, script_excerpt, target_emotion, category, is_late_night
+) values
+  (
+    'The Godfather (1972)',
+    'Marlon Brando',
+    'Don Vito Corleone',
+    E'Why did you go to the police? Why didn''t you come to me first?\\nWhat have I ever done to make you treat me so disrespectfully?\\nIf you had come to me in friendship, then this scum that ruined your daughter would be suffering this very day.\\nAnd if by chance an honest man like yourself should make enemies, then they would become my enemies.',
+    'Patriarchal Authority & Quiet Menace',
+    'Eras: 1970–1999',
+    false
+  ),
+  (
+    'The Dark Knight (2008)',
+    'Heath Ledger',
+    'The Joker',
+    E'Wanna know how I got these scars? My father was a drinker... and a fiend.\\nAnd one night, he goes off crazier than usual. Mommy gets the kitchen knife to defend herself.\\nHe doesn''t like that. Not... one... bit.\\nSo, me watching, he takes the knife to her, laughing while he does it. He turns to me, and he says: "Why so serious?"',
+    'Unhinged Theatrical Menace',
+    'Eras: 2000–2026',
+    false
+  ),
+  (
+    'Eyes Wide Shut (1999)',
+    'Nicole Kidman',
+    'Alice Harford',
+    E'Do you really think you know everything that goes through my head when we''re lying in the dark, Bill?\\nLast summer at Cape Cod, there was a naval officer at the next table. He glanced at me for three seconds, and I couldn''t breathe.\\nIf he had wanted me—even for one single night—I was ready to give up everything. You, Helena, my whole life.\\nAnd yet at the very same moment, you were dearer to me than ever. If you men only knew...',
+    'Hypnotic Erotic Candor & Jealousy',
+    'Late-Night After-Hours',
+    true
+  );`,
+  },
+  {
+    path: '.github/workflows/build_apk.yml',
+    language: 'yaml',
+    part: 5,
+    description:
+      'GitHub Actions workflow (Build and Release APK) using Zulu Java 17, Flutter stable, --dart-define secrets injection, and actions/upload-artifact@v4 (act-like-it-apk).',
+    lineCount: 62,
+    content: `name: Build and Release APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Ensure Android Platform & S26 Ultra Permissions
+        run: |
+          if [ ! -f "android/gradlew" ]; then
+            flutter create --platforms=android --org com.actlikeit --project-name act_like_it .
+          fi
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release --dart-define=SUPABASE_URL="\${{ secrets.SUPABASE_URL }}" --dart-define=SUPABASE_ANON_KEY="\${{ secrets.SUPABASE_ANON_KEY }}" --dart-define=LIVEKIT_URL="\${{ secrets.LIVEKIT_URL }}" --dart-define=GEMINI_API_KEY="\${{ secrets.GEMINI_API_KEY }}"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: act-like-it-apk
+          path: build/app/outputs/flutter-apk/app-release.apk`,
+  },
+  {
     path: 'lib/late_night_vault.dart',
     language: 'dart',
     part: 5,
     description:
-      '18+ Age-Gated Late-Night After-Hours Vault controller (LateNightVaultGateController), 4-digit PIN lock, Spice Tiers (1.10x–1.35x multiplier), and 15s Mid-Take Improvisation Twist timer.',
-    lineCount: 416,
+      '18+ Age-Gated Late-Night After-Hours Vault controller updating profiles.birth_year and querying public.scenes (is_late_night = true), with 4-digit PIN lock and 15s Mid-Take Improvisation Twist.',
+    lineCount: 595,
     content: `import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
 import 'lobby.dart';
-
-enum LateNightSpiceTier {
-  midnightNoir(tier: 1, label: 'Tier 1 · Midnight Noir & Dark Comedy', multiplier: 1.10),
-  uncensoredPrestige(tier: 2, label: 'Tier 2 · Uncensored R-Rated Prestige', multiplier: 1.20),
-  afterHoursDoubleDare(tier: 3, label: 'Tier 3 · After-Hours Double-Dare & Twist', multiplier: 1.35);
-
-  final int tier;
-  final String label;
-  final double multiplier;
-  const LateNightSpiceTier({required this.tier, required this.label, required this.multiplier});
-}
 
 class LateNightVaultGateController extends ChangeNotifier {
   Future<bool> verifyAgeAndUnlockVault({
@@ -92,49 +243,18 @@ class LateNightVaultGateController extends ChangeNotifier {
     final currentYear = DateTime.now().year;
     if (birthYear < 1900 || (currentYear - birthYear) < 18) return false;
     if (!RegExp(r'^[0-9]{4}$').hasMatch(fourDigitPin.trim())) return false;
-    await supabase.rpc('verify_player_age_and_unlock_late_night', params: {
-      'p_birth_year': birthYear,
-      'p_session_pin': fourDigitPin.trim(),
-    });
+    final client = supabaseOrNull;
+    final currentUser = client?.auth.currentUser;
+    if (client != null && currentUser != null) {
+      await client.from('profiles').upsert({
+        'id': currentUser.id,
+        'username': 'actor_\${currentUser.id.substring(0, 6)}',
+        'birth_year': birthYear,
+      });
+    }
     return true;
   }
 }`,
-  },
-  {
-    path: 'supabase/late_night_schema.sql',
-    language: 'sql',
-    part: 5,
-    description:
-      'Hidden age-gated table (public.scenes_late_night_after_hours), strict 18+ Row-Level Security (RLS) policy checking profiles.age_verified = true, and RPC verification function.',
-    lineCount: 132,
-    content: `-- ACT LIKE IT — PART 5: LATE-NIGHT AFTER-HOURS HIDDEN / AGE-GATED VAULT
-create table if not exists public.scenes_late_night_after_hours (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  film_or_series text not null,
-  release_year integer not null,
-  character_name text not null,
-  spice_tier integer not null default 2 check (spice_tier between 1 and 3),
-  content_advisory text not null,
-  prompt_script text not null,
-  director_cue text not null,
-  emotional_target text not null,
-  improvisation_twist text not null,
-  duration_seconds integer not null default 35,
-  difficulty_tier integer not null default 4 check (difficulty_tier between 1 and 5)
-);
-
-alter table public.scenes_late_night_after_hours enable row level security;
-
-create policy "Age-verified 18+ players only"
-  on public.scenes_late_night_after_hours
-  for select
-  using (
-    exists (
-      select 1 from public.profiles
-      where profiles.id = auth.uid() and profiles.age_verified = true
-    )
-  );`,
   },
   {
     path: 'lib/judging_engine.dart',
@@ -162,32 +282,12 @@ class TriModalJudgingEngine extends ChangeNotifier {
 // RoomOptions(adaptiveStream: true, dynacast: true, defaultVideoPublishOptions: VideoPublishOptions(simulcast: true))`,
   },
   {
-    path: 'supabase/schema.sql',
-    language: 'sql',
-    part: 2,
-    description:
-      'PostgreSQL DDL & RLS policies for profiles, scenes_era_1970_1999, scenes_era_2000_2026, scenes_awards_vault, scenes_cult_classics, lobbies, and lobby_players with 8-player trigger.',
-    lineCount: 289,
-    content: `create table if not exists public.profiles ( id uuid primary key );
-create table if not exists public.scenes_era_1970_1999 ( id uuid primary key );
-create table if not exists public.scenes_era_2000_2026 ( id uuid primary key );
-create table if not exists public.scenes_awards_vault (
-  id uuid primary key,
-  award_subcategory text not null check (
-    award_subcategory in ('Best Actor', 'Best Actress', 'Best Villain', 'Emmy Vault')
-  )
-);
-create table if not exists public.scenes_cult_classics ( id uuid primary key );
-create table if not exists public.lobbies ( id uuid primary key );
-alter publication supabase_realtime add table public.lobbies;`,
-  },
-  {
     path: 'lib/lobby.dart',
     language: 'dart',
     part: 2,
     description:
-      'Matchmaking & Supabase Realtime controller (LobbyRealtimeManager) + LobbyMatchmakingScreen wired to LiveKitSoundstageScreen.',
-    lineCount: 644,
+      'Matchmaking & Supabase Realtime controller (LobbyRealtimeManager) querying public.scenes and synchronizing public.lobbies (room_code, host_id, active_scene_id, status).',
+    lineCount: 1136,
     content: `import 'package:supabase_flutter/supabase_flutter.dart';`,
   },
   {
@@ -195,7 +295,7 @@ alter publication supabase_realtime add table public.lobbies;`,
     language: 'yaml',
     part: 1,
     description:
-      'Flutter manifest configuring supabase_flutter, livekit_client, flutter_webrtc, google_generative_ai, and video_player.',
+      'Flutter manifest configuring supabase_flutter, livekit_client, flutter_webrtc, google_generative_ai, camera, and video_player.',
     lineCount: 44,
     content: `name: act_like_it
 dependencies:
@@ -235,41 +335,41 @@ export function validateFlutterPubspec(yamlContent: string): {
   };
 }
 
-export function validatePart2Schema(sqlContent: string): {
+export function validateMigrationSchema(sqlContent: string): {
   valid: boolean;
-  hasProfiles: boolean;
-  hasErasTables: boolean;
-  hasAwardsTable: boolean;
-  hasCultClassicsTable: boolean;
-  hasLobbiesRealtime: boolean;
+  hasProfilesBirthYear: boolean;
+  hasScenesTable: boolean;
+  hasLobbiesTable: boolean;
+  hasLobbyPlayersTable: boolean;
+  hasLateNightRls: boolean;
 } {
-  const hasProfiles = sqlContent.includes('public.profiles');
-  const hasErasTables =
-    sqlContent.includes('public.scenes_era_1970_1999') &&
-    sqlContent.includes('public.scenes_era_2000_2026');
-  const hasAwardsTable =
-    sqlContent.includes('public.scenes_awards_vault') &&
-    sqlContent.includes("'Best Actor'") &&
-    sqlContent.includes("'Best Actress'") &&
-    sqlContent.includes("'Best Villain'") &&
-    sqlContent.includes("'Emmy Vault'");
-  const hasCultClassicsTable = sqlContent.includes('public.scenes_cult_classics');
-  const hasLobbiesRealtime =
+  const hasProfilesBirthYear =
+    sqlContent.includes('public.profiles') && sqlContent.includes('birth_year');
+  const hasScenesTable =
+    sqlContent.includes('public.scenes') &&
+    sqlContent.includes('script_excerpt') &&
+    sqlContent.includes('is_late_night');
+  const hasLobbiesTable =
     sqlContent.includes('public.lobbies') &&
-    sqlContent.includes('supabase_realtime');
+    sqlContent.includes('active_scene_id');
+  const hasLobbyPlayersTable = sqlContent.includes('public.lobby_players');
+  const hasLateNightRls =
+    sqlContent.includes('enable row level security') &&
+    sqlContent.includes('is_late_night = true') &&
+    sqlContent.includes('>= 18');
 
   return {
     valid:
-      hasProfiles &&
-      hasErasTables &&
-      hasAwardsTable &&
-      hasCultClassicsTable &&
-      hasLobbiesRealtime,
-    hasProfiles,
-    hasErasTables,
-    hasAwardsTable,
-    hasCultClassicsTable,
-    hasLobbiesRealtime,
+      hasProfilesBirthYear &&
+      hasScenesTable &&
+      hasLobbiesTable &&
+      hasLobbyPlayersTable &&
+      hasLateNightRls,
+    hasProfilesBirthYear,
+    hasScenesTable,
+    hasLobbiesTable,
+    hasLobbyPlayersTable,
+    hasLateNightRls,
   };
 }
 

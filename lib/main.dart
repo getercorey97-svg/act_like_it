@@ -1,53 +1,133 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lobby.dart';
 import 'late_night_vault.dart';
 
-/// Application Configuration Constants
-/// Configured via --dart-define during cloud CI/CD or runtime environment injection.
+/// Application Configuration Constants & Runtime Overrides.
+/// Supports both CI `--dart-define` secrets AND in-app configuration on the
+/// Samsung Galaxy S26 Ultra so the APK works out-of-the-box immediately.
 class AppConfig {
-  static const String supabaseUrl = String.fromEnvironment(
+  static const String _envSupabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://your-project-id.supabase.co',
+    defaultValue: '',
   );
-  static const String supabaseAnonKey = String.fromEnvironment(
+  static const String _envSupabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'your-supabase-anon-key',
+    defaultValue: '',
   );
-  static const String liveKitUrl = String.fromEnvironment(
+  static const String _envLiveKitUrl = String.fromEnvironment(
     'LIVEKIT_URL',
-    defaultValue: 'wss://act-like-it-sfu.livekit.cloud',
+    defaultValue: '',
   );
-  static const String geminiApiKey = String.fromEnvironment(
+  static const String _envGeminiApiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
     defaultValue: '',
   );
+
+  static String _runtimeSupabaseUrl = '';
+  static String _runtimeSupabaseAnonKey = '';
+  static String _runtimeLiveKitUrl = '';
+  static String _runtimeGeminiApiKey = '';
+  static bool _supabaseInitialized = false;
+
+  static String get supabaseUrl =>
+      _runtimeSupabaseUrl.isNotEmpty ? _runtimeSupabaseUrl : _envSupabaseUrl;
+
+  static String get supabaseAnonKey => _runtimeSupabaseAnonKey.isNotEmpty
+      ? _runtimeSupabaseAnonKey
+      : _envSupabaseAnonKey;
+
+  static String get liveKitUrl =>
+      _runtimeLiveKitUrl.isNotEmpty ? _runtimeLiveKitUrl : _envLiveKitUrl;
+
+  static String get geminiApiKey =>
+      _runtimeGeminiApiKey.isNotEmpty ? _runtimeGeminiApiKey : _envGeminiApiKey;
+
+  static bool get hasCloudSupabase =>
+      supabaseUrl.startsWith('https://') &&
+      !supabaseUrl.contains('your-project-id') &&
+      supabaseAnonKey.isNotEmpty &&
+      _supabaseInitialized;
+
+  static bool get hasLiveKitCloud =>
+      liveKitUrl.startsWith('wss://') &&
+      !liveKitUrl.contains('act-like-it-sfu.livekit.cloud');
+
+  static Future<void> loadSavedConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    _runtimeSupabaseUrl = prefs.getString('cfg_supabase_url') ?? '';
+    _runtimeSupabaseAnonKey = prefs.getString('cfg_supabase_anon_key') ?? '';
+    _runtimeLiveKitUrl = prefs.getString('cfg_livekit_url') ?? '';
+    _runtimeGeminiApiKey = prefs.getString('cfg_gemini_api_key') ?? '';
+
+    if (supabaseUrl.startsWith('https://') && supabaseAnonKey.isNotEmpty) {
+      try {
+        await Supabase.initialize(
+          url: supabaseUrl,
+          anonKey: supabaseAnonKey,
+          realtimeClientOptions: const RealtimeClientOptions(
+            eventsPerSecond: 10,
+          ),
+        );
+        _supabaseInitialized = true;
+      } catch (_) {
+        _supabaseInitialized = false;
+      }
+    }
+  }
+
+  static Future<void> saveRuntimeConfig({
+    required String geminiKey,
+    required String supabaseProjectUrl,
+    required String supabaseKey,
+    required String liveKitServerUrl,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    _runtimeGeminiApiKey = geminiKey.trim();
+    _runtimeSupabaseUrl = supabaseProjectUrl.trim();
+    _runtimeSupabaseAnonKey = supabaseKey.trim();
+    _runtimeLiveKitUrl = liveKitServerUrl.trim();
+
+    await prefs.setString('cfg_gemini_api_key', _runtimeGeminiApiKey);
+    await prefs.setString('cfg_supabase_url', _runtimeSupabaseUrl);
+    await prefs.setString('cfg_supabase_anon_key', _runtimeSupabaseAnonKey);
+    await prefs.setString('cfg_livekit_url', _runtimeLiveKitUrl);
+
+    if (!_supabaseInitialized &&
+        supabaseUrl.startsWith('https://') &&
+        supabaseAnonKey.isNotEmpty) {
+      try {
+        await Supabase.initialize(
+          url: supabaseUrl,
+          anonKey: supabaseAnonKey,
+          realtimeClientOptions: const RealtimeClientOptions(
+            eventsPerSecond: 10,
+          ),
+        );
+        _supabaseInitialized = true;
+      } catch (_) {}
+    }
+  }
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock orientation to portrait for consistent mobile stage framing on Galaxy S26 Ultra
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Initialize Supabase (PostgreSQL, Realtime Channels, Edge Storage)
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabaseAnonKey,
-    realtimeClientOptions: const RealtimeClientOptions(
-      eventsPerSecond: 10,
-    ),
-  );
+  await AppConfig.loadSavedConfig();
 
   runApp(const ActLikeItApp());
 }
 
-/// Global convenience accessor for the Supabase client instance.
-final SupabaseClient supabase = Supabase.instance.client;
+/// Safe accessor for Supabase client when cloud mode is configured.
+SupabaseClient? get supabaseOrNull =>
+    AppConfig.hasCloudSupabase ? Supabase.instance.client : null;
 
 class ActLikeItApp extends StatelessWidget {
   const ActLikeItApp({super.key});
@@ -62,8 +142,8 @@ class ActLikeItApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0A0D14),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFE11D48), // Stage Crimson
-          secondary: Color(0xFFF59E0B), // Academy Gold
+          primary: Color(0xFFE11D48),
+          secondary: Color(0xFFF59E0B),
           surface: Color(0xFF121722),
           onPrimary: Colors.white,
           onSecondary: Color(0xFF0A0D14),
@@ -78,14 +158,6 @@ class ActLikeItApp extends StatelessWidget {
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
             color: Color(0xFFF8FAFC),
-          ),
-        ),
-        cardTheme: CardTheme(
-          color: const Color(0xFF121722),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFF1E293B), width: 1),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -108,7 +180,6 @@ class ActLikeItApp extends StatelessWidget {
   }
 }
 
-/// Foundational Shell Screen connected to Part 2 Matchmaking (lib/lobby.dart).
 class SoundstageShellScreen extends StatefulWidget {
   const SoundstageShellScreen({super.key});
 
@@ -117,31 +188,151 @@ class SoundstageShellScreen extends StatefulWidget {
 }
 
 class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
-  String _selectedCategoryGroup = 'Eras (1970–1999)';
+  SceneCategory _selectedCategory = SceneCategory.era1970To1999;
   bool _lateNightUnlocked = false;
 
-  static const List<Map<String, String>> _coreCategories = [
+  static const List<Map<String, dynamic>> _coreCategories = [
     {
+      'category': SceneCategory.era1970To1999,
       'group': 'Eras (1970–1999)',
       'subtitle': 'New Hollywood & Blockbuster Golden Age',
       'table': 'scenes_era_1970_1999',
     },
     {
+      'category': SceneCategory.era2000To2026,
       'group': 'Eras (2000–2026)',
       'subtitle': 'Modern Prestige Cinema & Streaming Defining Moments',
       'table': 'scenes_era_2000_2026',
     },
     {
-      'group': 'Awards Vault',
-      'subtitle': 'Best Actor · Best Actress · Best Villain · Emmy Vault',
+      'category': SceneCategory.awardsBestActor,
+      'group': 'Awards: Best Actor',
+      'subtitle': 'Academy & Guild Leading Performances',
       'table': 'scenes_awards_vault',
     },
     {
-      'group': 'Specialty',
-      'subtitle': 'Cult Classics & Unforgettable Monologues',
+      'category': SceneCategory.awardsBestActress,
+      'group': 'Awards: Best Actress',
+      'subtitle': 'Iconic Dramatic & Psychological Showcase',
+      'table': 'scenes_awards_vault',
+    },
+    {
+      'category': SceneCategory.awardsBestVillain,
+      'group': 'Awards: Best Villain',
+      'subtitle': 'Unblinking Dread & Scene-Stealing Antagonists',
+      'table': 'scenes_awards_vault',
+    },
+    {
+      'category': SceneCategory.awardsEmmyVault,
+      'group': 'Awards: Emmy Vault',
+      'subtitle': 'Prestige Television Monologues',
+      'table': 'scenes_awards_vault',
+    },
+    {
+      'category': SceneCategory.specialtyCultClassics,
+      'group': 'Specialty: Cult Classics',
+      'subtitle': 'Midnight Cinema & Unforgettable Quotables',
       'table': 'scenes_cult_classics',
     },
   ];
+
+  void _openCloudConfigSheet() {
+    final geminiCtrl = TextEditingController(text: AppConfig.geminiApiKey);
+    final supaUrlCtrl = TextEditingController(text: AppConfig.supabaseUrl);
+    final supaKeyCtrl = TextEditingController(text: AppConfig.supabaseAnonKey);
+    final liveKitCtrl = TextEditingController(text: AppConfig.liveKitUrl);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF121722),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Cloud API & Standalone Hybrid Settings',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'The app runs immediately on your S26 Ultra using hardware camera recording and built-in scene vaults. Optionally enter your cloud keys below to enable live Gemini API & Supabase sync.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: geminiCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Gemini API Key (AI Telemetrics)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: supaUrlCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Supabase Project URL (https://...)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: supaKeyCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Supabase Anon Public Key',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: liveKitCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'LiveKit WebSocket URL (wss://...)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await AppConfig.saveRuntimeConfig(
+                        geminiKey: geminiCtrl.text,
+                        supabaseProjectUrl: supaUrlCtrl.text,
+                        supabaseKey: supaKeyCtrl.text,
+                        liveKitServerUrl: liveKitCtrl.text,
+                      );
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                      setState(() {});
+                    },
+                    child: const Text('Save Runtime Configuration'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,17 +340,10 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
       appBar: AppBar(
         title: const Text('Act Like It'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Center(
-              child: Text(
-                'SFU 2–8 Players · Tri-Modal Judging',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.blueGrey.shade300,
-                ),
-              ),
-            ),
+          IconButton(
+            onPressed: _openCloudConfigSheet,
+            tooltip: 'Cloud & API Key Settings',
+            icon: const Icon(Icons.tune, color: Color(0xFFF59E0B)),
           ),
         ],
       ),
@@ -201,7 +385,7 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Enter a 6-digit lobby code or host a remote 2–8 player LiveKit SFU room. Perform iconic cinema prompts live while Gemini Multimodal AI and peers score your emotional cadence.',
+            'Host a 6-digit lobby or launch an instant soundstage session on your Galaxy S26 Ultra. Perform iconic cinema prompts with live camera capture, looped replay, and Gemini AI Telemetrics.',
             style: TextStyle(
               fontSize: 14,
               height: 1.5,
@@ -216,7 +400,8 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const LobbyMatchmakingScreen(
+                        builder: (_) => LobbyMatchmakingScreen(
+                          initialCategory: _selectedCategory,
                           startInJoinMode: false,
                         ),
                       ),
@@ -231,7 +416,8 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const LobbyMatchmakingScreen(
+                        builder: (_) => LobbyMatchmakingScreen(
+                          initialCategory: _selectedCategory,
                           startInJoinMode: true,
                         ),
                       ),
@@ -277,7 +463,7 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
           SizedBox(height: 12),
           Text(
             '1. AI Telemetrics · Gemini API multimodal video/audio frame analysis\n'
-            '2. Peer Judging · Looped video replay via Supabase Edge Storage\n'
+            '2. Peer Judging · Looped video replay (Device & Supabase Storage)\n'
             '3. Social Judging · External share engagement metric calculation',
             style: TextStyle(
               fontSize: 13,
@@ -295,7 +481,7 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Supabase Scene Vaults',
+          'Select Scene Vault Category (Tap to Launch)',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -304,15 +490,24 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
         ),
         const SizedBox(height: 12),
         ..._coreCategories.map((cat) {
-          final isSelected = _selectedCategoryGroup == cat['group'];
+          final categoryEnum = cat['category'] as SceneCategory;
+          final isSelected = _selectedCategory == categoryEnum;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
               onTap: () {
                 setState(() {
-                  _selectedCategoryGroup = cat['group']!;
+                  _selectedCategory = categoryEnum;
                 });
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => LobbyMatchmakingScreen(
+                      initialCategory: categoryEnum,
+                      startInJoinMode: false,
+                    ),
+                  ),
+                );
               },
               child: Container(
                 padding: const EdgeInsets.all(14),
@@ -335,7 +530,7 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            cat['group']!,
+                            cat['group'] as String,
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -344,7 +539,7 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            cat['subtitle']!,
+                            cat['subtitle'] as String,
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF94A3B8),
@@ -353,13 +548,9 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
                         ],
                       ),
                     ),
-                    Text(
-                      cat['table']!,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        color: Color(0xFFF59E0B),
-                      ),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: Color(0xFFF59E0B),
                     ),
                   ],
                 ),
@@ -396,7 +587,7 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Hidden, age-gated Supabase table configured in Part 5.',
+                  'Age-gated 18+ vault with 15s Mid-Take Improvisation Twists.',
                   style: TextStyle(
                     fontSize: 12,
                     color: Color(0xFF94A3B8),

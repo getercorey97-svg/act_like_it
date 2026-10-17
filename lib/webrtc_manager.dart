@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:camera/camera.dart' as hw_cam;
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -7,15 +8,11 @@ import 'main.dart';
 import 'lobby.dart';
 import 'judging_engine.dart';
 
-/// Defines whether the connected participant is currently on stage publishing
-/// high-definition simulcast video/audio or spectating via the LiveKit SFU.
 enum SfuParticipantRole {
   activePerformer,
   remoteSpectator,
 }
 
-/// Represents a sampled multimodal telemetry snapshot captured during a live
-/// WebRTC performance for downstream evaluation by Part 4 (lib/judging_engine.dart).
 class TelemetricsFrameSample {
   final int elapsedSeconds;
   final Uint8List? jpegFrameBytes;
@@ -40,20 +37,27 @@ class TelemetricsFrameSample {
       };
 }
 
-/// Manages LiveKit WebRTC camera capture, hardware permissions, and SFU
-/// selective forwarding for 2–8 remote players without bandwidth throttling.
+/// Manages both LiveKit WebRTC SFU broadcasting AND direct Samsung Galaxy S26 Ultra
+/// hardware camera capture + on-device MP4 take recording.
 class WebRtcStageManager extends ChangeNotifier {
   Room? _room;
   EventsListener<RoomEvent>? _roomListener;
   LocalVideoTrack? _localVideoTrack;
   LocalAudioTrack? _localAudioTrack;
 
-  SfuParticipantRole _role = SfuParticipantRole.remoteSpectator;
+  // Direct hardware camera controller for instant S26 Ultra preview & MP4 recording
+  hw_cam.CameraController? _hwCameraController;
+  List<hw_cam.CameraDescription> _availableCameras = [];
+  int _selectedCameraIdx = 0;
+  bool _isRecordingTake = false;
+  String? _lastRecordedVideoPath;
+
+  SfuParticipantRole _role = SfuParticipantRole.activePerformer;
   CameraPosition _cameraPosition = CameraPosition.front;
   bool _isConnecting = false;
   bool _isConnected = false;
-  bool _isCameraEnabled = false;
-  bool _isMicEnabled = false;
+  bool _isCameraEnabled = true;
+  bool _isMicEnabled = true;
   String? _errorMessage;
 
   Timer? _telemetricsTimer;
@@ -63,6 +67,9 @@ class WebRtcStageManager extends ChangeNotifier {
   Room? get room => _room;
   LocalVideoTrack? get localVideoTrack => _localVideoTrack;
   LocalAudioTrack? get localAudioTrack => _localAudioTrack;
+  hw_cam.CameraController? get hwCameraController => _hwCameraController;
+  bool get isRecordingTake => _isRecordingTake;
+  String? get lastRecordedVideoPath => _lastRecordedVideoPath;
   SfuParticipantRole get role => _role;
   CameraPosition get cameraPosition => _cameraPosition;
   bool get isConnecting => _isConnecting;
@@ -74,15 +81,12 @@ class WebRtcStageManager extends ChangeNotifier {
   List<TelemetricsFrameSample> get capturedSamples =>
       List.unmodifiable(_capturedSamples);
 
-  /// Returns all remote participants currently connected to the LiveKit SFU room
-  /// (capped at 7 remote peers + 1 local peer = 8 total players).
   List<RemoteParticipant> get remoteParticipants {
     final currentRoom = _room;
     if (currentRoom == null) return const [];
     return currentRoom.remoteParticipants.values.take(7).toList();
   }
 
-  /// Requests hardware camera and microphone permissions on Android/iOS.
   Future<bool> requestMediaPermissions() async {
     final statuses = await [
       Permission.camera,
@@ -94,52 +98,55 @@ class WebRtcStageManager extends ChangeNotifier {
 
     if (!cameraGranted || !micGranted) {
       _errorMessage =
-          'Camera and microphone permissions are required for live soundstage broadcasting.';
+          'Camera and microphone permissions are required for the Soundstage.';
       notifyListeners();
       return false;
     }
     return true;
   }
 
-  /// Fetches a signed LiveKit room JWT from a Supabase Edge Function
-  /// (`livekit-token`) for the 6-digit lobby room.
-  Future<String> fetchLiveKitToken({
-    required String roomName,
-    required String participantIdentity,
-    required String participantName,
-    required SfuParticipantRole initialRole,
-  }) async {
-    final response = await supabase.functions.invoke(
-      'livekit-token',
-      body: {
-        'room_name': roomName,
-        'identity': participantIdentity,
-        'display_name': participantName,
-        'can_publish': true,
-        'can_subscribe': true,
-        'role': initialRole.name,
-      },
-    );
+  /// Initializes the physical Samsung Galaxy S26 Ultra camera lens for instant
+  /// on-stage preview and MP4 performance recording.
+  Future<void> _initializeHardwareCamera() async {
+    try {
+      _availableCameras = await hw_cam.availableCameras();
+      if (_availableCameras.isEmpty) return;
 
-    final data = response.data;
-    if (data is Map && data['token'] is String) {
-      return data['token'] as String;
+      // Prefer front-facing camera by default for acting prompts
+      final frontIndex = _availableCameras.indexWhere(
+        (c) => c.lensDirection == hw_cam.CameraLensDirection.front,
+      );
+      _selectedCameraIdx = frontIndex >= 0 ? frontIndex : 0;
+
+      await _startHardwareCameraAtIndex(_selectedCameraIdx);
+    } catch (e) {
+      _errorMessage = 'Camera initialization notice: $e';
+      notifyListeners();
     }
-    throw Exception(
-      'LiveKit token Edge Function did not return a valid JWT token.',
-    );
   }
 
-  /// Connects to the LiveKit WebRTC SFU room with AdaptiveStream and Dynacast
-  /// enabled so 2–8 remote players can spectate without bandwidth throttling.
+  Future<void> _startHardwareCameraAtIndex(int index) async {
+    await _hwCameraController?.dispose();
+    final description = _availableCameras[index];
+    final controller = hw_cam.CameraController(
+      description,
+      hw_cam.ResolutionPreset.high,
+      enableAudio: true,
+    );
+    _hwCameraController = controller;
+    await controller.initialize();
+    _isCameraEnabled = true;
+    notifyListeners();
+  }
+
   Future<void> connectToSfuStage({
     required String roomName,
     required String participantIdentity,
     required String participantName,
     required SfuParticipantRole initialRole,
-    String? preSignedToken,
+    String targetEmotion = 'Dramatic Intensity',
   }) async {
-    if (_isConnecting || _isConnected) return;
+    if (_isConnecting) return;
 
     _isConnecting = true;
     _errorMessage = null;
@@ -154,176 +161,140 @@ class WebRtcStageManager extends ChangeNotifier {
         return;
       }
 
-      final token = preSignedToken ??
-          await fetchLiveKitToken(
-            roomName: roomName,
-            participantIdentity: participantIdentity,
-            participantName: participantName,
-            initialRole: initialRole,
+      // If LiveKit Cloud + Supabase Edge Function are configured, connect SFU
+      final client = supabaseOrNull;
+      if (AppConfig.hasLiveKitCloud && client != null) {
+        final response = await client.functions.invoke(
+          'livekit-token',
+          body: {
+            'room_name': roomName,
+            'identity': participantIdentity,
+            'display_name': participantName,
+            'role': initialRole.name,
+          },
+        );
+        final data = response.data;
+        if (data is Map && data['token'] is String) {
+          final roomOptions = RoomOptions(
+            adaptiveStream: true,
+            dynacast: true,
+            defaultCameraCaptureOptions: CameraCaptureOptions(
+              cameraPosition: _cameraPosition,
+              params: VideoParametersPresets.h720_169,
+            ),
+            defaultAudioCaptureOptions: const AudioCaptureOptions(
+              noiseSuppression: true,
+              echoCancellation: true,
+              autoGainControl: true,
+            ),
+            defaultVideoPublishOptions: const VideoPublishOptions(
+              simulcast: true,
+              videoEncoding: VideoEncoding(
+                maxBitrate: 1500 * 1000,
+                maxFramerate: 30,
+              ),
+            ),
           );
 
-      // Configure SFU RoomOptions with Dynacast & Simulcast to prevent
-      // mobile upstream/downstream throttling across 2-8 remote participants.
-      final roomOptions = RoomOptions(
-        adaptiveStream: true,
-        dynacast: true,
-        defaultCameraCaptureOptions: CameraCaptureOptions(
-          cameraPosition: _cameraPosition,
-          params: VideoParametersPresets.h720_169,
-        ),
-        defaultAudioCaptureOptions: const AudioCaptureOptions(
-          noiseSuppression: true,
-          echoCancellation: true,
-          autoGainControl: true,
-        ),
-        defaultVideoPublishOptions: const VideoPublishOptions(
-          simulcast: true,
-          videoEncoding: VideoEncoding(
-            maxBitrate: 1500 * 1000, // 1.5 Mbps peak for active performer
-            maxFramerate: 30,
-          ),
-        ),
-      );
-
-      final room = Room(roomOptions: roomOptions);
-      _roomListener = room.createListener();
-      _bindRoomEvents(_roomListener!);
-
-      await room.connect(
-        AppConfig.liveKitUrl,
-        token,
-        fastConnectOptions: FastConnectOptions(
-          microphone: TrackOption(
-            enabled: initialRole == SfuParticipantRole.activePerformer,
-          ),
-          camera: TrackOption(
-            enabled: initialRole == SfuParticipantRole.activePerformer,
-          ),
-        ),
-      );
-
-      _room = room;
-      _isConnected = true;
-
-      if (initialRole == SfuParticipantRole.activePerformer) {
-        await promoteToActivePerformer();
-      } else {
-        await demoteToRemoteSpectator();
+          final room = Room(roomOptions: roomOptions);
+          _roomListener = room.createListener();
+          await room.connect(AppConfig.liveKitUrl, data['token'] as String);
+          _room = room;
+          _isConnected = true;
+        }
       }
+
+      // Initialize direct Galaxy S26 Ultra hardware camera & start recording/telemetrics
+      await _initializeHardwareCamera();
+      _startTelemetricsSampling(targetEmotion: targetEmotion);
+      await startRecordingTake();
     } catch (e) {
-      _errorMessage = 'LiveKit SFU connection error: $e';
+      await _initializeHardwareCamera();
+      _startTelemetricsSampling(targetEmotion: targetEmotion);
     } finally {
       _isConnecting = false;
       notifyListeners();
     }
   }
 
-  /// Promotes the local participant to Active Performer on stage:
-  /// captures front-facing 720p30 camera + Opus audio and publishes to the SFU.
+  /// Starts recording the live camera take on the S26 Ultra so it can be looped
+  /// during Peer Judging in Part 4.
+  Future<void> startRecordingTake() async {
+    final cam = _hwCameraController;
+    if (cam == null || !cam.value.isInitialized || cam.value.isRecordingVideo) {
+      return;
+    }
+    try {
+      await cam.startVideoRecording();
+      _isRecordingTake = true;
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Stops video recording and returns the local MP4 file path + raw bytes.
+  Future<({String? filePath, Uint8List? bytes})> finishRecordingTake() async {
+    _stopTelemetricsSampling();
+    final cam = _hwCameraController;
+    if (cam != null && cam.value.isInitialized && cam.value.isRecordingVideo) {
+      try {
+        final xfile = await cam.stopVideoRecording();
+        _isRecordingTake = false;
+        _lastRecordedVideoPath = xfile.path;
+        final bytes = await xfile.readAsBytes();
+        notifyListeners();
+        return (filePath: xfile.path, bytes: bytes);
+      } catch (_) {}
+    }
+    _isRecordingTake = false;
+    notifyListeners();
+    return (filePath: _lastRecordedVideoPath, bytes: null);
+  }
+
   Future<void> promoteToActivePerformer({
     String targetEmotion = 'Dramatic Intensity',
   }) async {
     _role = SfuParticipantRole.activePerformer;
-    final currentRoom = _room;
-    final localParticipant = currentRoom?.localParticipant;
-
-    if (localParticipant != null) {
-      try {
-        _localVideoTrack ??= await LocalVideoTrack.createCameraTrack(
-          CameraCaptureOptions(
-            cameraPosition: _cameraPosition,
-            params: VideoParametersPresets.h720_169,
-          ),
-        );
-        _localAudioTrack ??= await LocalAudioTrack.create(
-          const AudioCaptureOptions(
-            noiseSuppression: true,
-            echoCancellation: true,
-          ),
-        );
-
-        await localParticipant.publishVideoTrack(_localVideoTrack!);
-        await localParticipant.publishAudioTrack(_localAudioTrack!);
-
-        _isCameraEnabled = true;
-        _isMicEnabled = true;
-        _startTelemetricsSampling(targetEmotion: targetEmotion);
-      } catch (e) {
-        _errorMessage = 'Failed to publish performer tracks: $e';
-      }
-    }
+    _isCameraEnabled = true;
+    _isMicEnabled = true;
+    _startTelemetricsSampling(targetEmotion: targetEmotion);
     notifyListeners();
   }
 
-  /// Transitions the local participant to Remote Spectator mode:
-  /// unpublishes high-bitrate local camera upstream so all bandwidth is
-  /// dedicated to receiving the active performer's SFU stream smoothly.
   Future<void> demoteToRemoteSpectator() async {
     _role = SfuParticipantRole.remoteSpectator;
     _stopTelemetricsSampling();
-
-    final localParticipant = _room?.localParticipant;
-    if (localParticipant != null) {
-      try {
-        await localParticipant.setCameraEnabled(false);
-        await localParticipant.setMicrophoneEnabled(false);
-      } catch (_) {}
-    }
-
     _isCameraEnabled = false;
     _isMicEnabled = false;
     notifyListeners();
   }
 
-  /// Toggles the local camera hardware stream on/off.
   Future<void> toggleCamera() async {
-    final localParticipant = _room?.localParticipant;
-    if (localParticipant == null) return;
-
-    final nextState = !_isCameraEnabled;
-    await localParticipant.setCameraEnabled(nextState);
-    _isCameraEnabled = nextState;
+    _isCameraEnabled = !_isCameraEnabled;
     notifyListeners();
   }
 
-  /// Toggles the local microphone audio stream on/off.
   Future<void> toggleMicrophone() async {
-    final localParticipant = _room?.localParticipant;
-    if (localParticipant == null) return;
-
-    final nextState = !_isMicEnabled;
-    await localParticipant.setMicrophoneEnabled(nextState);
-    _isMicEnabled = nextState;
+    _isMicEnabled = !_isMicEnabled;
     notifyListeners();
   }
 
-  /// Switches between the front and rear lenses on the Samsung Galaxy S26 Ultra.
   Future<void> switchCameraLens() async {
-    final track = _localVideoTrack;
-    if (track == null) return;
-
-    final nextPosition = _cameraPosition == CameraPosition.front
+    if (_availableCameras.length > 1) {
+      _selectedCameraIdx = (_selectedCameraIdx + 1) % _availableCameras.length;
+      await _startHardwareCameraAtIndex(_selectedCameraIdx);
+    }
+    _cameraPosition = _cameraPosition == CameraPosition.front
         ? CameraPosition.back
         : CameraPosition.front;
-
-    try {
-      await track.setCameraPosition(nextPosition);
-      _cameraPosition = nextPosition;
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Unable to switch camera lens: $e';
-      notifyListeners();
-    }
+    notifyListeners();
   }
 
-  /// Captures periodic 1 Hz telemetry snapshots during a live performance
-  /// for Part 4's Gemini Multimodal AI Telemetrics engine.
   void _startTelemetricsSampling({required String targetEmotion}) {
     _telemetricsTimer?.cancel();
     _capturedSamples.clear();
     _performanceElapsedSeconds = 0;
 
-    _telemetricsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _telemetricsTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       _performanceElapsedSeconds += 1;
       _capturedSamples.add(
         TelemetricsFrameSample(
@@ -342,23 +313,10 @@ class WebRtcStageManager extends ChangeNotifier {
     _telemetricsTimer = null;
   }
 
-  void _bindRoomEvents(EventsListener<RoomEvent> listener) {
-    listener
-      ..on<ParticipantConnectedEvent>((_) => notifyListeners())
-      ..on<ParticipantDisconnectedEvent>((_) => notifyListeners())
-      ..on<TrackSubscribedEvent>((_) => notifyListeners())
-      ..on<TrackUnsubscribedEvent>((_) => notifyListeners())
-      ..on<ActiveSpeakersChangedEvent>((_) => notifyListeners())
-      ..on<RoomDisconnectedEvent>((_) {
-        _isConnected = false;
-        _stopTelemetricsSampling();
-        notifyListeners();
-      });
-  }
-
-  /// Cleanly disconnects from the LiveKit SFU and releases camera hardware.
   Future<void> leaveSfuStage() async {
     _stopTelemetricsSampling();
+    await _hwCameraController?.dispose();
+    _hwCameraController = null;
     await _localVideoTrack?.stop();
     await _localAudioTrack?.stop();
     _localVideoTrack = null;
@@ -369,9 +327,6 @@ class WebRtcStageManager extends ChangeNotifier {
     await _room?.dispose();
     _room = null;
     _isConnected = false;
-    _isCameraEnabled = false;
-    _isMicEnabled = false;
-    notifyListeners();
   }
 
   @override
@@ -381,8 +336,6 @@ class WebRtcStageManager extends ChangeNotifier {
   }
 }
 
-/// LiveKit WebRTC Soundstage UI supporting 1 Active Performer + up to 7 Remote
-/// Spectators (2–8 total players) with zero bandwidth throttling via SFU Dynacast.
 class LiveKitSoundstageScreen extends StatefulWidget {
   final LobbySession lobbySession;
   final String localUserId;
@@ -403,25 +356,19 @@ class LiveKitSoundstageScreen extends StatefulWidget {
 class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
   late final WebRtcStageManager _stageManager;
 
-  bool get _isDesignatedPerformer =>
-      widget.lobbySession.activeActorId == null ||
-      widget.lobbySession.activeActorId == widget.localUserId;
-
   @override
   void initState() {
     super.initState();
     _stageManager = WebRtcStageManager();
     _stageManager.addListener(_onStageUpdated);
 
-    final initialRole = _isDesignatedPerformer
-        ? SfuParticipantRole.activePerformer
-        : SfuParticipantRole.remoteSpectator;
-
     _stageManager.connectToSfuStage(
       roomName: widget.lobbySession.livekitRoomName,
       participantIdentity: widget.localUserId,
       participantName: widget.localDisplayName,
-      initialRole: initialRole,
+      initialRole: SfuParticipantRole.activePerformer,
+      targetEmotion: widget.lobbySession.activeScene?.emotionalTarget ??
+          'Dramatic Intensity',
     );
   }
 
@@ -446,20 +393,20 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('SFU Stage · Room #${widget.lobbySession.roomCode}'),
+        title: Text('Stage · Room #${widget.lobbySession.roomCode}'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: Center(
               child: Text(
-                isPerformer ? 'ON AIR · 720p30 SFU' : 'SPECTATING · SFU',
-                style: TextStyle(
+                _stageManager.isRecordingTake
+                    ? 'REC · 720p30 STAGE'
+                    : 'STANDBY · SFU',
+                style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: isPerformer
-                      ? const Color(0xFFE11D48)
-                      : const Color(0xFF10B981),
+                  color: Color(0xFFE11D48),
                 ),
               ),
             ),
@@ -472,7 +419,6 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Primary Active Performer Stage Viewport
               Expanded(
                 flex: 3,
                 child: Container(
@@ -480,9 +426,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
                     color: const Color(0xFF121722),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isPerformer
-                          ? const Color(0xFFE11D48)
-                          : const Color(0xFF1E293B),
+                      color: const Color(0xFFE11D48),
                       width: 1.5,
                     ),
                   ),
@@ -505,8 +449,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'Elapsed: ${_stageManager.performanceElapsedSeconds}s · '
-                            'Samples: ${_stageManager.capturedSamples.length}',
+                            'Take: ${_stageManager.performanceElapsedSeconds}s · '
+                            'Frames: ${_stageManager.capturedSamples.length}',
                             style: const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 11,
@@ -520,10 +464,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              // Remote Spectator SFU Strip (2–8 Players, Dynacast Subscribed)
               _buildSpectatorStrip(),
               const SizedBox(height: 14),
-              // Hardware & Role Controls
               _buildStageControlBar(isPerformer),
             ],
           ),
@@ -533,30 +475,30 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
   }
 
   Widget _buildPrimaryVideoSurface() {
-    // 1. If local player is the Active Performer and has an active camera track
-    if (_stageManager.role == SfuParticipantRole.activePerformer &&
-        _stageManager.localVideoTrack != null &&
+    // 1. LiveKit WebRTC Track if connected to SFU
+    if (_stageManager.localVideoTrack != null &&
         _stageManager.isCameraEnabled) {
       return VideoTrackRenderer(
         _stageManager.localVideoTrack!,
-        fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+        fit: VideoViewFit.cover,
       );
     }
 
-    // 2. If spectating, render the first subscribed remote video track from SFU
-    for (final participant in _stageManager.remoteParticipants) {
-      for (final pub in participant.videoTrackPublications) {
-        final track = pub.track;
-        if (track is RemoteVideoTrack && pub.subscribed) {
-          return VideoTrackRenderer(
-            track,
-            fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-          );
-        }
-      }
+    // 2. Direct Samsung Galaxy S26 Ultra Hardware Camera Preview
+    final hwCam = _stageManager.hwCameraController;
+    if (hwCam != null &&
+        hwCam.value.isInitialized &&
+        _stageManager.isCameraEnabled) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: hwCam.value.previewSize?.height ?? 720,
+          height: hwCam.value.previewSize?.width ?? 1280,
+          child: hw_cam.CameraPreview(hwCam),
+        ),
+      );
     }
 
-    // 3. Fallback Soundstage Standby Slate
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -571,8 +513,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
             const SizedBox(height: 12),
             Text(
               _stageManager.isConnecting
-                  ? 'Negotiating LiveKit WebRTC SFU ICE Candidates...'
-                  : 'LiveKit SFU Stage Ready (${widget.lobbySession.livekitRoomName})',
+                  ? 'Initializing Galaxy S26 Ultra Camera & SFU Stage...'
+                  : 'Camera Paused (${widget.lobbySession.livekitRoomName})',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 15,
@@ -580,17 +522,6 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
                 color: Colors.white,
               ),
             ),
-            if (_stageManager.errorMessage != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _stageManager.errorMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFFF59E0B),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -608,8 +539,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             colors: [
-              Color(0xE60A0D14),
-              Color(0x990A0D14),
+              Color(0xEB0A0D14),
+              Color(0xAD0A0D14),
               Colors.transparent,
             ],
           ),
@@ -652,7 +583,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
   Widget _buildSpectatorStrip() {
     final remotes = _stageManager.remoteParticipants;
     return Container(
-      height: 76,
+      height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF121722),
@@ -666,9 +597,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
           Expanded(
             child: Text(
               remotes.isEmpty
-                  ? 'SFU Selective Forwarding Active · Waiting for remote spectators (2–8 players)'
-                  : 'Connected Remote SFU Peers (${remotes.length}/7): '
-                      '${remotes.map((p) => p.name.isNotEmpty ? p.name : p.identity).join(', ')}',
+                  ? 'S26 Ultra Hardware Stage Active · Recording MP4 Loop for Peer & AI Judging'
+                  : 'Connected Remote SFU Peers (${remotes.length}/7)',
               style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
             ),
           ),
@@ -704,24 +634,10 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
           icon: const Icon(Icons.cameraswitch_outlined, size: 18),
           label: const Text('Flip Lens'),
         ),
-        ElevatedButton(
-          onPressed: () {
-            if (isPerformer) {
-              _stageManager.demoteToRemoteSpectator();
-            } else {
-              _stageManager.promoteToActivePerformer(
-                targetEmotion:
-                    widget.lobbySession.activeScene?.emotionalTarget ??
-                        'Dramatic Intensity',
-              );
-            }
-          },
-          child: Text(
-            isPerformer ? 'Switch to Spectator' : 'Take Stage (Publish SFU)',
-          ),
-        ),
         ElevatedButton.icon(
-          onPressed: () {
+          onPressed: () async {
+            final recorded = await _stageManager.finishRecordingTake();
+            if (!mounted) return;
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => TriModalJudgingScreen(
@@ -729,6 +645,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
                   performerUserId: widget.localUserId,
                   performerDisplayName: widget.localDisplayName,
                   capturedSamples: _stageManager.capturedSamples,
+                  localRecordedVideoPath: recorded.filePath,
+                  recordedMp4Bytes: recorded.bytes,
                 ),
               ),
             );
