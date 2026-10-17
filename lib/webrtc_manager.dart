@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'main.dart';
 import 'lobby.dart';
+import 'judging_engine.dart';
 
 /// Defines whether the connected participant is currently on stage publishing
 /// high-definition simulcast video/audio or spectating via the LiveKit SFU.
@@ -718,6 +719,22 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
           child: Text(
             isPerformer ? 'Switch to Spectator' : 'Take Stage (Publish SFU)',
           ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => TriModalJudgingScreen(
+                  lobbySession: widget.lobbySession,
+                  performerUserId: widget.localUserId,
+                  performerDisplayName: widget.localDisplayName,
+                  capturedSamples: _stageManager.capturedSamples,
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.auto_awesome, size: 18),
+          label: const Text('Finish Take & Judge'),
         ),
       ],
     );

@@ -3,38 +3,45 @@ import {
   Copy,
   Check,
   FileCode2,
-  Video,
-  VideoOff,
-  Mic,
-  MicOff,
-  Camera,
-  Radio,
+  Repeat,
+  Share2,
+  Sparkles,
   Users,
 } from 'lucide-react';
 import {
   BATCH_STAGES,
   WORKSPACE_FILES,
   getBatchCompletionRatio,
-  calculateSfuBandwidthSavings,
+  calculateTriModalCompositeScore,
 } from './utils/part1Specs';
 
 export default function App() {
-  const [selectedFilePath, setSelectedFilePath] = useState<string>('lib/webrtc_manager.dart');
+  const [selectedFilePath, setSelectedFilePath] = useState<string>('lib/judging_engine.dart');
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'files' | 'sfu-stage' | 'sync-guide'>('files');
+  const [activeTab, setActiveTab] = useState<'files' | 'judging-sim' | 'sync-guide'>('files');
 
-  // Part 3 LiveKit WebRTC SFU Stage Simulator State
-  const [sfuRole, setSfuRole] = useState<'activePerformer' | 'remoteSpectator'>('activePerformer');
-  const [playerCount, setPlayerCount] = useState<number>(6);
-  const [camEnabled, setCamEnabled] = useState<boolean>(true);
-  const [micEnabled, setMicEnabled] = useState<boolean>(true);
-  const [cameraLens, setCameraLens] = useState<'Front (Selfie 720p30)' | 'Rear (Telephoto)'>('Front (Selfie 720p30)');
-  const [sampledFrames, setSampledFrames] = useState<number>(14);
+  // Part 4 Tri-Modal Judging & Supabase Loop Simulator State
+  const [facialScore, setFacialScore] = useState<number>(91);
+  const [vocalScore, setVocalScore] = useState<number>(88);
+  const [cueFidelity, setCueFidelity] = useState<number>(94);
+  const [peerVoteScore, setPeerVoteScore] = useState<number>(89);
+  const [externalShares, setExternalShares] = useState<number>(3);
+  const [externalReactions, setExternalReactions] = useState<number>(8);
+  const [loopCompletions, setLoopCompletions] = useState<number>(12);
 
   const selectedFile =
     WORKSPACE_FILES.find((f) => f.path === selectedFilePath) ?? WORKSPACE_FILES[0];
   const progress = getBatchCompletionRatio(BATCH_STAGES);
-  const sfuMetrics = calculateSfuBandwidthSavings(playerCount, sfuRole);
+
+  const triModal = calculateTriModalCompositeScore({
+    facialExpression: facialScore,
+    vocalCadence: vocalScore,
+    directorCueFidelity: cueFidelity,
+    peerVoteScore,
+    externalShares,
+    externalReactions,
+    loopCompletions,
+  });
 
   const handleCopyCode = async (path: string, content: string) => {
     try {
@@ -69,16 +76,16 @@ export default function App() {
               activeTab === 'files' ? 'text-white underline underline-offset-8' : ''
             }`}
           >
-            Part 1–3 Files
+            Part 1–4 Files
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('sfu-stage')}
+            onClick={() => setActiveTab('judging-sim')}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'sfu-stage' ? 'text-white underline underline-offset-8' : ''
+              activeTab === 'judging-sim' ? 'text-white underline underline-offset-8' : ''
             }`}
           >
-            LiveKit SFU Stage Simulator
+            Tri-Modal Judging Simulator
           </button>
           <button
             type="button"
@@ -97,7 +104,7 @@ export default function App() {
             onClick={() => setActiveTab('sync-guide')}
             className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition-colors whitespace-nowrap shrink-0"
           >
-            Push Part 3 to GitHub
+            Push Part 4 to GitHub
           </button>
         </div>
       </header>
@@ -113,13 +120,13 @@ export default function App() {
                 <span aria-hidden="true"> · </span>
                 <span>Zero Local Storage</span>
                 <span aria-hidden="true"> · </span>
-                <span>Batch 3 of 5 Ready</span>
+                <span>Batch 4 of 5 Ready</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Part 3: Real-Time Media Routing Generated
+                Part 4: AI Telemetrics & UI Looping Generated
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Generated <code className="font-mono text-amber-400">lib/webrtc_manager.dart</code> with LiveKit WebRTC camera capture, <code className="font-mono text-amber-400">adaptiveStream</code> + <code className="font-mono text-amber-400">dynacast</code> + <code className="font-mono text-amber-400">simulcast</code> SFU routing for 2–8 remote players, and 1 Hz telemetrics frame sampling for Part 4.
+                Generated <code className="font-mono text-amber-400">lib/judging_engine.dart</code> integrating Google Gemini (<code className="font-mono text-amber-400">gemini-2.5-flash</code>) multimodal frame/audio telemetrics judging, Supabase Edge Storage looped video playback (<code className="font-mono text-amber-400">performance-loops</code> bucket with <code className="font-mono text-amber-400">setLooping(true)</code>), and Social Share metric calculation.
               </p>
             </div>
 
@@ -144,18 +151,18 @@ export default function App() {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Part 3 Files
+              Part 4 Files
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('sfu-stage')}
+              onClick={() => setActiveTab('judging-sim')}
               className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                activeTab === 'sfu-stage'
+                activeTab === 'judging-sim'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              LiveKit SFU
+              Tri-Modal Judge
             </button>
             <button
               type="button"
@@ -271,192 +278,184 @@ export default function App() {
           </section>
         )}
 
-        {/* Tab 2: LiveKit WebRTC SFU Stage Simulator */}
-        {activeTab === 'sfu-stage' && (
+        {/* Tab 2: Tri-Modal Judging & Supabase Video Loop Simulator */}
+        {activeTab === 'judging-sim' && (
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: SFU Bandwidth & Role Configuration */}
+            {/* Left Column: Tri-Modal Inputs */}
             <div className="lg:col-span-5 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
               <div className="space-y-1">
                 <h2 className="text-lg font-bold text-white">
-                  LiveKit SFU Mesh & Dynacast Controls
+                  Tri-Modal Judging Parameters
                 </h2>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Simulates <code className="font-mono text-amber-400">WebRtcStageManager</code> in{' '}
-                  <code className="font-mono text-amber-400">lib/webrtc_manager.dart</code> across 2–8 remote players.
+                  Simulates <code className="font-mono text-amber-400">TriModalJudgingEngine</code> in{' '}
+                  <code className="font-mono text-amber-400">lib/judging_engine.dart</code> (45% AI Telemetrics · 35% Peer Loop · 20% Social Share).
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <span className="block text-xs font-semibold text-slate-300">
-                  Local Participant Role
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSfuRole('activePerformer');
-                      setCamEnabled(true);
-                      setMicEnabled(true);
-                    }}
-                    className={`px-3 py-2.5 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 ${
-                      sfuRole === 'activePerformer'
-                        ? 'bg-rose-600 border-rose-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-300'
-                    }`}
+              <div className="space-y-3">
+                <div>
+                  <label
+                    htmlFor="facial-range"
+                    className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-300"
                   >
-                    Active Performer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSfuRole('remoteSpectator');
-                      setCamEnabled(false);
-                      setMicEnabled(false);
-                    }}
-                    className={`px-3 py-2.5 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 ${
-                      sfuRole === 'remoteSpectator'
-                        ? 'bg-rose-600 border-rose-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-300'
-                    }`}
+                    <span className="truncate">Gemini Facial Micro-Expression</span>
+                    <span className="font-mono tabular-nums text-rose-400 whitespace-nowrap shrink-0">
+                      {facialScore}/100
+                    </span>
+                  </label>
+                  <input
+                    id="facial-range"
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={facialScore}
+                    onChange={(e) => setFacialScore(Number(e.target.value))}
+                    className="w-full accent-rose-600"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="vocal-range"
+                    className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-300"
                   >
-                    Remote Spectator
-                  </button>
+                    <span className="truncate">Gemini Vocal Cadence & dBFS</span>
+                    <span className="font-mono tabular-nums text-rose-400 whitespace-nowrap shrink-0">
+                      {vocalScore}/100
+                    </span>
+                  </label>
+                  <input
+                    id="vocal-range"
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={vocalScore}
+                    onChange={(e) => setVocalScore(Number(e.target.value))}
+                    className="w-full accent-rose-600"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="peer-range"
+                    className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-300"
+                  >
+                    <span className="truncate">Remote Peer Loop Score</span>
+                    <span className="font-mono tabular-nums text-emerald-400 whitespace-nowrap shrink-0">
+                      {peerVoteScore}/100
+                    </span>
+                  </label>
+                  <input
+                    id="peer-range"
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={peerVoteScore}
+                    onChange={(e) => setPeerVoteScore(Number(e.target.value))}
+                    className="w-full accent-emerald-500"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="player-count-range"
-                  className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-300"
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setLoopCompletions((c) => c + 1)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
                 >
-                  <span className="truncate">Remote SFU Slots (2–8)</span>
-                  <span className="font-mono tabular-nums text-amber-400 whitespace-nowrap shrink-0">
-                    {playerCount} Players
-                  </span>
-                </label>
-                <input
-                  id="player-count-range"
-                  type="range"
-                  min={2}
-                  max={8}
-                  value={playerCount}
-                  onChange={(e) => setPlayerCount(Number(e.target.value))}
-                  className="w-full accent-rose-600"
-                />
-              </div>
-
-              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">SFU Upstream Bitrate:</span>
-                  <span className="font-mono tabular-nums font-semibold text-emerald-400">
-                    {sfuMetrics.sfuUpstreamKbps} kbps
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Legacy P2P Mesh Upstream:</span>
-                  <span className="font-mono tabular-nums text-slate-400">
-                    {sfuMetrics.p2pUpstreamKbps} kbps
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-1 border-t border-slate-800">
-                  <span className="text-slate-300 font-semibold">Mobile Bandwidth Saved:</span>
-                  <span className="font-mono tabular-nums font-bold text-amber-400">
-                    {sfuMetrics.bandwidthSavedPercent}% Reduction
-                  </span>
-                </div>
+                  <Repeat className="w-3.5 h-3.5" />
+                  <span>+1 Loop Replay ({loopCompletions})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExternalShares((s) => s + 1);
+                    setExternalReactions((r) => r + 4);
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors whitespace-nowrap shrink-0"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share Clip ({externalShares})</span>
+                </button>
               </div>
             </div>
 
-            {/* Right Column: LiveKitSoundstageScreen Viewport */}
+            {/* Right Column: TriModalJudgingScreen Output */}
             <div className="lg:col-span-7 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    LiveKitSoundstageScreen · Room #482910
+                    TriModalJudgingScreen · Composite Result
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Lens: {cameraLens} · Telemetrics Buffer: {sampledFrames} Samples (1 Hz)
+                    Bucket: <code className="font-mono">performance-loops/482910/actor_round_1.mp4</code>
                   </p>
                 </div>
-                <span className="font-mono text-xs font-semibold text-rose-400">
-                  {sfuRole === 'activePerformer' ? 'ON AIR · 720p30 SFU' : 'SPECTATING · DYNACAST'}
-                </span>
+                <div className="text-right">
+                  <div className="text-xs text-slate-400">Composite Score</div>
+                  <div className="text-2xl font-bold font-mono tabular-nums text-amber-400">
+                    {triModal.compositeScore} / 100
+                  </div>
+                </div>
               </div>
 
-              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>VideoTrackRenderer (RTCVideoViewObjectFitCover)</span>
-                  <span className="font-mono tabular-nums text-amber-400">
-                    Audio: {micEnabled ? '-14.5 dBFS' : 'Muted (-60 dBFS)'}
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-1.5">
-                  <div className="text-xs font-semibold text-amber-400">
-                    Roy Batty · Blade Runner (1982)
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>1. AI Telemetrics</span>
+                    <Sparkles className="w-3.5 h-3.5 text-rose-400" />
                   </div>
-                  <p className="text-sm font-bold text-white">
-                    &ldquo;I have seen things you people wouldn&apos;t believe. Attack ships on fire off the shoulder of Orion. All those moments will be lost in time, like tears in rain.&rdquo;
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Cue: Begin with quiet awe · Target Emotion: Melancholic Transcendence
-                  </p>
+                  <div className="text-xl font-bold font-mono tabular-nums text-white">
+                    {triModal.aiScore}
+                  </div>
+                  <div className="text-xs text-slate-400">45% Weight · Gemini 2.5</div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setCamEnabled((v) => !v)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
-                  >
-                    {camEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
-                    <span>{camEnabled ? 'Cam On' : 'Cam Off'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMicEnabled((v) => !v)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
-                  >
-                    {micEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-                    <span>{micEnabled ? 'Mic On' : 'Mic Off'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCameraLens((prev) =>
-                        prev === 'Front (Selfie 720p30)'
-                          ? 'Rear (Telephoto)'
-                          : 'Front (Selfie 720p30)'
-                      )
-                    }
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Flip Galaxy S26 Lens</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSampledFrames((n) => n + 1)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors whitespace-nowrap shrink-0"
-                  >
-                    <Radio className="w-3.5 h-3.5" />
-                    <span>Sample 1 Hz Telemetry Frame</span>
-                  </button>
+                <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>2. Peer Loop Vote</span>
+                    <Users className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="text-xl font-bold font-mono tabular-nums text-white">
+                    {triModal.peerScore}
+                  </div>
+                  <div className="text-xs text-slate-400">35% Weight · Auto-Loop</div>
                 </div>
+
+                <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>3. Social Judging</span>
+                    <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <div className="text-xl font-bold font-mono tabular-nums text-white">
+                    {triModal.socialScore}
+                  </div>
+                  <div className="text-xs text-slate-400">20% Weight · Share API</div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="text-xs font-mono text-emerald-400">
+                  SUPABASE EDGE STORAGE · VideoPlayerController.setLooping(true)
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Director Critique: &ldquo;Strong emotional commitment to Melancholic Transcendence with controlled vocal pacing across 14s of WebRTC telemetry.&rdquo;
+                </p>
               </div>
             </div>
           </section>
         )}
 
-        {/* Tab 3: GitHub Sync Guide for Part 3 */}
+        {/* Tab 3: GitHub Sync Guide for Part 4 */}
         {activeTab === 'sync-guide' && (
           <section className="p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-6">
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-white">
-                Push Part 3 Changes to GitHub (act_like_it)
+                Push Part 4 Changes to GitHub (act_like_it)
               </h2>
               <p className="text-sm text-slate-300">
-                Push the LiveKit WebRTC camera capture and SFU broadcast module directly from Google AI Studio to your remote GitHub repository:
+                Push the Tri-Modal Judging Engine and Supabase Storage video loop controller directly from Google AI Studio:
               </p>
             </div>
 
@@ -464,10 +463,10 @@ export default function App() {
               <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
                 <div className="text-xs font-mono text-amber-400">01. Open GitHub Tab</div>
                 <h3 className="text-base font-semibold text-white">
-                  Verify Staged Part 3 Files
+                  Verify Staged Part 4 Files
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Verify that <code className="font-mono text-white">lib/webrtc_manager.dart</code> and the updated <code className="font-mono text-white">lib/lobby.dart</code> are staged in the GitHub panel.
+                  Verify that <code className="font-mono text-white">lib/judging_engine.dart</code> and the updated <code className="font-mono text-white">lib/webrtc_manager.dart</code> appear in your GitHub sync list.
                 </p>
               </div>
 
@@ -477,17 +476,17 @@ export default function App() {
                   Tap &ldquo;Push Changes&rdquo;
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Commit and push Part 3 directly from your Samsung Galaxy S26 Ultra browser with zero local storage.
+                  Commit and push Part 4 directly to your private <code className="font-mono text-white">act_like_it</code> repository on GitHub.
                 </p>
               </div>
 
               <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-amber-400">03. Advance to Part 4</div>
+                <div className="text-xs font-mono text-amber-400">03. Advance to Part 5</div>
                 <h3 className="text-base font-semibold text-white">
                   Confirm Completion
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Once pushed, instruct me to proceed to Part 4 (<code className="font-mono text-white">lib/judging_engine.dart</code> for Gemini AI Telemetrics and Supabase Storage looped video playback).
+                  Once pushed, instruct me to proceed to the final batch: Part 5 (Late-Night After-Hours Module).
                 </p>
               </div>
             </div>

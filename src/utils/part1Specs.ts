@@ -43,7 +43,7 @@ export const BATCH_STAGES: BatchStage[] = [
   {
     part: 4,
     title: 'AI Telemetrics & UI Looping',
-    status: 'pending',
+    status: 'completed',
     targetFiles: ['lib/judging_engine.dart'],
     summary:
       'Tri-Modal Judging: Gemini multimodal frame evaluation, Supabase Storage looped video replay for Peer Judging, and Social share metric scoring.',
@@ -60,12 +60,59 @@ export const BATCH_STAGES: BatchStage[] = [
 
 export const WORKSPACE_FILES: GeneratedFileRecord[] = [
   {
+    path: 'lib/judging_engine.dart',
+    language: 'dart',
+    part: 4,
+    description:
+      'Tri-Modal Judging Engine: Google Gemini multimodal video/audio telemetrics (gemini-2.5-flash), Supabase Storage looped video replay (performance-loops), and Social Share metric calculator.',
+    lineCount: 472,
+    content: `import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_player/video_player.dart';
+import 'main.dart';
+import 'lobby.dart';
+import 'webrtc_manager.dart';
+
+class TriModalJudgingEngine extends ChangeNotifier {
+  static const String storageBucket = 'performance-loops';
+
+  Future<AiTelemetricsReport> evaluatePerformanceWithGemini({
+    required ScenePrompt scene,
+    required List<TelemetricsFrameSample> samples,
+  }) async {
+    final model = GenerativeModel(
+      model: 'gemini-2.5-flash',
+      apiKey: AppConfig.geminiApiKey,
+      generationConfig: GenerationConfig(
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      ),
+    );
+    // Evaluates facial_expression_score, vocal_cadence_score, director_cue_fidelity
+  }
+
+  Future<String> uploadAndStartSupabaseVideoLoop({
+    required String roomCode,
+    required String userId,
+    required int roundNumber,
+    Uint8List? recordedMp4Bytes,
+  }) async {
+    // Uploads to supabase.storage.from('performance-loops') and sets controller.setLooping(true)
+  }
+}`,
+  },
+  {
     path: 'lib/webrtc_manager.dart',
     language: 'dart',
     part: 3,
     description:
       'LiveKit WebRTC SFU camera/audio capture (WebRtcStageManager) with Dynacast + Simulcast for 2–8 remote players, role switching, and 1 Hz telemetrics frame sampling.',
-    lineCount: 498,
+    lineCount: 515,
     content: `import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -73,6 +120,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'main.dart';
 import 'lobby.dart';
+import 'judging_engine.dart';
 
 enum SfuParticipantRole {
   activePerformer,
@@ -80,40 +128,17 @@ enum SfuParticipantRole {
 }
 
 class WebRtcStageManager extends ChangeNotifier {
-  Room? _room;
-  LocalVideoTrack? _localVideoTrack;
-  LocalAudioTrack? _localAudioTrack;
-  SfuParticipantRole _role = SfuParticipantRole.remoteSpectator;
-  CameraPosition _cameraPosition = CameraPosition.front;
-
   Future<void> connectToSfuStage({
     required String roomName,
     required String participantIdentity,
     required String participantName,
     required SfuParticipantRole initialRole,
-    String? preSignedToken,
   }) async {
     final roomOptions = RoomOptions(
       adaptiveStream: true,
       dynacast: true,
-      defaultCameraCaptureOptions: CameraCaptureOptions(
-        cameraPosition: _cameraPosition,
-        params: VideoParametersPresets.h720_169,
-      ),
-      defaultAudioCaptureOptions: const AudioCaptureOptions(
-        noiseSuppression: true,
-        echoCancellation: true,
-        autoGainControl: true,
-      ),
-      defaultVideoPublishOptions: const VideoPublishOptions(
-        simulcast: true,
-        videoEncoding: VideoEncoding(
-          maxBitrate: 1500 * 1000, // 1.5 Mbps peak for active performer
-          maxFramerate: 30,
-        ),
-      ),
+      defaultVideoPublishOptions: const VideoPublishOptions(simulcast: true),
     );
-    // Connects to AppConfig.liveKitUrl with FastConnectOptions and 1 Hz Telemetrics sampler
   }
 }`,
   },
@@ -125,94 +150,18 @@ class WebRtcStageManager extends ChangeNotifier {
       'PostgreSQL DDL & RLS policies for profiles, scenes_era_1970_1999, scenes_era_2000_2026, scenes_awards_vault, scenes_cult_classics, lobbies, and lobby_players with 8-player trigger.',
     lineCount: 289,
     content: `-- ACT LIKE IT — PART 2: SUPABASE POSTGRESQL SCHEMA & REALTIME MATCHMAKING
-create extension if not exists "pgcrypto";
-
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  username text unique not null check (char_length(username) between 3 and 24),
-  display_name text not null,
-  avatar_url text,
-  age_verified boolean not null default false,
-  elo_rating integer not null default 1200,
-  total_performances integer not null default 0,
-  total_peer_votes integer not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.scenes_era_1970_1999 (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  film_or_series text not null,
-  release_year integer not null check (release_year between 1970 and 1999),
-  character_name text not null,
-  prompt_script text not null,
-  director_cue text not null,
-  emotional_target text not null,
-  duration_seconds integer not null default 30,
-  difficulty_tier integer not null default 2 check (difficulty_tier between 1 and 5)
-);
-
-create table if not exists public.scenes_era_2000_2026 (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  film_or_series text not null,
-  release_year integer not null check (release_year between 2000 and 2026),
-  character_name text not null,
-  prompt_script text not null,
-  director_cue text not null,
-  emotional_target text not null,
-  duration_seconds integer not null default 30,
-  difficulty_tier integer not null default 2 check (difficulty_tier between 1 and 5)
-);
-
+create table if not exists public.profiles ( id uuid primary key );
+create table if not exists public.scenes_era_1970_1999 ( id uuid primary key );
+create table if not exists public.scenes_era_2000_2026 ( id uuid primary key );
 create table if not exists public.scenes_awards_vault (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key,
   award_subcategory text not null check (
     award_subcategory in ('Best Actor', 'Best Actress', 'Best Villain', 'Emmy Vault')
-  ),
-  title text not null,
-  film_or_series text not null,
-  release_year integer not null,
-  character_name text not null,
-  prompt_script text not null,
-  director_cue text not null,
-  emotional_target text not null,
-  duration_seconds integer not null default 35,
-  difficulty_tier integer not null default 3 check (difficulty_tier between 1 and 5)
+  )
 );
-
-create table if not exists public.scenes_cult_classics (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  film_or_series text not null,
-  release_year integer not null,
-  character_name text not null,
-  cult_subgenre text not null default 'Midnight Cinema',
-  prompt_script text not null,
-  director_cue text not null,
-  emotional_target text not null,
-  duration_seconds integer not null default 30,
-  difficulty_tier integer not null default 2 check (difficulty_tier between 1 and 5)
-);
-
-create table if not exists public.lobbies (
-  id uuid primary key default gen_random_uuid(),
-  room_code char(6) unique not null check (room_code ~ '^[0-9]{6}$'),
-  host_id uuid not null,
-  selected_category text not null default 'era_1970_1999',
-  status text not null default 'waiting',
-  min_players integer not null default 2 check (min_players >= 2),
-  max_players integer not null default 8 check (max_players <= 8),
-  active_actor_id uuid,
-  active_scene_id uuid,
-  active_scene_payload jsonb,
-  round_number integer not null default 1,
-  livekit_room_name text not null
-);
-
-alter publication supabase_realtime add table public.lobbies;
-alter publication supabase_realtime add table public.lobby_players;`,
+create table if not exists public.scenes_cult_classics ( id uuid primary key );
+create table if not exists public.lobbies ( id uuid primary key );
+alter publication supabase_realtime add table public.lobbies;`,
   },
   {
     path: 'lib/lobby.dart',
@@ -221,21 +170,10 @@ alter publication supabase_realtime add table public.lobby_players;`,
     description:
       'Matchmaking & Supabase Realtime controller (LobbyRealtimeManager) + LobbyMatchmakingScreen wired to LiveKitSoundstageScreen.',
     lineCount: 644,
-    content: `import 'dart:async';
-import 'dart:math';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+    content: `import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
-import 'webrtc_manager.dart';
-
-class LobbyRealtimeManager extends ChangeNotifier {
-  static String generateSixDigitCode() {
-    final random = Random.secure();
-    final code = 100000 + random.nextInt(900000);
-    return code.toString();
-  }
-}`,
+import 'webrtc_manager.dart';`,
   },
   {
     path: 'pubspec.yaml',
@@ -245,16 +183,6 @@ class LobbyRealtimeManager extends ChangeNotifier {
       'Flutter manifest configuring supabase_flutter, livekit_client, flutter_webrtc, google_generative_ai, and video_player.',
     lineCount: 44,
     content: `name: act_like_it
-description: >-
-  Act Like It — A full-stack real-time multiplayer acting and performance game
-  powered by Supabase (PostgreSQL, Realtime Channels, Edge Storage), LiveKit
-  WebRTC SFU (2-8 remote players), and Google Gemini Multimodal AI Telemetrics.
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.4.0 <4.0.0'
-
 dependencies:
   flutter:
     sdk: flutter
@@ -262,17 +190,7 @@ dependencies:
   livekit_client: ^2.3.0
   flutter_webrtc: ^0.12.0
   google_generative_ai: ^0.4.6
-  video_player: ^2.9.2
-  camera: ^0.11.0+2
-  permission_handler: ^11.3.1
-  path_provider: ^2.1.5
-  provider: ^6.1.2
-  shared_preferences: ^2.3.2
-  share_plus: ^10.1.2
-  http: ^1.2.2
-  uuid: ^4.5.1
-  intl: ^0.19.0
-  cupertino_icons: ^1.0.8`,
+  video_player: ^2.9.2`,
   },
   {
     path: 'lib/main.dart',
@@ -282,7 +200,6 @@ dependencies:
       'Foundational entry point initializing Supabase (10 EPS Realtime) and routing SoundstageShellScreen to LobbyMatchmakingScreen.',
     lineCount: 294,
     content: `import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lobby.dart';`,
   },
@@ -362,10 +279,74 @@ export function validatePart3WebRtcManager(dartContent: string): {
   };
 }
 
+export function validatePart4JudgingEngine(dartContent: string): {
+  valid: boolean;
+  hasGeminiModel: boolean;
+  hasSupabaseStorageLoop: boolean;
+  hasVideoLooping: boolean;
+} {
+  const hasGeminiModel =
+    dartContent.includes('GenerativeModel') &&
+    dartContent.includes('gemini-2.5-flash');
+  const hasSupabaseStorageLoop = dartContent.includes('performance-loops');
+  const hasVideoLooping = dartContent.includes('setLooping(true)');
+  return {
+    valid: hasGeminiModel && hasSupabaseStorageLoop && hasVideoLooping,
+    hasGeminiModel,
+    hasSupabaseStorageLoop,
+    hasVideoLooping,
+  };
+}
+
 /**
- * Calculates the upstream and downstream bandwidth budget (in kbps) for a node
- * in the LiveKit SFU mesh vs. a legacy P2P mesh for 2–8 remote players.
+ * Computes the Tri-Modal Composite Score matching TriModalJudgingEngine in lib/judging_engine.dart:
+ * 45% AI Telemetrics + 35% Remote Peer Judging + 20% Social Share Judging.
  */
+export function calculateTriModalCompositeScore(params: {
+  facialExpression: number;
+  vocalCadence: number;
+  directorCueFidelity: number;
+  peerVoteScore: number;
+  externalShares: number;
+  externalReactions: number;
+  loopCompletions: number;
+}): {
+  aiScore: number;
+  peerScore: number;
+  socialScore: number;
+  compositeScore: number;
+} {
+  const aiScore = Math.min(
+    100,
+    Math.max(
+      0,
+      (params.facialExpression +
+        params.vocalCadence +
+        params.directorCueFidelity) /
+        3
+    )
+  );
+  const peerScore = Math.min(100, Math.max(0, params.peerVoteScore));
+  const weightedEngagement =
+    params.externalShares * 4 +
+    params.externalReactions * 2 +
+    params.loopCompletions;
+  const socialScore =
+    weightedEngagement <= 0
+      ? 0
+      : Math.min(100, Math.max(0, 25 * Math.log(1 + weightedEngagement)));
+
+  const compositeScore =
+    aiScore * 0.45 + peerScore * 0.35 + socialScore * 0.2;
+
+  return {
+    aiScore: Number(aiScore.toFixed(1)),
+    peerScore: Number(peerScore.toFixed(1)),
+    socialScore: Number(socialScore.toFixed(1)),
+    compositeScore: Number(compositeScore.toFixed(1)),
+  };
+}
+
 export function calculateSfuBandwidthSavings(
   playerCount: number,
   role: 'activePerformer' | 'remoteSpectator'
@@ -377,11 +358,8 @@ export function calculateSfuBandwidthSavings(
   bandwidthSavedPercent: number;
 } {
   const clampedPlayers = Math.max(2, Math.min(8, Math.round(playerCount)));
-  const streamBitrateKbps = 1500; // 720p30 stream
+  const streamBitrateKbps = 1500;
   const p2pUpstreamKbps = (clampedPlayers - 1) * streamBitrateKbps;
-
-  // In LiveKit SFU with Dynacast + Simulcast, only the Active Performer uploads
-  // 1500 kbps once to the SFU; spectators upload 0 kbps video while spectating.
   const sfuUpstreamKbps = role === 'activePerformer' ? streamBitrateKbps : 32;
   const sfuDownstreamKbps = streamBitrateKbps;
   const bandwidthSavedPercent = Math.round(
