@@ -59,6 +59,17 @@ test('Supabase migration and seed files exist on disk and pass schema & category
   );
   assert.equal(webrtcDart.includes('VideoViewFit'), false);
   assert.equal(webrtcDart.includes('toIso88601String'), false);
+
+  // Verify .github/workflows/build_apk.yml has Force compileSdk 34 for AndroidX step
+  const workflowYml = fs.readFileSync('.github/workflows/build_apk.yml', 'utf8');
+  assert.ok(workflowYml.includes('name: Force compileSdk 34 for AndroidX'));
+  assert.ok(workflowYml.includes('/home/runner/.pub-cache/hosted'));
+  assert.ok(workflowYml.includes('compileSdkVersion 31/compileSdkVersion 34'));
+  assert.ok(
+    workflowYml.includes(
+      "sed -i 's/compileSdk = .*/compileSdk = 34/g' android/app/build.gradle.kts || true"
+    )
+  );
 });
 
 test('WORKSPACE_FILES entries pass structural validation', () => {
