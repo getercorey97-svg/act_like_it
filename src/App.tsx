@@ -3,108 +3,38 @@ import {
   Copy,
   Check,
   FileCode2,
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  Camera,
+  Radio,
   Users,
-  RefreshCw,
-  Play,
-  UserPlus,
 } from 'lucide-react';
 import {
   BATCH_STAGES,
   WORKSPACE_FILES,
   getBatchCompletionRatio,
-  isSixDigitLobbyCode,
+  calculateSfuBandwidthSavings,
 } from './utils/part1Specs';
 
-interface SimulatedPlayer {
-  id: string;
-  name: string;
-  isHost: boolean;
-  isReady: boolean;
-}
-
-const SCENE_SAMPLES: Record<
-  string,
-  { title: string; film: string; year: number; character: string; line: string; cue: string }
-> = {
-  'Eras: 1970–1999': {
-    title: 'Tears in Rain',
-    film: 'Blade Runner',
-    year: 1982,
-    character: 'Roy Batty',
-    line: "I have seen things you people wouldn't believe. Attack ships on fire off the shoulder of Orion. All those moments will be lost in time, like tears in rain.",
-    cue: 'Maintain steady eye contact with the lens and release a quiet breath on the final phrase.',
-  },
-  'Eras: 2000–2026': {
-    title: 'Not Quite My Tempo',
-    film: 'Whiplash',
-    year: 2014,
-    character: 'Terence Fletcher',
-    line: 'Were you rushing or were you dragging? If you deliberately sabotage my band, I will gut you like a pig.',
-    cue: 'Whisper the opening question with razor-sharp stillness, then snap into sudden percussive intensity.',
-  },
-  'Awards: Best Actor': {
-    title: 'I Drink Your Milkshake',
-    film: 'There Will Be Blood',
-    year: 2007,
-    character: 'Daniel Plainview',
-    line: 'If you have a milkshake, and I have a milkshake, and I have a straw... my straw reaches across the room. I drink your milkshake!',
-    cue: 'Lean forward into the frame and build rhythmic cadence.',
-  },
-  'Awards: Best Actress': {
-    title: 'Dinner Table Monologue',
-    film: 'Hereditary',
-    year: 2018,
-    character: 'Annie Graham',
-    line: 'All I do is worry and slave and defend you, and all I get back is that face on your face!',
-    cue: 'Hold trembling composure for two beats before letting raw grief overtake the line.',
-  },
-  'Awards: Best Villain': {
-    title: 'Call It, Friendo',
-    film: 'No Country for Old Men',
-    year: 2007,
-    character: 'Anton Chigurh',
-    line: "What's the most you ever lost on a coin toss? Don't put it in your pocket. It's your lucky quarter.",
-    cue: 'Zero blinking, flat deadpan cadence, chin tilted slightly down.',
-  },
-  'Awards: Emmy Vault': {
-    title: 'I Am the One Who Knocks',
-    film: 'Breaking Bad',
-    year: 2011,
-    character: 'Walter White',
-    line: "You clearly don't know who you're talking to, so let me clue you in. I am not in danger, Skyler. I am the danger.",
-    cue: 'Drop vocal pitch half an octave on the final five words.',
-  },
-  'Specialty: Cult Classics': {
-    title: 'Coffee Is for Closers',
-    film: 'Glengarry Glen Ross',
-    year: 1992,
-    character: 'Blake',
-    line: "Coffee's for closers only. You think I'm messing with you? Always be closing.",
-    cue: 'Snap fingers once and deliver with rapid-fire boardroom swagger.',
-  },
-};
-
 export default function App() {
-  const [selectedFilePath, setSelectedFilePath] = useState<string>('supabase/schema.sql');
+  const [selectedFilePath, setSelectedFilePath] = useState<string>('lib/webrtc_manager.dart');
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'files' | 'lobby-sim' | 'sync-guide'>('files');
+  const [activeTab, setActiveTab] = useState<'files' | 'sfu-stage' | 'sync-guide'>('files');
 
-  // Interactive Part 2 Lobby Simulator State
-  const [roomCode, setRoomCode] = useState<string>('482910');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Eras: 1970–1999');
-  const [joinCodeInput, setJoinCodeInput] = useState<string>('');
-  const [newPlayerName, setNewPlayerName] = useState<string>('');
-  const [lobbyError, setLobbyError] = useState<string | null>(null);
-  const [roundActive, setRoundActive] = useState<boolean>(false);
-  const [players, setPlayers] = useState<SimulatedPlayer[]>([
-    { id: 'p1', name: 'Galaxy S26 Host', isHost: true, isReady: true },
-    { id: 'p2', name: 'Elena (Remote SFU #2)', isHost: false, isReady: true },
-    { id: 'p3', name: 'Marcus (Remote SFU #3)', isHost: false, isReady: true },
-  ]);
+  // Part 3 LiveKit WebRTC SFU Stage Simulator State
+  const [sfuRole, setSfuRole] = useState<'activePerformer' | 'remoteSpectator'>('activePerformer');
+  const [playerCount, setPlayerCount] = useState<number>(6);
+  const [camEnabled, setCamEnabled] = useState<boolean>(true);
+  const [micEnabled, setMicEnabled] = useState<boolean>(true);
+  const [cameraLens, setCameraLens] = useState<'Front (Selfie 720p30)' | 'Rear (Telephoto)'>('Front (Selfie 720p30)');
+  const [sampledFrames, setSampledFrames] = useState<number>(14);
 
   const selectedFile =
     WORKSPACE_FILES.find((f) => f.path === selectedFilePath) ?? WORKSPACE_FILES[0];
   const progress = getBatchCompletionRatio(BATCH_STAGES);
+  const sfuMetrics = calculateSfuBandwidthSavings(playerCount, sfuRole);
 
   const handleCopyCode = async (path: string, content: string) => {
     try {
@@ -116,50 +46,6 @@ export default function App() {
       setTimeout(() => setCopiedPath(null), 2000);
     }
   };
-
-  const handleGenerateNewRoomCode = () => {
-    const nextCode = String(100000 + Math.floor(Math.random() * 900000));
-    setRoomCode(nextCode);
-    setRoundActive(false);
-    setLobbyError(null);
-  };
-
-  const handleAddRemotePlayer = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLobbyError(null);
-    const trimmedName = newPlayerName.trim();
-    if (!trimmedName) {
-      setLobbyError('Enter a stage display name to add a remote player.');
-      return;
-    }
-    if (joinCodeInput.trim() && !isSixDigitLobbyCode(joinCodeInput)) {
-      setLobbyError('Room code must be an exact 6-digit number.');
-      return;
-    }
-    if (players.length >= 8) {
-      setLobbyError('Lobby has reached the maximum capacity of 8 remote LiveKit SFU players.');
-      return;
-    }
-    setPlayers((prev) => [
-      ...prev,
-      {
-        id: `p-${Date.now()}`,
-        name: trimmedName,
-        isHost: false,
-        isReady: true,
-      },
-    ]);
-    setNewPlayerName('');
-    setJoinCodeInput('');
-  };
-
-  const togglePlayerReady = (id: string) => {
-    setPlayers((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isReady: !p.isReady } : p))
-    );
-  };
-
-  const activeScene = SCENE_SAMPLES[selectedCategory] ?? SCENE_SAMPLES['Eras: 1970–1999'];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif] flex flex-col">
@@ -183,16 +69,16 @@ export default function App() {
               activeTab === 'files' ? 'text-white underline underline-offset-8' : ''
             }`}
           >
-            Part 1 & 2 Files
+            Part 1–3 Files
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('lobby-sim')}
+            onClick={() => setActiveTab('sfu-stage')}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'lobby-sim' ? 'text-white underline underline-offset-8' : ''
+              activeTab === 'sfu-stage' ? 'text-white underline underline-offset-8' : ''
             }`}
           >
-            6-Digit Lobby Simulator
+            LiveKit SFU Stage Simulator
           </button>
           <button
             type="button"
@@ -211,7 +97,7 @@ export default function App() {
             onClick={() => setActiveTab('sync-guide')}
             className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition-colors whitespace-nowrap shrink-0"
           >
-            Push Part 2 to GitHub
+            Push Part 3 to GitHub
           </button>
         </div>
       </header>
@@ -227,13 +113,13 @@ export default function App() {
                 <span aria-hidden="true"> · </span>
                 <span>Zero Local Storage</span>
                 <span aria-hidden="true"> · </span>
-                <span>Batch 2 of 5 Ready</span>
+                <span>Batch 3 of 5 Ready</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Part 2: Database & Matchmaking Generated
+                Part 3: Real-Time Media Routing Generated
               </h1>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Generated <code className="font-mono text-amber-400">supabase/schema.sql</code> (PostgreSQL tables & RLS for User Profiles, Eras 1970–1999 & 2000–2026, Awards Vault, Cult Classics, and 2–8 player Realtime Lobbies) and <code className="font-mono text-amber-400">lib/lobby.dart</code> (6-digit matchmaking & Supabase Realtime synchronization).
+                Generated <code className="font-mono text-amber-400">lib/webrtc_manager.dart</code> with LiveKit WebRTC camera capture, <code className="font-mono text-amber-400">adaptiveStream</code> + <code className="font-mono text-amber-400">dynacast</code> + <code className="font-mono text-amber-400">simulcast</code> SFU routing for 2–8 remote players, and 1 Hz telemetrics frame sampling for Part 4.
               </p>
             </div>
 
@@ -258,18 +144,18 @@ export default function App() {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Part 2 Files
+              Part 3 Files
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('lobby-sim')}
+              onClick={() => setActiveTab('sfu-stage')}
               className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                activeTab === 'lobby-sim'
+                activeTab === 'sfu-stage'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              6-Digit Lobby
+              LiveKit SFU
             </button>
             <button
               type="button"
@@ -385,185 +271,192 @@ export default function App() {
           </section>
         )}
 
-        {/* Tab 2: Interactive 6-Digit Lobby & Supabase Realtime Simulator */}
-        {activeTab === 'lobby-sim' && (
+        {/* Tab 2: LiveKit WebRTC SFU Stage Simulator */}
+        {activeTab === 'sfu-stage' && (
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column: SFU Bandwidth & Role Configuration */}
             <div className="lg:col-span-5 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
               <div className="space-y-1">
                 <h2 className="text-lg font-bold text-white">
-                  6-Digit Matchmaking & Realtime Controls
+                  LiveKit SFU Mesh & Dynacast Controls
                 </h2>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Mirrors <code className="font-mono text-amber-400">LobbyRealtimeManager</code> in{' '}
-                  <code className="font-mono text-amber-400">lib/lobby.dart</code> and the PostgreSQL trigger enforcing 2–8 remote players.
+                  Simulates <code className="font-mono text-amber-400">WebRtcStageManager</code> in{' '}
+                  <code className="font-mono text-amber-400">lib/webrtc_manager.dart</code> across 2–8 remote players.
                 </p>
               </div>
 
-              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs text-slate-400">Active 6-Digit Room Code</div>
-                  <div className="text-2xl font-bold font-mono tabular-nums tracking-widest text-amber-400">
-                    {roomCode}
-                  </div>
+              <div className="space-y-2">
+                <span className="block text-xs font-semibold text-slate-300">
+                  Local Participant Role
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSfuRole('activePerformer');
+                      setCamEnabled(true);
+                      setMicEnabled(true);
+                    }}
+                    className={`px-3 py-2.5 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 ${
+                      sfuRole === 'activePerformer'
+                        ? 'bg-rose-600 border-rose-500 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    Active Performer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSfuRole('remoteSpectator');
+                      setCamEnabled(false);
+                      setMicEnabled(false);
+                    }}
+                    className={`px-3 py-2.5 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 ${
+                      sfuRole === 'remoteSpectator'
+                        ? 'bg-rose-600 border-rose-500 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    Remote Spectator
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleGenerateNewRoomCode}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>New 6-Digit Code</span>
-                </button>
               </div>
 
               <div className="space-y-2">
                 <label
-                  htmlFor="category-select"
-                  className="block text-xs font-semibold text-slate-300"
+                  htmlFor="player-count-range"
+                  className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-300"
                 >
-                  Supabase Scene Category Table
+                  <span className="truncate">Remote SFU Slots (2–8)</span>
+                  <span className="font-mono tabular-nums text-amber-400 whitespace-nowrap shrink-0">
+                    {playerCount} Players
+                  </span>
                 </label>
-                <select
-                  id="category-select"
-                  value={selectedCategory}
-                  onChange={(e) => {
-                    setSelectedCategory(e.target.value);
-                    setRoundActive(false);
-                  }}
-                  className="w-full px-3 py-2.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white"
-                >
-                  {Object.keys(SCENE_SAMPLES).map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  id="player-count-range"
+                  type="range"
+                  min={2}
+                  max={8}
+                  value={playerCount}
+                  onChange={(e) => setPlayerCount(Number(e.target.value))}
+                  className="w-full accent-rose-600"
+                />
               </div>
 
-              <form onSubmit={handleAddRemotePlayer} className="space-y-3 pt-2 border-t border-slate-800">
-                <div className="text-xs font-semibold text-slate-300">
-                  Simulate Remote Player Joining via 6-Digit Code ({players.length}/8 Slots)
+              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">SFU Upstream Bitrate:</span>
+                  <span className="font-mono tabular-nums font-semibold text-emerald-400">
+                    {sfuMetrics.sfuUpstreamKbps} kbps
+                  </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="player-name-input" className="sr-only">
-                      Remote Player Name
-                    </label>
-                    <input
-                      id="player-name-input"
-                      type="text"
-                      value={newPlayerName}
-                      onChange={(e) => setNewPlayerName(e.target.value)}
-                      placeholder="Stage Name (e.g. Devon)"
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-800 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="join-code-input" className="sr-only">
-                      6-Digit Room Code
-                    </label>
-                    <input
-                      id="join-code-input"
-                      type="text"
-                      maxLength={6}
-                      value={joinCodeInput}
-                      onChange={(e) => setJoinCodeInput(e.target.value)}
-                      placeholder={`Room Code (${roomCode})`}
-                      className="w-full px-3 py-2 text-xs font-mono rounded-lg bg-slate-950 border border-slate-800 text-white"
-                    />
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Legacy P2P Mesh Upstream:</span>
+                  <span className="font-mono tabular-nums text-slate-400">
+                    {sfuMetrics.p2pUpstreamKbps} kbps
+                  </span>
                 </div>
-                {lobbyError && (
-                  <p className="text-xs text-rose-400">{lobbyError}</p>
-                )}
-                <button
-                  type="submit"
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Join Remote Player to Channel</span>
-                </button>
-              </form>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800">
+                  <span className="text-slate-300 font-semibold">Mobile Bandwidth Saved:</span>
+                  <span className="font-mono tabular-nums font-bold text-amber-400">
+                    {sfuMetrics.bandwidthSavedPercent}% Reduction
+                  </span>
+                </div>
+              </div>
             </div>
 
+            {/* Right Column: LiveKitSoundstageScreen Viewport */}
             <div className="lg:col-span-7 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    Realtime Channel: <code className="font-mono text-amber-400">lobby:{roomCode}</code>
+                    LiveKitSoundstageScreen · Room #482910
                   </h3>
                   <p className="text-xs text-slate-400">
-                    LiveKit SFU Room: <code className="font-mono">act_like_it_{roomCode}</code> · {players.length} / 8 Remote Players
+                    Lens: {cameraLens} · Telemetrics Buffer: {sampledFrames} Samples (1 Hz)
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setRoundActive(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors whitespace-nowrap shrink-0"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Draw Scene & Broadcast</span>
-                </button>
+                <span className="font-mono text-xs font-semibold text-rose-400">
+                  {sfuRole === 'activePerformer' ? 'ON AIR · 720p30 SFU' : 'SPECTATING · DYNACAST'}
+                </span>
               </div>
 
-              {roundActive && (
-                <div className="p-4 rounded-lg bg-slate-950 border border-rose-500 space-y-2">
-                  <div className="text-xs font-mono text-amber-400">
-                    BROADCAST EVENT: round_started · {selectedCategory} · {activeScene.film} ({activeScene.year})
-                  </div>
-                  <div className="text-sm font-semibold text-white">
-                    {activeScene.character}: &ldquo;{activeScene.line}&rdquo;
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Director Cue: {activeScene.cue}
-                  </div>
+              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>VideoTrackRenderer (RTCVideoViewObjectFitCover)</span>
+                  <span className="font-mono tabular-nums text-amber-400">
+                    Audio: {micEnabled ? '-14.5 dBFS' : 'Muted (-60 dBFS)'}
+                  </span>
                 </div>
-              )}
 
-              <div className="space-y-2">
-                {players.map((p) => (
-                  <div
-                    key={p.id}
-                    className="p-3 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-white truncate">
-                          {p.name}
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          {p.isHost ? 'Lobby Host' : 'Remote SFU Performer / Spectator'}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => togglePlayerReady(p.id)}
-                      className={`px-3 py-1 text-xs font-mono font-semibold rounded transition-colors whitespace-nowrap shrink-0 ${
-                        p.isReady
-                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                          : 'bg-amber-950 text-amber-300 border border-amber-800'
-                      }`}
-                    >
-                      {p.isReady ? 'READY' : 'WAITING'}
-                    </button>
+                <div className="p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-1.5">
+                  <div className="text-xs font-semibold text-amber-400">
+                    Roy Batty · Blade Runner (1982)
                   </div>
-                ))}
+                  <p className="text-sm font-bold text-white">
+                    &ldquo;I have seen things you people wouldn&apos;t believe. Attack ships on fire off the shoulder of Orion. All those moments will be lost in time, like tears in rain.&rdquo;
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Cue: Begin with quiet awe · Target Emotion: Melancholic Transcendence
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCamEnabled((v) => !v)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
+                  >
+                    {camEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
+                    <span>{camEnabled ? 'Cam On' : 'Cam Off'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMicEnabled((v) => !v)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
+                  >
+                    {micEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+                    <span>{micEnabled ? 'Mic On' : 'Mic Off'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCameraLens((prev) =>
+                        prev === 'Front (Selfie 720p30)'
+                          ? 'Rear (Telephoto)'
+                          : 'Front (Selfie 720p30)'
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors whitespace-nowrap shrink-0"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Flip Galaxy S26 Lens</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSampledFrames((n) => n + 1)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors whitespace-nowrap shrink-0"
+                  >
+                    <Radio className="w-3.5 h-3.5" />
+                    <span>Sample 1 Hz Telemetry Frame</span>
+                  </button>
+                </div>
               </div>
             </div>
           </section>
         )}
 
-        {/* Tab 3: GitHub Sync Guide for Part 2 */}
+        {/* Tab 3: GitHub Sync Guide for Part 3 */}
         {activeTab === 'sync-guide' && (
           <section className="p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-6">
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-white">
-                Push Part 2 Changes to GitHub (act_like_it)
+                Push Part 3 Changes to GitHub (act_like_it)
               </h2>
               <p className="text-sm text-slate-300">
-                Commit and push the newly generated database schema and matchmaking synchronization files directly from AI Studio:
+                Push the LiveKit WebRTC camera capture and SFU broadcast module directly from Google AI Studio to your remote GitHub repository:
               </p>
             </div>
 
@@ -571,10 +464,10 @@ export default function App() {
               <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
                 <div className="text-xs font-mono text-amber-400">01. Open GitHub Tab</div>
                 <h3 className="text-base font-semibold text-white">
-                  Verify Staged Part 2 Files
+                  Verify Staged Part 3 Files
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Confirm that <code className="font-mono text-white">supabase/schema.sql</code>, <code className="font-mono text-white">lib/lobby.dart</code>, and the updated <code className="font-mono text-white">lib/main.dart</code> appear in your GitHub sync list.
+                  Verify that <code className="font-mono text-white">lib/webrtc_manager.dart</code> and the updated <code className="font-mono text-white">lib/lobby.dart</code> are staged in the GitHub panel.
                 </p>
               </div>
 
@@ -584,17 +477,17 @@ export default function App() {
                   Tap &ldquo;Push Changes&rdquo;
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Push the commit directly to your private <code className="font-mono text-white">act_like_it</code> repository from your Galaxy S26 Ultra browser.
+                  Commit and push Part 3 directly from your Samsung Galaxy S26 Ultra browser with zero local storage.
                 </p>
               </div>
 
               <div className="p-5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
-                <div className="text-xs font-mono text-amber-400">03. Advance to Part 3</div>
+                <div className="text-xs font-mono text-amber-400">03. Advance to Part 4</div>
                 <h3 className="text-base font-semibold text-white">
                   Confirm Completion
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Once pushed, instruct me to proceed to Part 3 (<code className="font-mono text-white">lib/webrtc_manager.dart</code> for LiveKit WebRTC camera capture and SFU broadcast routing).
+                  Once pushed, instruct me to proceed to Part 4 (<code className="font-mono text-white">lib/judging_engine.dart</code> for Gemini AI Telemetrics and Supabase Storage looped video playback).
                 </p>
               </div>
             </div>

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
+import 'webrtc_manager.dart';
 
 /// Enumerates all non-hidden Supabase Scene Categories defined in Part 2.
 /// (The hidden Late-Night After-Hours table is unlocked separately in Part 5.)
@@ -872,6 +873,25 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
                 Text(
                   'Director Cue: ${activeScene.directorCue} · Target: ${activeScene.emotionalTarget}',
                   style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LiveKitSoundstageScreen(
+                            lobbySession: session,
+                            localUserId: _lobbyManager.localUserId,
+                            localDisplayName: _lobbyManager.localDisplayName,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.sensors, size: 18),
+                    label: const Text('Enter LiveKit SFU Soundstage'),
+                  ),
                 ),
               ],
             ),
