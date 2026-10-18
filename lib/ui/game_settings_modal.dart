@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../main.dart';
+
 /// Immutable configuration returned when the player taps "ROLL CAMERA"
 /// inside `GameSettingsModal`.
 class GameSettingsConfig {
@@ -24,17 +26,23 @@ class GameSettingsConfig {
 /// Uses a zero-clutter dark obsidian aesthetic (`#07090E`), heavy padding
 /// (`EdgeInsets.all(24.0)`), physical studio soundboard switches for Tri-Modal
 /// Judging, an "Improv Roulette" Wildcard switch, and a massive neon-bordered
-/// "ROLL CAMERA" CTA button.
+/// "ROLL CAMERA" CTA button. Also supports General Studio Console mode
+/// (`isGeneralSettings: true`) for configuring audio volume, haptics, camera resolution,
+/// and runtime Cloud API credentials.
 class GameSettingsModal extends StatefulWidget {
   static GameSettingsConfig latestConfig = const GameSettingsConfig();
 
   final String? modeTitle;
   final VoidCallback? onRollCamera;
+  final int? totalCastCount;
+  final bool isGeneralSettings;
 
   const GameSettingsModal({
     super.key,
     this.modeTitle,
     this.onRollCamera,
+    this.totalCastCount,
+    this.isGeneralSettings = false,
   });
 
   @override
@@ -48,6 +56,54 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
   bool _improvRouletteWildcard =
       GameSettingsModal.latestConfig.improvRouletteWildcard;
   bool _screenTestDuetMode = GameSettingsModal.latestConfig.screenTestDuetMode;
+
+  late final TextEditingController _geminiCtrl;
+  late final TextEditingController _supaUrlCtrl;
+  late final TextEditingController _supaKeyCtrl;
+  late final TextEditingController _liveKitCtrl;
+  double _audioVolume = 0.85;
+  bool _hapticsEnabled = true;
+  String _cameraResolution = '1080p60 Cinematic';
+  bool _hasSavedCredentials = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _geminiCtrl = TextEditingController(text: AppConfig.geminiApiKey);
+    _supaUrlCtrl = TextEditingController(text: AppConfig.supabaseUrl);
+    _supaKeyCtrl = TextEditingController(text: AppConfig.supabaseAnonKey);
+    _liveKitCtrl = TextEditingController(text: AppConfig.liveKitUrl);
+  }
+
+  @override
+  void dispose() {
+    _geminiCtrl.dispose();
+    _supaUrlCtrl.dispose();
+    _supaKeyCtrl.dispose();
+    _liveKitCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveCloudCredentials() async {
+    HapticFeedback.mediumImpact();
+    await AppConfig.saveRuntimeConfig(
+      geminiKey: _geminiCtrl.text,
+      supabaseProjectUrl: _supaUrlCtrl.text,
+      supabaseKey: _supaKeyCtrl.text,
+      liveKitServerUrl: _liveKitCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() => _hasSavedCredentials = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Runtime Cloud Credentials saved successfully to S26 Ultra Vault!',
+          style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700),
+        ),
+        backgroundColor: Color(0xFF10B981),
+      ),
+    );
+  }
 
   void _handleRollCamera() {
     HapticFeedback.heavyImpact();
@@ -112,8 +168,10 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Call Sheet Header
+              if (widget.isGeneralSettings) ...[
+                _buildGeneralSettingsConsole(),
+              ] else ...[
+                // Call Sheet Header
               Row(
                 children: [
                   Container(
@@ -137,9 +195,9 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'DIRECTOR\'S CALL SHEET · PRE-GAME SETUP',
-                          style: TextStyle(
+                        Text(
+                          'DIRECTOR\'S CALL SHEET · TOTAL CAST: ${widget.totalCastCount ?? 1} PLAYERS',
+                          style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
@@ -303,10 +361,280 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
               ),
               const SizedBox(height: 8),
               ],
+            ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildGeneralSettingsConsole() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // General Settings Header
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0x2606B6D4),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFF06B6D4),
+                  width: 1.4,
+                ),
+              ),
+              child: const Icon(
+                Icons.tune_rounded,
+                color: Color(0xFF06B6D4),
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'DIRECTOR\'S STUDIO CONSOLE · S26 ULTRA',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: Color(0xFF06B6D4),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'STUDIO HARDWARE & KEYS',
+                    style: GoogleFonts.limelight(
+                      fontSize: 22,
+                      color: Colors.white,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Section 1: Audio Volume & Haptics
+        const Text(
+          'STUDIO AUDIO & HAPTICS',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+            color: Color(0xFF94A3B8),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B0E17),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF1E293B)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Soundstage Master Volume',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    '${(_audioVolume * 100).round()}%',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                value: _audioVolume,
+                activeColor: const Color(0xFFF59E0B),
+                inactiveColor: const Color(0xFF1E293B),
+                onChanged: (v) {
+                  setState(() => _audioVolume = v);
+                },
+              ),
+              const Divider(color: Color(0xFF1E293B), height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Paparazzi Touch Haptics',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'S26 Ultra tactile kick on stanchions & rolls',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Switch.adaptive(
+                    value: _hapticsEnabled,
+                    activeColor: const Color(0xFF06B6D4),
+                    onChanged: (v) {
+                      HapticFeedback.mediumImpact();
+                      setState(() => _hapticsEnabled = v);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Section 2: Camera Hardware Profile
+        const Text(
+          'CAMERA HARDWARE PROFILE',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+            color: Color(0xFF94A3B8),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: ChoiceChip(
+                label: const Text('1080p60 Cinema'),
+                selected: _cameraResolution == '1080p60 Cinematic',
+                onSelected: (_) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _cameraResolution = '1080p60 Cinematic');
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ChoiceChip(
+                label: const Text('720p30 Rapid SFU'),
+                selected: _cameraResolution == '720p30 Rapid SFU',
+                onSelected: (_) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _cameraResolution = '720p30 Rapid SFU');
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Section 3: Cloud API Runtime Vault
+        const Text(
+          'CLOUD API RUNTIME VAULT',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+            color: Color(0xFF94A3B8),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _geminiCtrl,
+          decoration: const InputDecoration(
+            labelText: 'GEMINI_API_KEY (AI Telemetrics)',
+            filled: true,
+            fillColor: Color(0xFF0B0E17),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _supaUrlCtrl,
+          decoration: const InputDecoration(
+            labelText: 'SUPABASE_URL (https://xxx.supabase.co)',
+            filled: true,
+            fillColor: Color(0xFF0B0E17),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _supaKeyCtrl,
+          decoration: const InputDecoration(
+            labelText: 'SUPABASE_ANON_KEY',
+            filled: true,
+            fillColor: Color(0xFF0B0E17),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _liveKitCtrl,
+          decoration: const InputDecoration(
+            labelText: 'LIVEKIT_URL (wss://xxx.livekit.cloud)',
+            filled: true,
+            fillColor: Color(0xFF0B0E17),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF06B6D4),
+            foregroundColor: const Color(0xFF07090E),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          onPressed: _saveCloudCredentials,
+          icon: Icon(
+            _hasSavedCredentials
+                ? Icons.check_circle_rounded
+                : Icons.save_rounded,
+            size: 20,
+          ),
+          label: Text(
+            _hasSavedCredentials
+                ? 'CREDENTIALS SAVED TO VAULT'
+                : 'SAVE RUNTIME CLOUD CREDENTIALS',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 

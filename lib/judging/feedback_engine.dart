@@ -49,7 +49,14 @@ class FeedbackEngine {
     final randomIndex = math.Random().nextInt(pool.length);
     return pool[randomIndex];
   }
+
+  /// Alias for getFeedbackForScore matching PerformanceFeedbackEngine signature.
+  static String selectFeedback(double compositeScore, {int? seed}) =>
+      getFeedbackForScore(compositeScore, seed: seed);
 }
+
+/// Backward-compatibility alias for PerformanceFeedbackEngine
+typedef PerformanceFeedbackEngine = FeedbackEngine;
 
 /// Neon-accented card widget displaying the dynamic feedback variation
 /// inside `TriModalJudgingScreen`.

@@ -434,113 +434,15 @@ class _LivingMarqueeDashboardScreenState
   }
 
   void _openCloudConfigBottomSheet() {
-    final geminiCtrl = TextEditingController(text: AppConfig.geminiApiKey);
-    final supaUrlCtrl = TextEditingController(text: AppConfig.supabaseUrl);
-    final supaKeyCtrl = TextEditingController(text: AppConfig.supabaseAnonKey);
-    final liveKitCtrl = TextEditingController(text: AppConfig.liveKitUrl);
-
+    HapticFeedback.lightImpact();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0E121D),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'NEON BACKSTAGE · CLOUD API CREDENTIALS',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF06B6D4),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Galaxy S26 Ultra Runtime Vault',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: geminiCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'GEMINI_API_KEY (AI Telemetrics)',
-                    filled: true,
-                    fillColor: Color(0xFF06080E),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: supaUrlCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'SUPABASE_URL (https://xxx.supabase.co)',
-                    filled: true,
-                    fillColor: Color(0xFF06080E),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: supaKeyCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'SUPABASE_ANON_KEY',
-                    filled: true,
-                    fillColor: Color(0xFF06080E),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: liveKitCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'LIVEKIT_URL (wss://xxx.livekit.cloud)',
-                    filled: true,
-                    fillColor: Color(0xFF06080E),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await AppConfig.saveRuntimeConfig(
-                        geminiKey: geminiCtrl.text,
-                        supabaseProjectUrl: supaUrlCtrl.text,
-                        supabaseKey: supaKeyCtrl.text,
-                        liveKitServerUrl: liveKitCtrl.text,
-                      );
-                      if (!mounted) return;
-                      Navigator.of(ctx).pop();
-                      setState(() {});
-                    },
-                    child: const Text('Save Runtime Cloud Credentials'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const GameSettingsModal(isGeneralSettings: true),
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -620,7 +522,7 @@ class _LivingMarqueeDashboardScreenState
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     VipCredentialHeaderBar(
-                                      actorHandle: '@GALAXY_STAR',
+                                      actorHandle: '@GALAXY_S26_ACTOR',
                                       telemetricsTokens: _telemetricsTokens,
                                       careerWins: OfflineManager
                                           .instance.totalCareerWins,
@@ -896,7 +798,7 @@ class _LivingMarqueeDashboardScreenState
             ),
           ),
 
-          // Top-Right Corner: Social Gauge + Composite Rank
+          // Top-Right Corner: Social Gauge + Dedicated Studio Settings Trigger
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -905,6 +807,18 @@ class _LivingMarqueeDashboardScreenState
                 targetScore: 92.0,
                 neonColor: const Color(0xFFF59E0B),
                 phase: phase + 2.4,
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Studio Settings & Cloud Keys',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: _openCloudConfigBottomSheet,
+                icon: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFFF59E0B),
+                  size: 20,
+                ),
               ),
             ],
           ),

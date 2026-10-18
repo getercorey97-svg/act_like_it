@@ -392,16 +392,18 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '18+ RLS SECURITY GATE · AFTER-HOURS VAULT',
+                '18+ RESTRICTED ACCESS · MIDNIGHT SOUNDSTAGE',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
                   color: Color(0xFFF59E0B),
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Verify Age & Session PIN to Query Hidden Table',
+                'Midnight Speakeasy · Age & PIN Gate',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -410,7 +412,7 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Prompts in public.scenes_late_night_after_hours are protected by PostgreSQL Row-Level Security (profiles.age_verified = true) and feature Mid-Take Improvisation Twists at t = 15s.',
+                'Exclusive 18+ high-stakes dramatic dialogues, psychological thrillers, and uncensored prestige scripts with director\'s cut improv twists. Age verification required for soundstage entry.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.5,
@@ -425,6 +427,8 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
                   labelText: 'Birth Year (YYYY)',
+                  hintText: 'e.g. 1998',
+                  helperText: 'Must be 18 years or older',
                   filled: true,
                   fillColor: Color(0xFF0A0D14),
                   border: OutlineInputBorder(),
@@ -438,7 +442,9 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                 obscureText: true,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
-                  labelText: '4-Digit Session Lock PIN',
+                  labelText: '4-Digit Security PIN',
+                  hintText: 'e.g. 2026',
+                  helperText: 'PIN protects After-Hours soundstage',
                   filled: true,
                   fillColor: Color(0xFF0A0D14),
                   border: OutlineInputBorder(),
@@ -470,8 +476,8 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                         },
                   child: Text(
                     _controller.isVerifying
-                        ? 'Verifying 18+ RLS Policy...'
-                        : 'Verify 18+ & Unlock After-Hours Vault',
+                        ? 'Verifying Soundstage Clearance...'
+                        : 'Verify Age & Enter Midnight Speakeasy',
                   ),
                 ),
               ),

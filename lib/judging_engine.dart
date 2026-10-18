@@ -594,6 +594,8 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
   int _selectedPassAndPlayRating1To10 = 9;
   final List<int> _passAndPlayRatings1To10 = [9];
   bool _queuedForOfflineAi = false;
+  bool _isPlaying = true;
+  bool _isMuted = false;
 
   ScenePrompt get _scene =>
       widget.lobbySession.activeScene ??
@@ -759,6 +761,91 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                           fontSize: 10,
                           color: Color(0xFF10B981),
                         ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    left: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xCC05070D),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0x33FFFFFF)),
+                      ),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              if (controller != null &&
+                                  controller.value.isInitialized) {
+                                if (controller.value.isPlaying) {
+                                  controller.pause();
+                                  setState(() => _isPlaying = false);
+                                } else {
+                                  controller.play();
+                                  setState(() => _isPlaying = true);
+                                }
+                              } else {
+                                setState(() => _isPlaying = !_isPlaying);
+                              }
+                            },
+                            child: Icon(
+                              _isPlaying
+                                  ? Icons.pause_circle_filled_rounded
+                                  : Icons.play_circle_fill_rounded,
+                              color: const Color(0xFFF59E0B),
+                              size: 26,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              controller?.seekTo(Duration.zero);
+                              controller?.play();
+                              setState(() => _isPlaying = true);
+                            },
+                            child: const Icon(
+                              Icons.replay_rounded,
+                              color: Colors.white70,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              setState(() => _isMuted = !_isMuted);
+                              controller?.setVolume(_isMuted ? 0.0 : 1.0);
+                            },
+                            child: Icon(
+                              _isMuted
+                                  ? Icons.volume_off_rounded
+                                  : Icons.volume_up_rounded,
+                              color: _isMuted
+                                  ? const Color(0xFFE11D48)
+                                  : const Color(0xFF06B6D4),
+                              size: 22,
+                            ),
+                          ),
+                          const Spacer(),
+                          const Text(
+                            'REPLAY CONTROLS · 1080p',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

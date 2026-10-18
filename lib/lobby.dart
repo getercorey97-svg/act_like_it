@@ -1308,6 +1308,13 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   Future<void> _loadVipSessionAndClipboard() async {
     final activeCode = await LobbyRealtimeManager.loadActiveRoomSession();
     final tokens = await LobbyRealtimeManager.loadTelemetricsTokens();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedActor = prefs.getString('act_like_it_saved_actor_name');
+      if (savedActor != null && savedActor.trim().isNotEmpty && mounted) {
+        _nameController.text = savedActor.trim();
+      }
+    } catch (_) {}
     if (mounted) {
       setState(() {
         _savedActiveRoomCode = activeCode;
@@ -1498,7 +1505,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               children: [
                 VipCredentialHeaderBar(
                   actorHandle: _nameController.text.trim().isEmpty
-                      ? '@GALAXY_STAR'
+                      ? '@GALAXY_S26_ACTOR'
                       : '@${_nameController.text.trim().toUpperCase().replaceAll(' ', '_')}',
                   telemetricsTokens: _telemetricsTokens,
                   careerWins: OfflineManager.instance.totalCareerWins,
@@ -1526,14 +1533,23 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                   ),
                   const SizedBox(height: 10),
                 ],
-                const TutorialOverlay(
+                TutorialOverlay(
                   tutorialKey: 'lobby_room_code_v1',
                   badgeLabel: 'DIRECTOR\'S PREMIERE CUE',
-                  title: 'Walk the Carpet or Step Into a Studio Door',
+                  title: 'Studio Green Room & Matchmaking Airlock',
                   message:
-                      'Tap the marquee for a paparazzi flash frenzy, tilt any studio door in 3D, or dial in your 6-digit soundstage credentials below.',
-                  neonAccent: Color(0xFFF59E0B),
+                      'Host a new 6-digit soundstage or dial in an invite code below to step onto the set with remote co-stars.',
+                  neonAccent: const Color(0xFFF59E0B),
                   icon: Icons.camera_enhance_rounded,
+                  onDismissed: () async {
+                    try {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool(
+                        'act_like_it_lobby_tooltip_dismissed',
+                        true,
+                      );
+                    } catch (_) {}
+                  },
                 ),
                 Interactive3DHolographicMarquee(
                   phase: phase,
@@ -1547,65 +1563,153 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
         ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate(
-              BespokePremiereDoorsList.buildSixDoors(
-                context: context,
-                scrollController: _parallaxScrollController,
-                phase: phase,
-                careerWins: OfflineManager.instance.totalCareerWins,
-                averageScore: OfflineManager.instance.averageFinalScore,
-                onPremiereDoorTap: () => _openCallSheetAndExecute(
-                  () {
-                    setState(() => _isJoinMode = false);
-                    _lobbyManager.createLobby(
-                      displayName: _nameController.text,
-                      category: _selectedCategory,
-                      preselectedPrompt: widget.initialPromptOverride,
-                    );
-                  },
-                  modeTitle: 'PREMIERE SOUNDSTAGE',
+          sliver: SliverToBoxAdapter(
+            child: _buildDedicatedStudioGreenRoom(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDedicatedStudioGreenRoom() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Green Room Header Card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF0F172A), Color(0xFF0B0E17)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFF06B6D4).withValues(alpha: 0.6),
+              width: 1.5,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 20,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0x2606B6D4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF06B6D4)),
+                        ),
+                        child: const Icon(
+                          Icons.meeting_room_rounded,
+                          color: Color(0xFF06B6D4),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'STUDIO GREEN ROOM',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                          color: Color(0xFF06B6D4),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0x2610B981),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF10B981)),
+                    ),
+                    child: const Text(
+                      'STAGE READY · 1080p60',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Live Matchmaking Lounge & Soundstage Airlock',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
-                onAirlockJoinTap: () => _openCallSheetAndExecute(
-                  () {
-                    setState(() => _isJoinMode = true);
-                    _checkClipboardForSixDigitCode();
-                    if (_codeController.text.trim().length == 6) {
-                      _lobbyManager.joinLobbyByCode(
-                        roomCode: _codeController.text,
-                        displayName: _nameController.text,
-                      );
-                    } else {
-                      _codeFocusNode.requestFocus();
-                    }
-                  },
-                  modeTitle: 'SOUNDSTAGE AIRLOCK',
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Dial in your 6-digit room code above or generate a fresh set pass. Remote co-stars sync in real time with LiveKit WebRTC SFU video feeds and Gemini AI Telemetrics.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: Color(0xFF94A3B8),
                 ),
-                onAfterHoursTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).push(
-                    StageSharedTransitionRoute(
-                      page: const LateNightAfterHoursScreen(),
-                    ),
-                  );
-                },
-                onTrophyVaultTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).push(
-                    StageSharedTransitionRoute(
-                      page: const MatchHistoryScreen(),
-                    ),
-                  );
-                },
-                onCameraViewfinderTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).push(
-                    StageSharedTransitionRoute(
-                      page: const InteractiveInstructionsScreen(),
-                    ),
-                  );
-                },
-                onBoxOfficeVaultTap: () {
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _buildGreenRoomSpecChip(
+                    icon: Icons.speed_rounded,
+                    label: 'SFU LOW LATENCY',
+                    accent: const Color(0xFF06B6D4),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildGreenRoomSpecChip(
+                    icon: Icons.psychology_rounded,
+                    label: 'GEMINI 2.5 FLASH',
+                    accent: const Color(0xFFE11D48),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildGreenRoomSpecChip(
+                    icon: Icons.people_alt_rounded,
+                    label: '2-8 CAST',
+                    accent: const Color(0xFFF59E0B),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Quick Stage Hub Navigation
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF59E0B),
+                  side: const BorderSide(color: Color(0xFFF59E0B), width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor: const Color(0x990B0E17),
+                ),
+                onPressed: () {
                   HapticFeedback.lightImpact();
                   Navigator.of(context).push(
                     StageSharedTransitionRoute(
@@ -1613,11 +1717,82 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                     ),
                   );
                 },
+                icon: const Icon(Icons.confirmation_number_rounded, size: 16),
+                label: const Text(
+                  'SCENE VAULT',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF10B981),
+                  side: const BorderSide(color: Color(0xFF10B981), width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor: const Color(0x990B0E17),
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.of(context).push(
+                    StageSharedTransitionRoute(
+                      page: const MatchHistoryScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.emoji_events_rounded, size: 16),
+                label: const Text(
+                  'TROPHY ROOM',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildGreenRoomSpecChip({
+    required IconData icon,
+    required String label,
+    required Color accent,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF070A12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accent.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: accent, size: 16),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 8.5,
+                fontWeight: FontWeight.w800,
+                color: accent,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1651,7 +1826,10 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                 children: [
                   Expanded(
                     child: ChoiceChip(
-                      label: const Text('Host New 6-Digit Room'),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Host 6-Digit Room'),
+                      ),
                       selected: !_isJoinMode,
                       onSelected: (_) => setState(() => _isJoinMode = false),
                     ),
@@ -1659,7 +1837,10 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                   const SizedBox(width: 10),
                   Expanded(
                     child: ChoiceChip(
-                      label: const Text('Join via 6-Digit Code'),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Join via 6-Digit Code'),
+                      ),
                       selected: _isJoinMode,
                       onSelected: (_) {
                         setState(() => _isJoinMode = true);
@@ -1672,7 +1853,12 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               const SizedBox(height: 14),
               TextField(
                 controller: _nameController,
-                onChanged: (_) => setState(() {}),
+                onChanged: (val) {
+                  setState(() {});
+                  SharedPreferences.getInstance().then((p) {
+                    p.setString('act_like_it_saved_actor_name', val.trim());
+                  });
+                },
                 decoration: const InputDecoration(
                   labelText: 'Stage Display Name',
                   filled: true,
@@ -3241,7 +3427,7 @@ class BespokePremiereDoorsList {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'REC 00:00:$seconds:18',
+                      'REC 00:${seconds.padLeft(2, '0')} · 1080p · 60fps',
                       style: GoogleFonts.courierPrime(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

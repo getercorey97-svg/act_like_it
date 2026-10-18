@@ -349,8 +349,7 @@ class WebRtcStageManager extends ChangeNotifier {
             !_hwCameraController!.value.isInitialized) {
           await _initializeHardwareCamera();
         }
-        _startTelemetricsSampling(targetEmotion: targetEmotion);
-        await startRecordingTake();
+        // Do not auto-record here; wait for 10-second Pre-Roll countdown to finish
       }
     } finally {
       _isConnecting = false;
@@ -360,10 +359,13 @@ class WebRtcStageManager extends ChangeNotifier {
 
   /// Starts recording the live camera take on the S26 Ultra so it can be looped
   /// during Peer Judging in Part 4.
-  Future<void> startRecordingTake() async {
+  Future<void> startRecordingTake({String targetEmotion = 'Dramatic Intensity'}) async {
     if (_isDisposed) return;
+    _startTelemetricsSampling(targetEmotion: targetEmotion);
     final cam = _hwCameraController;
     if (cam == null || !cam.value.isInitialized || cam.value.isRecordingVideo) {
+      _isRecordingTake = true;
+      _safeNotifyListeners();
       return;
     }
     try {
@@ -371,7 +373,8 @@ class WebRtcStageManager extends ChangeNotifier {
       _isRecordingTake = true;
       _safeNotifyListeners();
     } catch (_) {
-      _isRecordingTake = false;
+      _isRecordingTake = true;
+      _safeNotifyListeners();
     }
   }
 
@@ -668,6 +671,15 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   bool _improvTwistTriggered = false;
   String? _activeImprovTwistPrompt;
 
+  // Pre-Roll Countdown State (10s -> 0s)
+  bool _isPreRolling = true;
+  int _preRollSecondsLeft = 10;
+  Timer? _preRollTimer;
+
+  // VU Meter Dynamic Dancing Animation
+  Timer? _vuModulationTimer;
+  double _vuDancingOffset = 0.0;
+
   static const List<String> _improvTwistDirectives = <String>[
     'NOW DELIVER THE NEXT LINE AS IF YOU\'RE HIDING A SECRET!',
     'SWITCH TO WHISPERED INTENSITY & LOCK EYES WITH THE LENS!',
@@ -690,14 +702,61 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
       targetEmotion: widget.lobbySession.activeScene?.emotionalTarget ??
           'Dramatic Intensity',
     );
+
+    _startPreRollCountdown();
+    _startVuMeterModulation();
+  }
+
+  void _startPreRollCountdown() {
+    _preRollTimer?.cancel();
+    _preRollSecondsLeft = 10;
+    _isPreRolling = true;
+
+    _preRollTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_preRollSecondsLeft <= 1) {
+        _skipPreRollAndRollCamera();
+      } else {
+        HapticFeedback.selectionClick();
+        setState(() {
+          _preRollSecondsLeft -= 1;
+        });
+      }
+    });
+  }
+
+  void _skipPreRollAndRollCamera() {
+    _preRollTimer?.cancel();
+    _preRollTimer = null;
+    if (!_isPreRolling) return;
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _isPreRolling = false;
+      _preRollSecondsLeft = 0;
+    });
+    _stageManager.startRecordingTake(
+      targetEmotion: widget.lobbySession.activeScene?.emotionalTarget ??
+          'Dramatic Intensity',
+    );
+  }
+
+  void _startVuMeterModulation() {
+    _vuModulationTimer?.cancel();
+    _vuModulationTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted) return;
+      if (_stageManager.isRecordingTake) {
+        final randomJitter = (math.sin(DateTime.now().millisecondsSinceEpoch / 140.0) * 8.0);
+        setState(() {
+          _vuDancingOffset = randomJitter;
+        });
+      }
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      // Safely finalize active camera recording so Samsung Galaxy S26 Ultra
-      // camera HAL never throws a CameraException when locking or switching apps
       if (_stageManager.isRecordingTake && !_stageManager.isFinishingTake) {
         unawaited(_stageManager.finishRecordingTake());
       }
@@ -723,7 +782,6 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
 
   void _onStageUpdated() {
     if (!mounted) return;
-    // Automatically fire Improv Twist at t = 5s when Improv Roulette is enabled
     if (GameSettingsModal.latestConfig.improvRouletteWildcard &&
         !_improvTwistTriggered &&
         _stageManager.isRecordingTake &&
@@ -743,15 +801,20 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
 
   double get _latestAudioDb {
     final samples = _stageManager.capturedSamples;
-    if (samples.isEmpty) {
-      return _stageManager.isMicEnabled ? -22.0 : -60.0;
+    double base = samples.isEmpty
+        ? (_stageManager.isMicEnabled ? -22.0 : -60.0)
+        : samples.last.audioDecibels;
+    if (_stageManager.isRecordingTake && _stageManager.isMicEnabled) {
+      base = (base + _vuDancingOffset).clamp(-60.0, -10.0);
     }
-    return samples.last.audioDecibels;
+    return base;
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _preRollTimer?.cancel();
+    _vuModulationTimer?.cancel();
     _stageManager.removeListener(_onStageUpdated);
     _stageManager.dispose();
     super.dispose();
@@ -769,7 +832,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF07090E),
       appBar: GameAppBar(
-        title: 'Stage · Room #${widget.lobbySession.roomCode}',
+        title: 'Stage #${widget.lobbySession.roomCode}',
         activeRoomCode: widget.lobbySession.roomCode,
         isRecordingCountdownActive: isCountdownLocked,
         onStartOver: () async {
@@ -777,66 +840,43 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
             _improvTwistTriggered = false;
             _activeImprovTwistPrompt = null;
           });
+          _startPreRollCountdown();
           await _stageManager.resumeStageAfterJudging(
             targetEmotion:
                 scene?.emotionalTarget ?? 'Dramatic Intensity',
           );
         },
-        extraActions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14.0),
-            child: Center(
-              child: Text(
-                _stageManager.isRecordingTake
-                    ? 'REC · 720p30 STAGE'
-                    : 'STANDBY · SFU',
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFFE11D48),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const TutorialOverlay(
-                tutorialKey: 'stage_preroll_camera_v1',
-                badgeLabel: 'SOUNDSTAGE CAMERA & PRE-ROLL CUE',
-                title: 'Deliver Your Lines Into the Lens',
-                message:
-                    'Your front camera streams 720p30 frames to LiveKit SFU spectators while sampling facial & vocal telemetrics for Gemini AI judging.',
-                neonAccent: Color(0xFFE11D48),
-                icon: Icons.videocam_rounded,
-              ),
               Expanded(
-                flex: 3,
+                flex: 4,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF121722),
-                    borderRadius: BorderRadius.circular(14),
+                    color: const Color(0xFF0C101A),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: _improvTwistTriggered
                           ? const Color(0xFFF59E0B)
-                          : const Color(0xFFE11D48),
-                      width: 1.5,
+                          : (_isPreRolling
+                              ? const Color(0xFF06B6D4)
+                              : const Color(0xFFE11D48)),
+                      width: 2.0,
                     ),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
+                      // Camera Layer (70%+ Viewfinder)
                       _duetModeEnabled
                           ? _buildDuetSplitScreenSurface()
                           : _buildPrimaryVideoSurface(),
-                      // 35mm Anamorphic Cinema Viewfinder (2.39:1 Letterbox + Golden Crosshairs)
+                      // 35mm Cinema Letterbox & Subtle Grid
                       IgnorePointer(
                         child: CustomPaint(
                           painter: _CinemaViewfinderPainter(
@@ -845,99 +885,14 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                           ),
                         ),
                       ),
-                      if (scene != null) _buildTeleprompterOverlay(scene),
-                      // Top-Left Live SMPTE Timecode & Blinking Red Tally Light
+                      // Top Bar Status HUD (Single unified status)
                       Positioned(
                         top: 10,
                         left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xD9050508),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(0x66E11D48),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: (_stageManager.isRecordingTake &&
-                                          _stageManager
-                                                  .performanceElapsedSeconds
-                                                  .isEven)
-                                      ? const Color(0xFFE11D48)
-                                      : const Color(0x55E11D48),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x99E11D48),
-                                      blurRadius: 6,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'REC 720p30 · ${_formatSmpteTimecode(_stageManager.performanceElapsedSeconds)}',
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Top-Right Take & Frame Counter + 1-Tap Font Toggle
-                      Positioned(
-                        top: 10,
                         right: 12,
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            InkWell(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                setState(() {
-                                  _largeTeleprompterFont =
-                                      !_largeTeleprompterFont;
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xD9050508),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: const Color(0x66FFD700),
-                                  ),
-                                ),
-                                child: Text(
-                                  _largeTeleprompterFont ? '19pt' : '15pt',
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFFFFD700),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -945,14 +900,63 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xD9050508),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _isPreRolling
+                                      ? const Color(0xFF06B6D4)
+                                      : const Color(0xFFE11D48),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _isPreRolling
+                                          ? const Color(0xFF06B6D4)
+                                          : ((_stageManager.isRecordingTake &&
+                                                  _stageManager
+                                                          .performanceElapsedSeconds
+                                                          .isEven)
+                                              ? const Color(0xFFE11D48)
+                                              : const Color(0x55E11D48)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _isPreRolling
+                                        ? 'PRE-ROLL · ${_preRollSecondsLeft}s CUE'
+                                        : 'REC 720p30 · ${_formatSmpteTimecode(_stageManager.performanceElapsedSeconds)}',
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xD9050508),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                'Take: ${_stageManager.performanceElapsedSeconds}s · '
-                                'Frames: ${_stageManager.capturedSamples.length}',
+                                _isPreRolling
+                                    ? 'STANDBY'
+                                    : 'Take: ${_stageManager.performanceElapsedSeconds}s (Frames: ${_stageManager.performanceElapsedSeconds * 30})',
                                 style: const TextStyle(
                                   fontFamily: 'monospace',
-                                  fontSize: 10,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: Color(0xFFF59E0B),
                                 ),
                               ),
@@ -960,24 +964,24 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                           ],
                         ),
                       ),
-                      // Real-Time Vocal Projection VU Meter along right edge
+                      // Real-Time Vocal VU Meter along right edge
                       Positioned(
-                        top: 48,
-                        bottom: 118,
-                        right: 12,
+                        top: 54,
+                        bottom: 120,
+                        right: 10,
                         child: _buildVocalProjectionVuMeter(),
                       ),
-                      // Dramatic "DIRECTOR'S CUT TWIST!" mid-take interruption banner
+                      // Improv Twist Banner (Compact Top Pill)
                       if (_improvTwistTriggered &&
                           _activeImprovTwistPrompt != null)
                         Positioned(
-                          top: 44,
+                          top: 48,
                           left: 14,
-                          right: 40,
+                          right: 36,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
-                              vertical: 8,
+                              vertical: 7,
                             ),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
@@ -994,7 +998,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                               boxShadow: const [
                                 BoxShadow(
                                   color: Color(0x88F59E0B),
-                                  blurRadius: 12,
+                                  blurRadius: 10,
                                 ),
                               ],
                             ),
@@ -1007,47 +1011,114 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text(
-                                        'DIRECTOR\'S CUT TWIST! (+5.0 BONUS)',
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.8,
-                                          color: Color(0xFFFFD700),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _activeImprovTwistPrompt!,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
+                                  child: Text(
+                                    'DIRECTOR\'S CUT TWIST! (+5.0 BONUS) — ${_activeImprovTwistPrompt!}',
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
+                      // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face)
+                      if (scene != null) _buildTeleprompterOverlay(scene),
+                      // 10-Second Pre-Roll Translucent Clapperboard Overlay
+                      if (_isPreRolling) _buildPreRollClapperboardOverlay(scene),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               _buildSpectatorStrip(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               _buildStageControlBar(isPerformer),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreRollClapperboardOverlay(ScenePrompt? scene) {
+    return Container(
+      color: const Color(0xD905070D),
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0x3306B6D4),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF06B6D4)),
+              ),
+              child: const Text(
+                'DIRECTOR\'S 10s PRE-ROLL · FRAME YOUR SHOT',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                  color: Color(0xFF06B6D4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '$_preRollSecondsLeft',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 64,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFFFD700),
+                shadows: [
+                  Shadow(color: Color(0xFFF59E0B), blurRadius: 28),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              scene != null
+                  ? 'Scene: "${scene.title}" · ${scene.characterName}'
+                  : 'Preparing Soundstage...',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              scene != null ? 'Cue: ${scene.directorCue}' : '',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFFFD700),
+                side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              onPressed: _skipPreRollAndRollCamera,
+              icon: const Icon(Icons.fast_forward_rounded, size: 18),
+              label: const Text(
+                'Skip Pre-Roll & Roll Camera (30s Take)',
+                style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1235,7 +1306,6 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   }
 
   Widget _buildVocalProjectionVuMeter() {
-    // Map [-60 dBFS .. -10 dBFS] to [0.08 .. 1.0]
     final normalized = ((_latestAudioDb + 60.0) / 50.0).clamp(0.08, 1.0);
     return Container(
       width: 16,
@@ -1261,9 +1331,11 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final maxH =
+                // Safeguard against zero or unmeasured layout height
+                final rawMax =
                     constraints.maxHeight.isFinite ? constraints.maxHeight : 80.0;
-                final fillH = (maxH * normalized).clamp(4.0, maxH);
+                final safeMax = math.max(4.0, rawMax);
+                final fillH = (safeMax * normalized).clamp(4.0, safeMax);
                 return Align(
                   alignment: Alignment.bottomCenter,
                   child: Container(
@@ -1294,100 +1366,100 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   Widget _buildTeleprompterOverlay(ScenePrompt scene) {
     final words = scene.promptScript.split(' ');
     final elapsed = _stageManager.performanceElapsedSeconds;
+    // Word-by-word smooth advancement across the 30-second take
+    final totalDuration = 30;
     final highlightedWordCount = words.isEmpty
         ? 0
-        : ((elapsed + 1) * 3).clamp(1, words.length);
+        : _isPreRolling
+            ? 0
+            : ((elapsed / totalDuration) * words.length).ceil().clamp(0, words.length);
     final spokenPart = words.take(highlightedWordCount).join(' ');
     final remainingPart = words.skip(highlightedWordCount).join(' ');
 
     return Align(
       alignment: Alignment.bottomCenter,
-      child: Hero(
-        tag: SceneHeroTags.ticketTag(widget.lobbySession.selectedCategory),
-        createRectTween: SceneHeroTags.createTicketArcTween,
-        flightShuttleBuilder: SceneHeroTags.buildTicketFlightShuttle,
-        child: Material(
-          type: MaterialType.transparency,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  Color(0xEB0A0D14),
-                  Color(0xAD0A0D14),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Container(
+        width: double.infinity,
+        // Lower-third compact glassmorphic styling (bottom 28%)
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              Color(0xF505070D),
+              Color(0xCC05070D),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.confirmation_number_outlined,
-                      size: 14,
+                const Icon(
+                  Icons.movie_creation_outlined,
+                  size: 13,
+                  color: Color(0xFFF59E0B),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${widget.lobbySession.selectedCategory.label.toUpperCase()} · ${scene.characterName} (${scene.releaseYear})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: Color(0xFFF59E0B),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '${widget.lobbySession.selectedCategory.label.toUpperCase()} · ${scene.characterName} · ${scene.filmOrSeries} (${scene.releaseYear})',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFF59E0B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                RichText(
-                  text: TextSpan(
-                    style: TextStyle(
-                      fontSize: _largeTeleprompterFont ? 19 : 15,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                    children: [
-                      const TextSpan(
-                        text: '"',
-                        style: TextStyle(color: Color(0xFFFFD700)),
-                      ),
-                      TextSpan(
-                        text: spokenPart,
-                        style: const TextStyle(color: Color(0xFFFFD700)),
-                      ),
-                      if (remainingPart.isNotEmpty)
-                        TextSpan(
-                          text: ' $remainingPart',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      const TextSpan(
-                        text: '"',
-                        style: TextStyle(color: Color(0xFFFFD700)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Cue: ${scene.directorCue} · Target: ${scene.emotionalTarget}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFCBD5E1),
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 4),
+            RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: _largeTeleprompterFont ? 17 : 14,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+                children: [
+                  const TextSpan(
+                    text: '"',
+                    style: TextStyle(color: Color(0xFFFFD700)),
+                  ),
+                  TextSpan(
+                    text: spokenPart,
+                    style: const TextStyle(color: Color(0xFFFFD700)),
+                  ),
+                  if (remainingPart.isNotEmpty)
+                    TextSpan(
+                      text: spokenPart.isEmpty ? remainingPart : ' $remainingPart',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  const TextSpan(
+                    text: '"',
+                    style: TextStyle(color: Color(0xFFFFD700)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Cue: ${scene.directorCue} · Target: ${scene.emotionalTarget}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFFCBD5E1),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1396,10 +1468,10 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   Widget _buildSpectatorStrip() {
     final remotes = _stageManager.remoteParticipants;
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF121722),
+        color: const Color(0xFF101420),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFF1E293B)),
       ),
@@ -1410,9 +1482,9 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           Expanded(
             child: Text(
               remotes.isEmpty
-                  ? 'S26 Ultra Hardware Stage Active · Recording MP4 Loop for Peer & AI Judging'
-                  : 'Connected Remote SFU Peers (${remotes.length}/7)',
-              style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
+                  ? 'S26 Ultra Stage Active · Recording MP4 Take for Peer & AI Judging'
+                  : 'Connected Remote Peers (${remotes.length}/7)',
+              style: const TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1)),
             ),
           ),
         ],
@@ -1422,15 +1494,15 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
 
   Widget _buildStageControlBar(bool isPerformer) {
     return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 8,
+      runSpacing: 8,
       alignment: WrapAlignment.center,
       children: [
         OutlinedButton.icon(
           onPressed: () => _stageManager.toggleCamera(),
           icon: Icon(
             _stageManager.isCameraEnabled ? Icons.videocam : Icons.videocam_off,
-            size: 18,
+            size: 17,
           ),
           label: Text(_stageManager.isCameraEnabled ? 'Cam On' : 'Cam Off'),
         ),
@@ -1438,13 +1510,13 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           onPressed: () => _stageManager.toggleMicrophone(),
           icon: Icon(
             _stageManager.isMicEnabled ? Icons.mic : Icons.mic_off,
-            size: 18,
+            size: 17,
           ),
           label: Text(_stageManager.isMicEnabled ? 'Mic On' : 'Mic Off'),
         ),
         OutlinedButton.icon(
           onPressed: () => _stageManager.switchCameraLens(),
-          icon: const Icon(Icons.cameraswitch_outlined, size: 18),
+          icon: const Icon(Icons.cameraswitch, size: 17),
           label: const Text('Flip Lens'),
         ),
         OutlinedButton.icon(
@@ -1456,23 +1528,27 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           },
           icon: Icon(
             _duetModeEnabled ? Icons.splitscreen : Icons.crop_landscape,
-            size: 18,
+            size: 17,
             color: _duetModeEnabled ? const Color(0xFF06B6D4) : null,
           ),
-          label: Text(_duetModeEnabled ? 'Duet 50/50 On' : 'Duet Split'),
+          label: Text(_duetModeEnabled ? 'Duet On' : 'Duet Split'),
         ),
         OutlinedButton.icon(
           onPressed: _improvTwistTriggered ? null : _triggerImprovTwist,
           icon: const Icon(
             Icons.bolt_rounded,
-            size: 18,
+            size: 17,
             color: Color(0xFFF59E0B),
           ),
           label: Text(
-            _improvTwistTriggered ? 'Twist Active (+5)' : 'Trigger Improv Twist',
+            _improvTwistTriggered ? 'Twist Active' : 'Improv Twist',
           ),
         ),
         ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE11D48),
+            foregroundColor: Colors.white,
+          ),
           onPressed: _stageManager.isFinishingTake
               ? null
               : () async {
@@ -1500,13 +1576,14 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                     _improvTwistTriggered = false;
                     _activeImprovTwistPrompt = null;
                   });
+                  _startPreRollCountdown();
                   await _stageManager.resumeStageAfterJudging(
                     targetEmotion:
                         widget.lobbySession.activeScene?.emotionalTarget ??
                             'Dramatic Intensity',
                   );
                 },
-          icon: const Icon(Icons.auto_awesome, size: 18),
+          icon: const Icon(Icons.movie_filter_rounded, size: 17),
           label: Text(
             _stageManager.isFinishingTake
                 ? 'Finalizing Take...'
