@@ -131,7 +131,7 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
                         color: const Color(0xFF0B0E17),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: rec.wonMatch
+                          color: rec.isWin
                               ? const Color(0xFF10B981)
                               : const Color(0xFF1E293B),
                         ),
@@ -139,10 +139,10 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
                       child: Row(
                         children: [
                           Icon(
-                            rec.wonMatch
+                            rec.isWin
                                 ? Icons.emoji_events_rounded
                                 : Icons.movie_creation_outlined,
-                            color: rec.wonMatch
+                            color: rec.isWin
                                 ? const Color(0xFFF59E0B)
                                 : const Color(0xFF06B6D4),
                             size: 28,
