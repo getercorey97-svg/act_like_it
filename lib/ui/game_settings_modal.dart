@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -126,23 +127,27 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
       constraints: BoxConstraints(
         maxHeight: mediaQuery.size.height * 0.88,
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF07090E),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: const Border(
-            top: BorderSide(color: Color(0xFFF59E0B), width: 2.0),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFE11D48).withValues(alpha: 0.28),
-              blurRadius: 36,
-              spreadRadius: 2,
-              offset: const Offset(0, -8),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xF507090E),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: const Border(
+                top: BorderSide(color: Color(0xFFF59E0B), width: 2.0),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE11D48).withValues(alpha: 0.28),
+                  blurRadius: 36,
+                  spreadRadius: 2,
+                  offset: const Offset(0, -8),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: SafeArea(
+            child: SafeArea(
           top: false,
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -253,7 +258,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
               _buildStudioSoundboardToggle(
                 channelCode: 'CH 02 · 35% WEIGHT',
                 title: 'Peer Judging',
-                subtitle: 'Continuous Supabase loop replay & 1–10 spectator vote',
+                subtitle: 'Screening Room loop replay & 1–10 ensemble vote',
                 icon: Icons.thumbs_up_down_rounded,
                 neonColor: const Color(0xFF06B6D4),
                 value: _peerJudgingEnabled,
@@ -365,6 +370,8 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
             ),
           ),
         ),
+      ),
+      ),
       ),
     );
   }

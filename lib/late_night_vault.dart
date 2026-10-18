@@ -327,7 +327,7 @@ class LateNightAfterHoursScreen extends StatefulWidget {
 class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
   late final LateNightVaultGateController _controller;
   final TextEditingController _birthYearController =
-      TextEditingController(text: '1997');
+      TextEditingController(text: '1988');
   final TextEditingController _pinController =
       TextEditingController(text: '2026');
 
@@ -356,8 +356,10 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF07090E),
       appBar: AppBar(
-        title: const Text('Late-Night After-Hours (18+)'),
+        backgroundColor: const Color(0xFF07090E),
+        title: const Text('Midnight Speakeasy (18+)'),
         actions: [
           if (_controller.isUnlocked)
             TextButton(
@@ -369,10 +371,24 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
             ),
         ],
       ),
-      body: SafeArea(
-        child: _controller.isUnlocked
-            ? _buildUnlockedVaultView()
-            : _buildAgeGateVerificationView(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.0, -0.55),
+            radius: 1.35,
+            colors: [
+              Color(0xFF520002),
+              Color(0xFF1A050A),
+              Color(0xFF07090E),
+            ],
+            stops: [0.0, 0.48, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: _controller.isUnlocked
+              ? _buildUnlockedVaultView()
+              : _buildAgeGateVerificationView(),
+        ),
       ),
     );
   }
@@ -384,9 +400,16 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF121722),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE11D48)),
+            color: const Color(0xF207090E),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFF5DEB3).withValues(alpha: 0.45), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x55520002),
+                blurRadius: 24,
+                spreadRadius: 2,
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,7 +450,7 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
                   labelText: 'Birth Year (YYYY)',
-                  hintText: 'e.g. 1998',
+                  hintText: '1988',
                   helperText: 'Must be 18 years or older',
                   filled: true,
                   fillColor: Color(0xFF0A0D14),

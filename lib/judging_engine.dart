@@ -201,10 +201,14 @@ class TriModalJudgingEngine extends ChangeNotifier {
     _isEvaluatingAi = true;
     _errorMessage = null;
     _safeNotifyListeners();
+    final startedAt = DateTime.now();
 
     try {
+      // Deduct 1 AI Token from user's balance when AI Telemetrics runs
+      await LobbyRealtimeManager.consumeTelemetricsToken();
+
       final avgDecibels = samples.isEmpty
-          ? -16.0
+          ? -45.0
           : samples.fold<double>(0.0, (a, b) => a + b.audioDecibels) /
               samples.length;
 
@@ -260,17 +264,27 @@ Return strict JSON with keys:
       _aiReport = AiTelemetricsReport.fromJson(decoded);
       return _aiReport!;
     } catch (_) {
-      final sampleFactor = (samples.length.clamp(5, 30) / 30.0) * 12.0;
+      final avgDecibels = samples.isEmpty
+          ? -45.0
+          : samples.fold<double>(0.0, (a, b) => a + b.audioDecibels) /
+              samples.length;
+      final durationBoost = (samples.length.clamp(0, 30) / 30.0) * 18.0;
+      final vocalBoost = (((avgDecibels + 50.0).clamp(0.0, 42.0)) / 42.0) * 16.0;
+      final baseDynamic = 62.0 + durationBoost + vocalBoost;
       _aiReport = AiTelemetricsReport(
-        overallAiScore: (84.0 + sampleFactor).clamp(0.0, 98.0),
-        facialExpressionScore: (86.0 + sampleFactor * 0.8).clamp(0.0, 99.0),
-        vocalCadenceScore: (82.0 + sampleFactor).clamp(0.0, 98.0),
-        directorCueFidelity: (85.0 + sampleFactor * 0.9).clamp(0.0, 99.0),
+        overallAiScore: baseDynamic.clamp(55.0, 98.0),
+        facialExpressionScore: (baseDynamic + 2.0).clamp(56.0, 99.0),
+        vocalCadenceScore: (baseDynamic - 1.5).clamp(54.0, 98.0),
+        directorCueFidelity: (baseDynamic + 1.0).clamp(55.0, 99.0),
         directorCritique:
-            'Committed delivery of "${scene.title}" (${scene.filmOrSeries}) hitting "${scene.emotionalTarget}" across ${samples.length}s of stage telemetry.',
+            'Evaluated ${samples.length}s of soundstage telemetry (${avgDecibels.toStringAsFixed(1)} dBFS vocal projection) on "${scene.title}" hitting "${scene.emotionalTarget}".',
       );
       return _aiReport!;
     } finally {
+      final elapsed = DateTime.now().difference(startedAt);
+      if (elapsed < const Duration(seconds: 2)) {
+        await Future<void>.delayed(const Duration(seconds: 2) - elapsed);
+      }
       _isEvaluatingAi = false;
       _safeNotifyListeners();
     }
@@ -368,6 +382,16 @@ Return strict JSON with keys:
       _isUploadingLoop = false;
       _safeNotifyListeners();
     }
+  }
+
+  void updateLivePeerPreview(double sliderScore) {
+    if (_isDisposed) return;
+    if (_peerVotes.isEmpty) {
+      _peerVotes.add(sliderScore.clamp(0.0, 100.0));
+    } else {
+      _peerVotes[_peerVotes.length - 1] = sliderScore.clamp(0.0, 100.0);
+    }
+    _safeNotifyListeners();
   }
 
   Future<void> submitPeerVote({
@@ -468,7 +492,7 @@ Watch Premiere Reel: $shareUrl
     required String playerId,
     required ScenePrompt scene,
     bool isOfflineLocalParty = false,
-    double winThreshold = 85.0,
+    double winThreshold = 75.0,
   }) async {
     final finalComposite = compositeTriModalScore;
     final isWin = finalComposite >= winThreshold;
@@ -650,8 +674,9 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
     final controller = _engine.loopController;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF07090E),
       appBar: GameAppBar(
-        title: 'Tri-Modal Judging Stage',
+        title: 'Tri-Modal Verdict',
         activeRoomCode: widget.lobbySession.roomCode,
         latestCompositeScore: _engine.compositeTriModalScore,
         extraActions: [
@@ -671,26 +696,68 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const TutorialOverlay(
-              tutorialKey: 'judging_peer_swipe_v1',
-              badgeLabel: 'TRI-MODAL JUDGING TIP',
-              title: 'Watch the Loop & Slide to Rate Peers',
-              message:
-                  'Your take replays continuously above while Gemini AI (45%), Peer Voting (35%), and Social Shares (20%) combine into your final Composite Verdict.',
-              neonAccent: Color(0xFFF59E0B),
-              icon: Icons.thumbs_up_down_rounded,
-            ),
-            _buildShowstopperArchetypeBadgeCard(),
-            const SizedBox(height: 12),
-            DynamicFeedbackBanner(
-              compositeScore: _engine.compositeTriModalScore,
-              seed: widget.lobbySession.roundNumber,
-            ),
-            const SizedBox(height: 16),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.0, -0.55),
+            radius: 1.35,
+            colors: [
+              Color(0xFF520002),
+              Color(0xFF1A050A),
+              Color(0xFF07090E),
+            ],
+            stops: [0.0, 0.48, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              if (_engine.isEvaluatingAi) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF140D1E),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.movie_creation_rounded, color: Color(0xFFFFD700), size: 24),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'GEMINI AI ANALYZING TELEMETRICS...',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.0,
+                            color: Color(0xFFFFD700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const TutorialOverlay(
+                tutorialKey: 'judging_peer_swipe_v1',
+                badgeLabel: 'TRI-MODAL JUDGING TIP',
+                title: 'Watch the Loop & Slide to Rate Peers',
+                message:
+                    'Your take replays continuously above while Gemini AI (45%), Peer Voting (35%), and Social Shares (20%) combine into your final Composite Verdict.',
+                neonAccent: Color(0xFFF59E0B),
+                icon: Icons.thumbs_up_down_rounded,
+              ),
+              _buildShowstopperArchetypeBadgeCard(),
+              const SizedBox(height: 12),
+              DynamicFeedbackBanner(
+                compositeScore: _engine.compositeTriModalScore,
+                seed: widget.lobbySession.roundNumber,
+              ),
+              const SizedBox(height: 16),
             Container(
               height: 240,
               decoration: BoxDecoration(
@@ -866,19 +933,23 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '1. Gemini AI Telemetrics (45%)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                      const Expanded(
+                        child: Text(
+                          '1. Gemini AI Telemetrics (45%)',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '${_engine.aiScore.toStringAsFixed(1)} / 100',
                         style: const TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFFE11D48),
                         ),
@@ -929,19 +1000,23 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '2. Peer Judging · Loop Replay (35%)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                      const Expanded(
+                        child: Text(
+                          '2. Peer Judging · Loop Replay (35%)',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '${_engine.peerScore.toStringAsFixed(1)} / 100',
                         style: const TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF10B981),
                         ),
@@ -956,7 +1031,10 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                     divisions: 100,
                     activeColor: const Color(0xFFE11D48),
                     label: _peerSliderValue.round().toString(),
-                    onChanged: (val) => setState(() => _peerSliderValue = val),
+                    onChanged: (val) {
+                      setState(() => _peerSliderValue = val);
+                      _engine.updateLivePeerPreview(val);
+                    },
                   ),
                   SizedBox(
                     width: double.infinity,
@@ -1075,19 +1153,23 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '3. Social Judging · Share Metrics (20%)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                      const Expanded(
+                        child: Text(
+                          '3. Social Judging · Share Metrics (20%)',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '${_engine.socialScore.toStringAsFixed(1)} / 100',
                         style: const TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFFF59E0B),
                         ),
@@ -1120,7 +1202,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                 color: const Color(0xFF121722),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _engine.compositeTriModalScore >= 85.0
+                  color: _engine.compositeTriModalScore >= 75.0
                       ? const Color(0xFF10B981)
                       : const Color(0xFFF59E0B),
                 ),
@@ -1131,34 +1213,38 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '4. Match History & Win Tracking',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                      const Expanded(
+                        child: Text(
+                          '4. Match History & Win Tracking',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _engine.compositeTriModalScore >= 85.0
+                          color: _engine.compositeTriModalScore >= 75.0
                               ? const Color(0x2610B981)
                               : const Color(0x26F59E0B),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          _engine.compositeTriModalScore >= 85.0
-                              ? 'STAGE WIN (85+)'
-                              : 'ROUND COMPLETED',
+                          _engine.compositeTriModalScore >= 75.0
+                              ? 'STAGE WIN (75+)'
+                              : 'ROUND COMPLETE',
                           style: TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: _engine.compositeTriModalScore >= 85.0
+                            color: _engine.compositeTriModalScore >= 75.0
                                 ? const Color(0xFF10B981)
                                 : const Color(0xFFF59E0B),
                           ),
@@ -1169,7 +1255,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                   const SizedBox(height: 8),
                   Text(
                     _engine.hasSavedMatchHistory
-                        ? 'Auto-saved to match_history (Final: ${_engine.compositeTriModalScore.toStringAsFixed(1)}/100 · Win: ${_engine.compositeTriModalScore >= 85.0 ? "YES" : "NO"}).'
+                        ? 'Auto-saved to match_history (Final: ${_engine.compositeTriModalScore.toStringAsFixed(1)}/100 · Win: ${_engine.compositeTriModalScore >= 75.0 ? "YES" : "NO"}).'
                         : 'Saving final Tri-Modal result to match_history...',
                     style: const TextStyle(
                       fontSize: 12,
@@ -1210,6 +1296,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
             const SizedBox(height: 16),
             _buildHollywoodCriticsScorecard(report),
           ],
+        ),
         ),
       ),
     );

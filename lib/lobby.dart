@@ -222,17 +222,17 @@ class ScenePrompt {
       };
 }
 
-/// Built-in Scene Vaults so the APK works 100% offline or online on the S26 Ultra.
+/// Built-in Scene Vaults with original Copyright-Safe Parody Scripts so the APK works 100% offline or online on the S26 Ultra.
 const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
   SceneCategory.era1970To1999: [
     ScenePrompt(
-      id: 'era-70-blade-runner',
-      title: 'Tears in Rain',
-      filmOrSeries: 'Blade Runner',
+      id: 'era-70-neon-rain',
+      title: 'Sparks in the Downpour',
+      filmOrSeries: 'Neon Rain 1982 (Original Parody)',
       releaseYear: 1982,
-      characterName: 'Roy Batty',
+      characterName: 'Commander Vance',
       promptScript:
-          "I've seen things you people wouldn't believe. Attack ships on fire off the shoulder of Orion. All those moments will be lost in time, like tears in rain.",
+          "I've watched neon starships burn above the rings of Saturn, flickering like fireflies in the dark. Every memory we built will vanish into the static, like sparks in a midnight downpour.",
       directorCue:
           'Begin with quiet awe, maintain steady eye contact with the camera lens, and release a gentle breath on the final phrase.',
       emotionalTarget: 'Melancholic Transcendence',
@@ -240,13 +240,13 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
       difficultyTier: 4,
     ),
     ScenePrompt(
-      id: 'era-90-few-good-men',
-      title: 'You Cannot Handle the Truth',
-      filmOrSeries: 'A Few Good Men',
+      id: 'era-90-courtroom-honor',
+      title: 'The Verdict You Requested',
+      filmOrSeries: 'Courtroom Honor (Original Parody)',
       releaseYear: 1992,
-      characterName: 'Col. Nathan R. Jessep',
+      characterName: 'General Sterling',
       promptScript:
-          'You weep for Santiago, and you curse the Marines. You have that luxury. You have the luxury of not knowing what I know.',
+          'You sit in the gallery and question the watchtower, because you enjoy the comfort of never holding the line. You demand the classified truth, yet your hands would tremble the moment I laid the ledger on that bench!',
       directorCue:
           'Start with icy courtroom restraint before escalating vocal projection on the second sentence.',
       emotionalTarget: 'Commanding Indignation',
@@ -256,13 +256,13 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
   ],
   SceneCategory.era2000To2026: [
     ScenePrompt(
-      id: 'era-00-whiplash',
-      title: 'Not Quite My Tempo',
-      filmOrSeries: 'Whiplash',
+      id: 'era-00-tempo-obsession',
+      title: 'Off My Metronome',
+      filmOrSeries: 'Tempo Obsession (Original Parody)',
       releaseYear: 2014,
-      characterName: 'Terence Fletcher',
+      characterName: 'Maestro Vance',
       promptScript:
-          'Were you rushing or were you dragging? If you deliberately sabotage my band, I will gut you like a pig.',
+          'Were you rushing the downbeat or dragging the brass? If you sabotage the rhythm of this conservatory stage on my watch, I will lock the rehearsal doors until sunrise.',
       directorCue:
           'Whisper the opening question with razor-sharp stillness, then snap into sudden percussive intensity.',
       emotionalTarget: 'Controlled Menace',
@@ -270,13 +270,13 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
       difficultyTier: 4,
     ),
     ScenePrompt(
-      id: 'era-20-eeaao',
-      title: 'In Another Life',
-      filmOrSeries: 'Everything Everywhere All at Once',
+      id: 'era-20-parallel-laundromat',
+      title: 'Quiet Universe',
+      filmOrSeries: 'Parallel Laundromat (Original Parody)',
       releaseYear: 2022,
-      characterName: 'Waymond Wang',
+      characterName: 'Desmond',
       promptScript:
-          'In another life, I would have really liked just doing laundry and taxes with you.',
+          'In another timeline, without the flashing cameras or the chaos, I think I would have loved just folding warm laundry and balancing receipts beside you.',
       directorCue:
           'Soften your shoulders, let a bittersweet half-smile form, and deliver with vulnerable sincerity.',
       emotionalTarget: 'Tender Vulnerability',
@@ -286,13 +286,13 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
   ],
   SceneCategory.awardsBestActor: [
     ScenePrompt(
-      id: 'award-actor-twbb',
-      title: 'I Drink Your Milkshake',
-      filmOrSeries: 'There Will Be Blood',
+      id: 'award-actor-black-gold',
+      title: 'The Pipeline Reaches',
+      filmOrSeries: 'Black Gold Tycoon (Original Parody)',
       releaseYear: 2007,
-      characterName: 'Daniel Plainview',
+      characterName: 'Harlan Vance',
       promptScript:
-          'If you have a milkshake, and I have a milkshake, and I have a straw... my straw reaches across the room. I drink your milkshake!',
+          'If your derrick sits on the ridge and my pipeline runs three miles deep, my siphon reaches clear across the valley floor. I drain the entire reservoir before your crew even turns the valve!',
       directorCue:
           'Lean forward into the frame, build rhythmic cadence on the metaphor, and erupt on the final declaration.',
       emotionalTarget: 'Ruthless Triumph',
@@ -302,29 +302,29 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
   ],
   SceneCategory.awardsBestActress: [
     ScenePrompt(
-      id: 'award-actress-lambs',
-      title: 'The Silence of the Lambs (1991)',
-      filmOrSeries: 'Jodie Foster',
+      id: 'award-actress-midnight-ranch',
+      title: 'The Open Pasture Gate',
+      filmOrSeries: 'Midnight Ranch (Original Parody)',
       releaseYear: 1991,
-      characterName: 'Clarice Starling',
+      characterName: 'Agent Clara',
       promptScript:
-          "I woke up early one morning and I heard this strange noise... this screaming. They were slaughtering the spring lambs. And I opened the gate—they wouldn't run, they just stood there, confused. So I picked up one lamb, and I ran away as fast as I could.",
+          'I woke before dawn when the frost was still heavy on the fence, and I unlatched the wooden gate so the colts could run free. None of them moved—so I gathered the smallest one in my coat and walked into the fog.',
       directorCue:
-          'Hold trembling composure for two beats before letting raw childhood memory overtake the line.',
-      emotionalTarget: 'Trembling Childhood Trauma & Resolve',
+          'Hold trembling composure for two beats before letting quiet resolve overtake the line.',
+      emotionalTarget: 'Trembling Resolve',
       durationSeconds: 35,
       difficultyTier: 5,
     ),
   ],
   SceneCategory.awardsBestSupportingActor: [
     ScenePrompt(
-      id: 'award-supp-good-will-hunting',
-      title: 'Good Will Hunting (1997)',
-      filmOrSeries: 'Robin Williams',
+      id: 'award-supp-river-bench',
+      title: 'Beyond the Textbook',
+      filmOrSeries: 'Charles River Bench (Original Parody)',
       releaseYear: 1997,
-      characterName: 'Sean Maguire',
+      characterName: 'Professor Callahan',
       promptScript:
-          "So if I asked you about art, you'd probably give me the skinny on every art book ever written. But I'll bet you can't tell me what it smells like in the Sistine Chapel. If I ask you about love, you'd probably quote me a sonnet. But you've never looked at a woman and been totally vulnerable.",
+          "You can recite every chapter ever printed on Renaissance brushwork, yet you have never stood beneath a cathedral dome and breathed in the turpentine and dust. Real life isn't footnotes—it's risking your heart in the open.",
       directorCue:
           'Speak with quiet, grounded warmth and steady, unhurried eye contact.',
       emotionalTarget: 'Grounded Empathy & Quiet Wisdom',
@@ -334,13 +334,13 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
   ],
   SceneCategory.awardsBestVillain: [
     ScenePrompt(
-      id: 'award-villain-ncfom',
-      title: 'Call It, Friendo',
-      filmOrSeries: 'No Country for Old Men',
+      id: 'award-villain-coin-toss',
+      title: 'Call It in the Dust',
+      filmOrSeries: 'Desert Coin Toss (Original Parody)',
       releaseYear: 2007,
-      characterName: 'Anton Chigurh',
+      characterName: 'The Collector',
       promptScript:
-          "What's the most you ever lost on a coin toss? Don't put it in your pocket. It's your lucky quarter.",
+          "Tell me the highest stake you ever put on a single flip of silver. Don't slide that coin back into your register—it stopped being ordinary change the moment it left my palm.",
       directorCue:
           'Zero blinking, flat deadpan cadence, tilt chin slightly downward while staring directly into the lens.',
       emotionalTarget: 'Unblinking Dread',
@@ -350,13 +350,13 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
   ],
   SceneCategory.awardsEmmyVault: [
     ScenePrompt(
-      id: 'award-emmy-breaking-bad',
-      title: 'I Am the One Who Knocks',
-      filmOrSeries: 'Breaking Bad',
+      id: 'award-emmy-desert-chemistry',
+      title: 'The Storm at the Gate',
+      filmOrSeries: 'Desert Chemistry (Original Parody)',
       releaseYear: 2011,
-      characterName: 'Walter White',
+      characterName: 'Professor Sterling',
       promptScript:
-          "You clearly don't know who you're talking to, so let me clue you in. I am not in danger, Skyler. I am the danger.",
+          'You still think we are waiting for someone to rescue this operation from the storm. Listen closely: I am not the one hiding behind the bolted door—I am the storm at the gate.',
       directorCue:
           'Drop vocal pitch half an octave and step closer to the microphone on the final five words.',
       emotionalTarget: 'Ego & Cold Authority',
@@ -366,13 +366,13 @@ const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
   ],
   SceneCategory.specialtyCultClassics: [
     ScenePrompt(
-      id: 'cult-glengarry',
-      title: 'Put That Coffee Down',
-      filmOrSeries: 'Glengarry Glen Ross',
+      id: 'cult-espresso-closers',
+      title: 'Espresso Is for Closers',
+      filmOrSeries: 'Midnight Boardroom (Original Parody)',
       releaseYear: 1992,
-      characterName: 'Blake',
+      characterName: 'Vance Blake',
       promptScript:
-          "Coffee's for closers only. You think I'm messing with you? I am not messing with you. Always be closing.",
+          'Set that porcelain cup back on the saucer! Double-shot espresso is reserved for top producers who sign the gold leads before midnight. Always be closing the deal.',
       directorCue:
           'Snap fingers once, pace the frame slightly, and deliver with rapid-fire boardroom swagger.',
       emotionalTarget: 'Aggressive Salesmanship',
@@ -3412,36 +3412,29 @@ class BespokePremiereDoorsList {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 120),
-                      opacity: recBlink ? 1.0 : 0.2,
-                      child: const Icon(
-                        Icons.fiber_manual_record_rounded,
-                        color: Color(0xFFE11D48),
-                        size: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'REC 00:${seconds.padLeft(2, '0')} · 1080p · 60fps',
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 120),
+                  opacity: recBlink ? 1.0 : 0.2,
+                  child: const Icon(
+                    Icons.fiber_manual_record_rounded,
+                    color: Color(0xFFE11D48),
+                    size: 14,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'REC 00:00:$seconds:18 · ISO 800 · 24FPS · BAT 99%',
                       style: GoogleFonts.courierPrime(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFFE11D48),
                       ),
                     ),
-                  ],
-                ),
-                Text(
-                  'ISO 800 · 24FPS · BAT 99%',
-                  style: GoogleFonts.courierPrime(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFFA855F7),
                   ),
                 ),
               ],

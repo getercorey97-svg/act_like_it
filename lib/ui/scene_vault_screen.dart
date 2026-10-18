@@ -33,7 +33,7 @@ const List<VaultEraTicketSpec> kVaultEraTickets = [
     admitCode: 'BOX OFFICE · REEL 70–99',
     eraTitle: '1970–1999',
     tagline: 'New Hollywood & Silver Screen Classics',
-    featuredReels: 'Blade Runner · A Few Good Men · Pulp Fiction · Taxi Driver',
+    featuredReels: 'Neon Rain 1982 · Courtroom Honor · Diner Pulp · Midnight Cab',
     neonAccent: Color(0xFFF59E0B),
     icon: Icons.movie_filter_rounded,
   ),
@@ -42,7 +42,7 @@ const List<VaultEraTicketSpec> kVaultEraTickets = [
     admitCode: 'BOX OFFICE · REEL 00–26',
     eraTitle: '2000–2026',
     tagline: 'Modern Prestige & High-Voltage Cinema',
-    featuredReels: 'Whiplash · The Dark Knight · Oppenheimer · Succession',
+    featuredReels: 'Tempo Obsession · Gotham Shadow · Atomic Horizon · Boardroom Dynasty',
     neonAccent: Color(0xFF06B6D4),
     icon: Icons.auto_awesome_motion_rounded,
   ),
@@ -51,7 +51,7 @@ const List<VaultEraTicketSpec> kVaultEraTickets = [
     admitCode: 'MIDNIGHT VAULT · CULT',
     eraTitle: 'Cult Classics',
     tagline: 'Underground Legends & Midnight Quotables',
-    featuredReels: 'The Big Lebowski · Fight Club · Rocky Horror · Donnie Darko',
+    featuredReels: 'Bowling Alley Zen · Basement Rules · Midnight Time Warp · Velvet Tangent',
     neonAccent: Color(0xFFA855F7),
     icon: Icons.bolt_rounded,
   ),
@@ -60,27 +60,27 @@ const List<VaultEraTicketSpec> kVaultEraTickets = [
     admitCode: 'ACADEMY VAULT · LEAD',
     eraTitle: 'Best Actor',
     tagline: 'Tour-de-Force Award-Winning Monologues',
-    featuredReels: 'There Will Be Blood · Training Day · Network',
+    featuredReels: 'Black Gold Tycoon · Rookie Precinct · Prime Time Broadcast',
     neonAccent: Color(0xFFE11D48),
     icon: Icons.emoji_events_rounded,
-  ),
-  VaultEraTicketSpec(
-    category: SceneCategory.awardsBestActress,
-    admitCode: 'ACADEMY VAULT · ICON',
-    eraTitle: 'Best Actress',
-    tagline: 'Raw Psychological Power & Precision',
-    featuredReels: 'Black Swan · Silence of the Lambs · Everything Everywhere',
-    neonAccent: Color(0xFFEC4899),
-    icon: Icons.stars_rounded,
   ),
   VaultEraTicketSpec(
     category: SceneCategory.awardsBestVillain,
     admitCode: 'ACADEMY VAULT · NEMESIS',
     eraTitle: 'Best Villain',
     tagline: 'Cold Fatalism & Commanding Menace',
-    featuredReels: 'No Country for Old Men · Inglourious Basterds · Wall Street',
+    featuredReels: 'Desert Coin Toss · Tavern Interrogation · Greed Street',
     neonAccent: Color(0xFF10B981),
     icon: Icons.whatshot_rounded,
+  ),
+  VaultEraTicketSpec(
+    category: SceneCategory.awardsEmmyVault,
+    admitCode: 'ACADEMY VAULT · EMMY',
+    eraTitle: 'Emmy Vault',
+    tagline: 'Prestige Television Showstoppers',
+    featuredReels: 'Desert Chemistry · Waystar Boardroom · The Bear Kitchen',
+    neonAccent: Color(0xFFEC4899),
+    icon: Icons.live_tv_rounded,
   ),
 ];
 
@@ -119,7 +119,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
   }
 
   Future<void> _onSelectTicket(VaultEraTicketSpec ticket) async {
-    HapticFeedback.mediumImpact();
+    HapticFeedback.heavyImpact();
     final settings = await showModalBottomSheet<GameSettingsConfig>(
       context: context,
       isScrollControlled: true,
@@ -145,14 +145,27 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF07090E),
       appBar: const GameAppBar(
-        title: 'The Scene Vault · Box Office',
+        title: 'The Scene Vault',
       ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.0, -0.6),
+            radius: 1.35,
+            colors: [
+              Color(0xFF520002),
+              Color(0xFF1A050A),
+              Color(0xFF07090E),
+            ],
+            stops: [0.0, 0.48, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -227,6 +240,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -380,14 +394,13 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                                 color: ticket.neonAccent,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
                               '"${prompts.first.promptScript}"',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 12.5,
                                 fontStyle: FontStyle.italic,
+                                height: 1.45,
                                 color: Colors.white70,
                               ),
                             ),

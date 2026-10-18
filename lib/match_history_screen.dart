@@ -43,11 +43,24 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: AnimatedBuilder(
-          animation: OfflineManager.instance,
-          builder: (context, _) {
-            final mgr = OfflineManager.instance;
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.0, -0.6),
+            radius: 1.35,
+            colors: [
+              Color(0xFF520002),
+              Color(0xFF1A050A),
+              Color(0xFF07090E),
+            ],
+            stops: [0.0, 0.48, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: AnimatedBuilder(
+            animation: OfflineManager.instance,
+            builder: (context, _) {
+              final mgr = OfflineManager.instance;
             final records = mgr.matchHistoryLog;
             final totalMatches = records.length;
             final totalWins = mgr.totalCareerWins;
@@ -209,6 +222,7 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
             );
           },
         ),
+      ),
       ),
     );
   }

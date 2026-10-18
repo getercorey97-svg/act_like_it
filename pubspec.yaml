@@ -50,4 +50,4 @@ flutter:
   uses-material-design: true
 
 dependency_overrides:
-  shared_preferences_android: ^2.4.28
+  shared_preferences_android: "2.1.2"

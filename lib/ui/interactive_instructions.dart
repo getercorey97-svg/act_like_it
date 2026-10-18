@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -51,7 +52,7 @@ const List<InstructionStorySlide> kInstructionStorySlides = [
     subtitle:
         'Step onto the digital soundstage, lock into character during the 10-second countdown, and deliver your lines as the neon teleprompter scrolls.',
     weightBadge: 'STAGE FLOW',
-    neonAccent: Color(0xFF06B6D4), // Neon Cyan
+    neonAccent: Color(0xFFF59E0B), // 24K Spotlight Gold
     primaryIcon: Icons.videocam_rounded,
     highlights: [
       InstructionHighlightPoint(
@@ -68,9 +69,9 @@ const List<InstructionStorySlide> kInstructionStorySlides = [
       ),
       InstructionHighlightPoint(
         icon: Icons.sensors_rounded,
-        heading: 'Live SFU Broadcast',
+        heading: 'Live Ensemble Screening Room',
         detail:
-            'Up to 8 remote players spectate your take in real time over LiveKit WebRTC or pass the phone in Offline Party Mode.',
+            'Up to 8 ensemble co-stars spectate your take in real time in the Screening Room or pass the phone in Offline Party Mode.',
       ),
     ],
     interactiveDemoCaption: 'TAP SLATE TO TEST 10s PRE-ROLL CUE',
@@ -113,7 +114,7 @@ const List<InstructionStorySlide> kInstructionStorySlides = [
     badgeLabel: 'PEER JUDGING',
     title: 'Swipe to Rate Remote Friends 1 to 10',
     subtitle:
-        'Immediately after "Cut!", your performance loops continuously via Supabase Storage while the lobby scores your conviction.',
+        'Immediately after "Cut!", your performance loops continuously in the Screening Room while the ensemble scores your conviction.',
     weightBadge: '35% SCORE WEIGHT',
     neonAccent: Color(0xFFF59E0B), // Neon Amber
     primaryIcon: Icons.thumbs_up_down_rounded,
@@ -415,28 +416,33 @@ class _InteractiveInstructionsScreenState
     required InstructionStorySlide slide,
     required int index,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D111A),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: slide.neonAccent.withValues(alpha: 0.75),
-          width: 1.6,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: slide.neonAccent.withValues(alpha: 0.22),
-            blurRadius: 24,
-            spreadRadius: 1,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xF507090E),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: slide.neonAccent.withValues(alpha: 0.75),
+                width: 1.6,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: slide.neonAccent.withValues(alpha: 0.22),
+                  blurRadius: 24,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
           // Top Clapperboard Diagonal Stripes Bar
           SizedBox(
             height: 28,
@@ -576,6 +582,9 @@ class _InteractiveInstructionsScreenState
             ),
           ),
         ],
+      ),
+      ),
+      ),
       ),
     );
   }
@@ -906,7 +915,7 @@ class _InteractiveInstructionsScreenState
                   ),
                   label: Text(
                     isFinalSlide
-                        ? 'BACK TO LOBBY'
+                        ? 'BACK TO RED CARPET'
                         : 'NEXT SLIDE (${_currentIndex + 1}/${kInstructionStorySlides.length})',
                     style: const TextStyle(
                       fontFamily: 'monospace',
@@ -970,6 +979,20 @@ class _InstructionsMarqueeBackdropPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final bgRect = Offset.zero & size;
+    final velvetPaint = Paint()
+      ..shader = const RadialGradient(
+        center: Alignment(0.0, -0.55),
+        radius: 1.35,
+        colors: [
+          Color(0xFF520002),
+          Color(0xFF1A050A),
+          Color(0xFF07090E),
+        ],
+        stops: [0.0, 0.48, 1.0],
+      ).createShader(bgRect);
+    canvas.drawRect(bgRect, velvetPaint);
+
     final angle = progress * 2 * math.pi;
     final primaryCenter = Offset(
       size.width * (0.5 + 0.25 * math.cos(angle)),
@@ -983,7 +1006,8 @@ class _InstructionsMarqueeBackdropPainter extends CustomPainter {
     final primaryPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          activeAccent.withValues(alpha: 0.18),
+          const Color(0xFFF5DEB3).withValues(alpha: 0.20),
+          activeAccent.withValues(alpha: 0.14),
           Colors.transparent,
         ],
       ).createShader(
@@ -994,7 +1018,7 @@ class _InstructionsMarqueeBackdropPainter extends CustomPainter {
     final secondaryPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFA855F7).withValues(alpha: 0.12),
+          const Color(0xFF520002).withValues(alpha: 0.35),
           Colors.transparent,
         ],
       ).createShader(
