@@ -648,6 +648,18 @@ class LobbyRealtimeManager extends ChangeNotifier {
     }
   }
 
+  static Future<int> consumeTelemetricsToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final current = await loadTelemetricsTokens();
+      final next = current > 0 ? current - 1 : 0;
+      await prefs.setInt(_kTelemetricsTokensPrefsKey, next);
+      return next;
+    } catch (_) {
+      return 25;
+    }
+  }
+
   void _notifySafely() {
     if (!_isDisposed) {
       notifyListeners();
