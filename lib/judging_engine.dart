@@ -423,7 +423,7 @@ Return strict JSON with keys:
   }) async {
     if (_isDisposed) return;
     final archetype = showstopperArchetype;
-    final criticQuote = PerformanceFeedbackEngine.selectFeedback(
+    final criticQuote = FeedbackEngine.getFeedbackForScore(
       compositeTriModalScore,
       seed: roundNumber,
     );
@@ -1235,7 +1235,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
     final composite = _engine.compositeTriModalScore;
     final badge = _engine.showstopperArchetype;
     final isStandingOvation = composite >= 85.0;
-    final criticQuote = PerformanceFeedbackEngine.selectFeedback(
+    final criticQuote = FeedbackEngine.getFeedbackForScore(
       composite,
       seed: widget.lobbySession.roundNumber,
     );
