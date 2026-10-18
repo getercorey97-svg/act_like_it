@@ -1,77 +1,66 @@
-# Android SDK 36 SharedPreferences Kotlin Coroutine Fix (`pubspec.yaml`)
+# Missing `MatchHistoryScreen` Placeholder Fix
 
-This plan resolves the fatal native Android initialization crash (`java.lang.NoSuchMethodError: no non-static method "Lio/flutter/plugins/sharedpreferences/SharedPreferencesApiRegistrar;.getAll(...)"`) caught by the Safe Boot Diagnostic screen when running on Android SDK 36.
+This plan resolves the GitHub Actions `assembleRelease` compilation failure (`Error when reading 'lib/match_history_screen.dart': No such file or directory`) by generating a clean, standalone stateless `MatchHistoryScreen` widget while leaving all existing codebase files untouched.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Strict Code Isolation Enforced**: No existing dependencies, scripts, or structural elements in `pubspec.yaml` or any Dart application files will be altered, removed, or refactored. Only the `shared_preferences` version constraint and the `dependency_overrides` block at the bottom of `pubspec.yaml` will be modified.
+> **Strict Code Isolation**: Per your instructions, zero existing files, UI themes, or dependencies will be altered, rewritten, or updated. Only the missing `MatchHistoryScreen` placeholder module will be created so the compiler can resolve the import and link the release APK cleanly.
 
-- **Confirmed Decision 1 (Version Constraints)**: Upgrade `shared_preferences` to `^2.5.2` in `dependencies` and pin `shared_preferences_android: ^2.4.7` in `dependency_overrides`.
-- **Confirmed Decision 2 (Override Scope)**: Override only `shared_preferences_android: ^2.4.7` in `dependency_overrides` so Gradle/Kotlin resolves the updated Pigeon coroutine method signatures without disturbing other packages.
+- **Confirmed Decision 1 — Widget Structure**: Implement `MatchHistoryScreen` as a minimal `StatelessWidget` with a `const MatchHistoryScreen({super.key})` constructor, a `Scaffold`, an `AppBar` titled `"Match History"`, and a centered placeholder body.
+- **Confirmed Decision 2 — Visual Styling**: Apply the app's dark backstage palette (`#07090E` scaffold background and `#0B0E17` dark `AppBar`) so navigating to the screen is visually seamless with the Living Marquee dashboard.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Eliminates the native Android JNI/Kotlin method signature mismatch in `SharedPreferencesPlugin` during startup (`OfflineManager.instance.initialize()` and `Supabase.initialize()`).
-- **Target Audience / Persona**: Mobile players running the release APK compiled against Android SDK 36 on devices such as the Samsung Galaxy S26 Ultra.
-- **Key Value**: Restores clean native plugin initialization for local scene caching and auth session persistence while preserving all existing LiveKit, Supabase, and Gemini functionality.
+- **What It Does**: Provides the missing `MatchHistoryScreen` widget imported by the Living Marquee dashboard when pausing the Game Show background music before navigation.
+- **Target Audience / Persona**: Mobile players on Android (Samsung Galaxy S26 Ultra) and the automated GitHub Actions cloud build pipeline (`flutter build apk --release`).
+- **Key Value**: Eliminates the broken import error during `assembleRelease` while guaranteeing zero regression risk to the existing audio engine, dashboard animations, or Android SDK 36 configuration.
 
 ---
 
 ## 2. User Experience & Visual Design
 
 - **Key User Flows**:
-  1. **App Launch**: On cold boot, the Flutter engine initializes `SharedPreferencesAsync` / `SharedPreferencesPlugin` over the updated Android Pigeon channel without throwing `NoSuchMethodError`.
-  2. **Living Marquee Entry**: Because native initialization succeeds without triggering the Safe Boot Diagnostic fallback screen, the user lands directly on the animated Living Marquee dashboard.
-  3. **Workspace Inspection & GitHub Sync**: The AI Studio workspace viewer displays the complete, copy-pasteable `pubspec.yaml` file ready for one-tap GitHub synchronization.
-- **Visual Identity & Theme**: Preserves the existing Obsidian & Gold Cinema (`#07070B` / `#F5B041`) Living Marquee aesthetic and Safe Boot Diagnostic telemetry wrapper untouched.
-- **Interactive Feedback & Motion**: No visual or motion regressions; startup transitions smoothly from the splash screen into the Living Marquee dashboard.
+  1. The user taps the Career Trophy Room / Match History button on the Living Marquee dashboard.
+  2. The dashboard pauses the looping Game Show background music (`_pauseMusicBeforeNavigation()`) and pushes `const MatchHistoryScreen()`.
+  3. `MatchHistoryScreen` renders a dark backstage `Scaffold` with a `"Match History"` `AppBar` and a clean centered placeholder view, allowing the user to return to the dashboard via the standard back button.
+- **Visual Identity & Theme**:
+  - *Aesthetic Direction*: Backstage Dark (`#07090E` background, `#0B0E17` surface, `#10B981` emerald trophy accent, crisp white typography).
+  - *Typography & Hierarchy*: Bold `AppBar` header (`"Match History"`) paired with a clean centered subtitle indicating the Career Trophy Room & Match History placeholder view.
+  - *Component Styling & Layout*: Pure Flutter Material `StatelessWidget` with zero external package dependencies beyond `package:flutter/material.dart`.
+- **Interactive Feedback & Motion**: Standard Material back navigation returning cleanly to the Living Marquee dashboard.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Upgrade `shared_preferences` to `^2.5.2` + `shared_preferences_android: ^2.4.7` Override**
-  - *Chosen Approach*: Update `shared_preferences: ^2.5.2` under `dependencies:` and append a `dependency_overrides:` section with `shared_preferences_android: ^2.4.7`.
-  - *Why*: `supabase_flutter` and older transitive dependencies can lock an older `shared_preferences_android` implementation whose Pigeon-generated Kotlin interface lacks the updated `Continuation` signature expected under Kotlin 2.x / Android SDK 36. Forcing `shared_preferences_android: ^2.4.7` guarantees compatible bytecode across all transitive callers.
-  - *Alternatives Considered*: Downgrading Android compileSdk — rejected because newer camera/WebRTC plugins require compileSdk 35/36.
+- **Decision 1: Standalone `StatelessWidget` with `const` Constructor**
+  - *Chosen Approach*: Define `class MatchHistoryScreen extends StatelessWidget` with `const MatchHistoryScreen({super.key});` importing only `package:flutter/material.dart`.
+  - *Why*: Matches the exact call site (`builder: (_) => const MatchHistoryScreen()`) in the dashboard, requires zero additional imports that could introduce circular dependencies, and compiles deterministically in `flutter build apk --release`.
+  - *Alternatives Considered*: Importing database or offline managers into the placeholder was passed over to keep the module 100% self-contained and isolated.
 
 ---
 
 ## 4. Technical Architecture & Data Strategy *(Technical Reference)*
 
-### Architecture & Dependency Resolution Flow
-
+- **Architecture & Component Diagram**:
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│                         Flutter App Cold Boot                         │
-│           (Supabase.initialize() + OfflineManager.initialize())       │
-└───────────────────────────────────┬───────────────────────────────────┘
-                                    │
-                                    ▼
-┌───────────────────────────────────────────────────────────────────────┐
-│                    Dart Package: shared_preferences                   │
-│                          Constraint: ^2.5.2                           │
-└───────────────────────────────────┬───────────────────────────────────┘
-                                    │
-                                    ▼
-┌───────────────────────────────────────────────────────────────────────┐
-│             dependency_overrides: shared_preferences_android          │
-│                          Forced Version: ^2.4.7                       │
-│   Aligns Pigeon Kotlin Coroutine Signatures with Android SDK 36       │
-└───────────────────────────────────┬───────────────────────────────────┘
-                                    │
-                                    ▼
-┌───────────────────────────────────────────────────────────────────────┐
-│        Android Native: SharedPreferencesApiRegistrar.getAll(...)      │
-│       Executes cleanly without java.lang.NoSuchMethodError            │
-└───────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                LivingMarqueeDashboardScreen                  │
+│  • Pauses AudioPlayer (_pauseMusicBeforeNavigation)          │
+│  • Pushes MaterialPageRoute(builder: (_) => const ...)       │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ Resolves import & const constructor
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│               MatchHistoryScreen (StatelessWidget)           │
+│  • Scaffold (backgroundColor: #07090E)                       │
+│  • AppBar   (title: Text('Match History'), bg: #0B0E17)      │
+│  • Body     (Centered backstage placeholder card & message)  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Data Model & State
-- All existing `SharedPreferences` keys (`act_like_it_cached_scenes_v1`, `act_like_it_offline_queue_v1`, `act_like_it_match_history_v1`, and Supabase Auth tokens) remain 100% compatible with `shared_preferences: ^2.5.2`.
-
-### Interactive Component & State Mapping
-- Upon approval, `pubspec.yaml` will be updated in the workspace and surfaced in the workspace previewer, and the complete `pubspec.yaml` contents will be output in a single clean code block for verification and GitHub sync.
+- **Data Model & State**: Stateless presentation widget (`const MatchHistoryScreen({super.key})`) with no mutable state or asynchronous side effects.
+- **Interactive Component & State Mapping**: The `AppBar` automatically provides a back navigation control (`Navigator.pop`) when pushed onto the navigation stack from the dashboard.
