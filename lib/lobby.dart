@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
 import 'webrtc_manager.dart';
 import 'offline_manager.dart';
+import 'ui/game_app_bar.dart';
+import 'ui/tutorial_overlay.dart';
 
 enum SceneCategory {
   era1970To1999(
@@ -1206,13 +1208,13 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
     final activeSession = _lobbyManager.session;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          activeSession == null
-              ? 'Multiplayer Matchmaking'
-              : 'Lobby #${activeSession.roomCode}',
-        ),
-        actions: [
+      appBar: GameAppBar(
+        title: activeSession == null
+            ? 'Multiplayer Matchmaking'
+            : 'Lobby #${activeSession.roomCode}',
+        activeRoomCode: activeSession?.roomCode,
+        onStartOver: () => _lobbyManager.leaveLobby(),
+        extraActions: [
           if (activeSession != null)
             TextButton(
               onPressed: () => _lobbyManager.leaveLobby(),
@@ -1235,6 +1237,15 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        const TutorialOverlay(
+          tutorialKey: 'lobby_room_code_v1',
+          badgeLabel: 'LOBBY MATCHMAKING TIP',
+          title: 'Generate or Join a 6-Digit Soundstage',
+          message:
+              'Tap "Generate 6-Digit Room Code" to host up to 8 remote players via LiveKit SFU, or switch to "Join via 6-Digit Code" to enter a friend\'s stage.',
+          neonAccent: Color(0xFF06B6D4),
+          icon: Icons.dialpad_rounded,
+        ),
         Hero(
           tag: SceneHeroTags.ticketTag(_selectedCategory),
           createRectTween: SceneHeroTags.createTicketArcTween,

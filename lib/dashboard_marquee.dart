@@ -9,6 +9,7 @@ import 'webrtc_manager.dart';
 import 'late_night_vault.dart';
 import 'offline_manager.dart';
 import 'match_history_screen.dart';
+import 'ui/interactive_instructions.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
@@ -1167,6 +1168,33 @@ class _LivingMarqueeDashboardScreenState
           label: Text(
             'CAREER TROPHY ROOM · ${OfflineManager.instance.totalCareerWins} WINS · AVG ${OfflineManager.instance.averageFinalScore.toStringAsFixed(1)}',
             style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFA855F7),
+            side: const BorderSide(color: Color(0xFFA855F7), width: 1.2),
+            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+            backgroundColor: const Color(0x990B0E17),
+          ),
+          onPressed: () async {
+            await _pauseMusicBeforeNavigation();
+            if (!mounted) return;
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const InteractiveInstructionsScreen(),
+              ),
+            );
+          },
+          icon: const Icon(Icons.auto_stories_rounded, size: 16),
+          label: const Text(
+            'HOW TO PLAY · STORY CAROUSEL GUIDE',
+            style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 11,
               fontWeight: FontWeight.w800,

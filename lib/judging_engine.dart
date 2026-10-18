@@ -11,6 +11,9 @@ import 'main.dart';
 import 'lobby.dart';
 import 'webrtc_manager.dart';
 import 'offline_manager.dart';
+import 'judging/feedback_engine.dart';
+import 'ui/game_app_bar.dart';
+import 'ui/tutorial_overlay.dart';
 
 class AiTelemetricsReport {
   final double overallAiScore;
@@ -544,9 +547,11 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
     final controller = _engine.loopController;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tri-Modal Judging Stage'),
-        actions: [
+      appBar: GameAppBar(
+        title: 'Tri-Modal Judging Stage',
+        activeRoomCode: widget.lobbySession.roomCode,
+        latestCompositeScore: _engine.compositeTriModalScore,
+        extraActions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: Center(
@@ -567,6 +572,20 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            const TutorialOverlay(
+              tutorialKey: 'judging_peer_swipe_v1',
+              badgeLabel: 'TRI-MODAL JUDGING TIP',
+              title: 'Watch the Loop & Slide to Rate Peers',
+              message:
+                  'Your take replays continuously above while Gemini AI (45%), Peer Voting (35%), and Social Shares (20%) combine into your final Composite Verdict.',
+              neonAccent: Color(0xFFF59E0B),
+              icon: Icons.thumbs_up_down_rounded,
+            ),
+            DynamicFeedbackBanner(
+              compositeScore: _engine.compositeTriModalScore,
+              seed: widget.lobbySession.roundNumber,
+            ),
+            const SizedBox(height: 16),
             Container(
               height: 240,
               decoration: BoxDecoration(
