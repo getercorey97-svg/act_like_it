@@ -49,4 +49,4 @@ flutter:
   uses-material-design: true
 
 dependency_overrides:
-  shared_preferences_android: ^2.4.7
+  shared_preferences_android: ^2.4.28

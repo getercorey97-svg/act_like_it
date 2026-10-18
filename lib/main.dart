@@ -128,24 +128,34 @@ class AppConfig {
 
   static Future<void> loadSavedConfig() async {
     SafeBootDiagnostics.log('Loading SharedPreferences runtime config...');
+    SharedPreferences? prefs;
     try {
-      final prefs = await SharedPreferences.getInstance().timeout(
+      prefs = await SharedPreferences.getInstance().timeout(
         const Duration(seconds: 4),
       );
-      _runtimeSupabaseUrl = (prefs.getString('cfg_supabase_url') ?? '').trim();
-      _runtimeSupabaseAnonKey =
-          (prefs.getString('cfg_supabase_anon_key') ?? '').trim();
-      _runtimeLiveKitUrl = (prefs.getString('cfg_livekit_url') ?? '').trim();
-      _runtimeGeminiApiKey =
-          (prefs.getString('cfg_gemini_api_key') ?? '').trim();
-      SafeBootDiagnostics.log('SharedPreferences loaded successfully.');
-    } catch (e, st) {
-      SafeBootDiagnostics.log('SharedPreferences warning (non-fatal): $e');
-      SafeBootDiagnostics.recordException(
-        e,
-        st,
-        phase: 'SHARED_PREFS_INIT',
+    } catch (e) {
+      SafeBootDiagnostics.log(
+        'Native SharedPreferences channel fallback (in-memory mode): $e',
       );
+      try {
+        SharedPreferences.setMockInitialValues({});
+        prefs = await SharedPreferences.getInstance();
+      } catch (_) {}
+    }
+
+    if (prefs != null) {
+      try {
+        _runtimeSupabaseUrl =
+            (prefs.getString('cfg_supabase_url') ?? '').trim();
+        _runtimeSupabaseAnonKey =
+            (prefs.getString('cfg_supabase_anon_key') ?? '').trim();
+        _runtimeLiveKitUrl = (prefs.getString('cfg_livekit_url') ?? '').trim();
+        _runtimeGeminiApiKey =
+            (prefs.getString('cfg_gemini_api_key') ?? '').trim();
+        SafeBootDiagnostics.log('SharedPreferences loaded successfully.');
+      } catch (e) {
+        SafeBootDiagnostics.log('SharedPreferences read notice: $e');
+      }
     }
 
     final parsedSupabaseUri = Uri.tryParse(supabaseUrl);
