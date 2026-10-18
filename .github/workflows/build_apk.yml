@@ -44,8 +44,10 @@ jobs:
           fi
           sed -i 's/compileSdk = .*/compileSdk = 36/g' android/app/build.gradle.kts || true
 
-      - name: Install Dependencies
-        run: flutter pub get
+      - name: Clean & Install Dependencies
+        run: |
+          flutter clean
+          flutter pub get
 
       - name: Force compileSdk 36 for AndroidX
         run: |

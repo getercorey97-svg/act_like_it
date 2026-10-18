@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter, MaskFilter;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -125,6 +126,7 @@ class _LivingMarqueeDashboardScreenState
     extends State<LivingMarqueeDashboardScreen> with TickerProviderStateMixin {
   // 1. Continuous Stage Spotlight & Backstage Pulse Controller
   late final AnimationController _spotlightController;
+  late final AnimationController _frenzyBurstController;
 
   // 2. Action Clapperboard Physical Snap Controller
   late final AnimationController _clapperController;
@@ -134,6 +136,9 @@ class _LivingMarqueeDashboardScreenState
   late final PageController _ticketPageController;
   late final ScrollController _redCarpetScrollController;
   double _redCarpetScrollOffset = 0.0;
+  double _redCarpetScrollVelocity = 0.0;
+  int _lastStanchionTickIndex = 0;
+  Offset? _activeTouchPosition;
   double _currentTicketPage = 0.0;
   int _focusedTicketIndex = 0;
 
@@ -160,8 +165,13 @@ class _LivingMarqueeDashboardScreenState
 
     _spotlightController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
+      duration: const Duration(seconds: 6),
     )..repeat();
+
+    _frenzyBurstController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
 
     _clapperController = AnimationController(
       vsync: this,
@@ -191,9 +201,25 @@ class _LivingMarqueeDashboardScreenState
 
   void _onRedCarpetScroll() {
     if (!mounted || !_redCarpetScrollController.hasClients) return;
+    final nextOffset = _redCarpetScrollController.offset;
+    final delta = (nextOffset - _redCarpetScrollOffset).abs();
+
+    // Subtle haptic tick as the player walks past each 3D gold brass stanchion post
+    final stanchionIndex = (nextOffset / 92.0).floor();
+    if (stanchionIndex != _lastStanchionTickIndex && nextOffset > 0) {
+      _lastStanchionTickIndex = stanchionIndex;
+      HapticFeedback.selectionClick();
+    }
+
     setState(() {
-      _redCarpetScrollOffset = _redCarpetScrollController.offset;
+      _redCarpetScrollVelocity = delta.clamp(0.0, 48.0);
+      _redCarpetScrollOffset = nextOffset;
     });
+  }
+
+  void _triggerPaparazziFrenzy() {
+    HapticFeedback.heavyImpact();
+    _frenzyBurstController.forward(from: 0.0);
   }
 
   Future<void> _initGameShowMusicLoop() async {
@@ -263,6 +289,7 @@ class _LivingMarqueeDashboardScreenState
     _ticketPageController.removeListener(_onTicketScroll);
     _ticketPageController.dispose();
     _spotlightController.dispose();
+    _frenzyBurstController.dispose();
     _clapperController.dispose();
     _marqueeTickerController.dispose();
     _audioPlayer.dispose();
@@ -476,232 +503,179 @@ class _LivingMarqueeDashboardScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07090E),
-      body: AnimatedBuilder(
-        animation: _spotlightController,
-        builder: (context, _) {
-          final t = _spotlightController.value * 2 * math.pi;
+      backgroundColor: const Color(0xFF05070B),
+      body: Listener(
+        onPointerDown: (e) {
+          if (mounted) setState(() => _activeTouchPosition = e.localPosition);
+        },
+        onPointerMove: (e) {
+          if (mounted) setState(() => _activeTouchPosition = e.localPosition);
+        },
+        onPointerUp: (_) {
+          if (mounted) setState(() => _activeTouchPosition = null);
+        },
+        child: AnimatedBuilder(
+          animation: Listenable.merge([
+            _spotlightController,
+            _frenzyBurstController,
+          ]),
+          builder: (context, _) {
+            final phase = _spotlightController.value * 2 * math.pi;
+            final frenzy = _frenzyBurstController.isAnimating
+                ? (1.0 - _frenzyBurstController.value)
+                : 0.0;
 
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // --------------------------------------------------------------
-              // 1. BASE LAYER: First-Person Perspective Red Carpet + Parallax
-              // --------------------------------------------------------------
-              RepaintBoundary(
-                child: CustomPaint(
-                  painter: PaparazziRedCarpetPainter(
-                    scrollOffset: _redCarpetScrollOffset,
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // --------------------------------------------------------------
+                // 1. BASE LAYER: 3D Perspective Red Carpet, Brass Stanchions & 42 Bokeh
+                // --------------------------------------------------------------
+                RepaintBoundary(
+                  child: CustomPaint(
+                    painter: PaparazziRedCarpetPainter(
+                      scrollOffset: _redCarpetScrollOffset,
+                      phase: phase,
+                      scrollVelocity: _redCarpetScrollVelocity,
+                      touchPosition: _activeTouchPosition,
+                    ),
                   ),
                 ),
-              ),
 
-              // --------------------------------------------------------------
-              // 2. OVERLAY LAYER: Randomized Paparazzi Camera Flashes
-              // --------------------------------------------------------------
-              IgnorePointer(
-                child: CustomPaint(
-                  painter: PaparazziFlashOverlayPainter(
-                    progress: (_spotlightController.value * 3.5) % 1.0,
-                  ),
-                ),
-              ),
-
-              // --------------------------------------------------------------
-              // 3. FOREGROUND: Zero-Clutter CustomScrollView of 6 Studio Doors
-              // --------------------------------------------------------------
-              SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: CustomScrollView(
-                        controller: _redCarpetScrollController,
-                        physics: const BouncingScrollPhysics(),
-                        slivers: [
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                            sliver: SliverToBoxAdapter(
-                              child: _buildPaparazziPremiereHeader(),
-                            ),
-                          ),
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                            sliver: SliverList(
-                              delegate: SliverChildListDelegate([
-                                // THE PREMIERE DOOR: Create Lobby / Quick Play
-                                PaparazziCinemaDoorCard(
-                                  doorBadge: 'THE PREMIERE DOOR · CLAPPERBOARD',
-                                  title: 'Create Lobby / Quick Play',
-                                  subtitle:
-                                      'Snap the glowing Director\'s Clapperboard, configure your Call Sheet, and launch a 6-digit soundstage.',
-                                  icon: Icons.movie_creation_rounded,
-                                  neonAccent: const Color(0xFFE11D48),
-                                  onTap: () => _openCallSheetAndNavigate(
-                                    modeTitle: 'CREATE LOBBY · QUICK PLAY',
-                                    joinMode: false,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-
-                                // DOOR 1: Join 6-Digit Room ("On Air" Stage Light)
-                                PaparazziCinemaDoorCard(
-                                  doorBadge: 'DOOR 01 · ON AIR STAGE LIGHT',
-                                  title: 'Join 6-Digit Room',
-                                  subtitle:
-                                      'Step into a live 6-digit remote soundstage and stream over the LiveKit WebRTC SFU.',
-                                  icon: Icons.sensors_rounded,
-                                  neonAccent: const Color(0xFF06B6D4),
-                                  onTap: () => _openCallSheetAndNavigate(
-                                    modeTitle: 'JOIN 6-DIGIT ROOM',
-                                    joinMode: true,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-
-                                // DOOR 2: 18+ After-Hours (Neon Velvet Rope / VIP Pass)
-                                PaparazziCinemaDoorCard(
-                                  doorBadge: 'DOOR 02 · NEON VELVET ROPE',
-                                  title: '18+ After-Hours',
-                                  subtitle:
-                                      'Present your VIP pass for uncut midnight prompts and 15-second mid-take improvisation twists.',
-                                  icon: Icons.verified_user_outlined,
-                                  neonAccent: const Color(0xFFF59E0B),
-                                  onTap: () async {
-                                    await _pauseMusicBeforeNavigation();
-                                    if (!mounted) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const LateNightAfterHoursScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-
-                                // DOOR 3: Career Trophy Room (Golden Statuette)
-                                PaparazziCinemaDoorCard(
-                                  doorBadge: 'DOOR 03 · GOLDEN STATUETTE',
-                                  title: 'Career Trophy Room',
-                                  subtitle:
-                                      'View your Golden Statuettes (${OfflineManager.instance.totalCareerWins} Wins · Avg ${OfflineManager.instance.averageFinalScore.toStringAsFixed(1)}) and past takes.',
-                                  icon: Icons.emoji_events_rounded,
-                                  neonAccent: const Color(0xFF10B981),
-                                  onTap: () async {
-                                    await _pauseMusicBeforeNavigation();
-                                    if (!mounted) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const MatchHistoryScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-
-                                // DOOR 4: How to Play / Instructions (Director's Megaphone)
-                                PaparazziCinemaDoorCard(
-                                  doorBadge: 'DOOR 04 · DIRECTOR\'S MEGAPHONE',
-                                  title: 'How to Play / Instructions',
-                                  subtitle:
-                                      'Swipe through interactive story clapperboards for Pre-Roll, AI Telemetrics, Peer, and Social Judging.',
-                                  icon: Icons.campaign_rounded,
-                                  neonAccent: const Color(0xFFA855F7),
-                                  onTap: () async {
-                                    await _pauseMusicBeforeNavigation();
-                                    if (!mounted) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const InteractiveInstructionsScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-
-                                // DOOR 5: The Scene Vault (Vintage Box Office Window)
-                                PaparazziCinemaDoorCard(
-                                  doorBadge:
-                                      'DOOR 05 · VINTAGE BOX OFFICE WINDOW',
-                                  title: 'The Scene Vault',
-                                  subtitle:
-                                      'Swipe oversized perforated movie tickets across 1970–1999, 2000–2026, and Cult Classics.',
-                                  icon: Icons.confirmation_number_rounded,
-                                  neonAccent: const Color(0xFFEC4899),
-                                  onTap: () async {
-                                    await _pauseMusicBeforeNavigation();
-                                    if (!mounted) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const SceneVaultScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ]),
-                            ),
-                          ),
-                        ],
+                // --------------------------------------------------------------
+                // 2. OVERLAY LAYER: Paparazzi Silhouettes & 4-Point Star-Burst Flashes
+                // --------------------------------------------------------------
+                IgnorePointer(
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: PaparazziFlashOverlayPainter(
+                        progress: _spotlightController.value,
+                        scrollVelocity: _redCarpetScrollVelocity,
+                        frenzyIntensity: frenzy,
                       ),
                     ),
-
-                    // Continuous Live Marquee Ticker at Bottom
-                    _buildGlobalMarqueeTicker(t),
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+
+                // --------------------------------------------------------------
+                // 3. FOREGROUND: 3D Holographic Marquee + 6 Bespoke Doors + Chyron
+                // --------------------------------------------------------------
+                SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: CustomScrollView(
+                          controller: _redCarpetScrollController,
+                          physics: const BouncingScrollPhysics(),
+                          slivers: [
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                              sliver: SliverToBoxAdapter(
+                                child: Interactive3DHolographicMarquee(
+                                  phase: phase,
+                                  onPaparazziFrenzy: _triggerPaparazziFrenzy,
+                                  trailingControls:
+                                      _buildPaparazziPremiereHeader(),
+                                ),
+                              ),
+                            ),
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                              sliver: SliverList(
+                                delegate: SliverChildListDelegate(
+                                  BespokePremiereDoorsList.buildSixDoors(
+                                    context: context,
+                                    scrollController:
+                                        _redCarpetScrollController,
+                                    phase: phase,
+                                    careerWins:
+                                        OfflineManager.instance.totalCareerWins,
+                                    averageScore: OfflineManager
+                                        .instance.averageFinalScore,
+                                    onPremiereDoorTap: () =>
+                                        _openCallSheetAndNavigate(
+                                      modeTitle: 'PREMIERE SOUNDSTAGE',
+                                      joinMode: false,
+                                    ),
+                                    onAirlockJoinTap: () =>
+                                        _openCallSheetAndNavigate(
+                                      modeTitle: 'SOUNDSTAGE AIRLOCK',
+                                      joinMode: true,
+                                    ),
+                                    onAfterHoursTap: () async {
+                                      await _pauseMusicBeforeNavigation();
+                                      if (!mounted) return;
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const LateNightAfterHoursScreen(),
+                                        ),
+                                      );
+                                    },
+                                    onTrophyVaultTap: () async {
+                                      await _pauseMusicBeforeNavigation();
+                                      if (!mounted) return;
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const MatchHistoryScreen(),
+                                        ),
+                                      );
+                                    },
+                                    onCameraViewfinderTap: () async {
+                                      await _pauseMusicBeforeNavigation();
+                                      if (!mounted) return;
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const InteractiveInstructionsScreen(),
+                                        ),
+                                      );
+                                    },
+                                    onBoxOfficeVaultTap: () async {
+                                      await _pauseMusicBeforeNavigation();
+                                      if (!mounted) return;
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const SceneVaultScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Floating Holographic "LIVE WIRE" Broadcast Chyron at Bottom
+                      HolographicLiveWireChyron(
+                        tickerAnimation: _marqueeTickerController,
+                        feedItems: _liveMarqueeFeedItems,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildPaparazziPremiereHeader() {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'FIRST-PERSON PAPARAZZI RED CARPET',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                  color: Color(0xFFF59E0B),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'ACT LIKE IT',
-                style: GoogleFonts.limelight(
-                  fontSize: 38,
-                  color: Colors.white,
-                  letterSpacing: 2.2,
-                  shadows: const [
-                    Shadow(
-                      color: Color(0xFFE11D48),
-                      blurRadius: 22,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
         IconButton(
           onPressed: _toggleBackgroundMusic,
           tooltip: _isMusicPlaying ? 'Mute Stage Music' : 'Unmute Stage Music',
           icon: Icon(
-            _isMusicPlaying ? Icons.volume_up : Icons.volume_off,
+            _isMusicPlaying ? Icons.volume_up_rounded : Icons.volume_off_rounded,
             color: _isMusicPlaying
                 ? const Color(0xFFF59E0B)
                 : const Color(0xFF64748B),

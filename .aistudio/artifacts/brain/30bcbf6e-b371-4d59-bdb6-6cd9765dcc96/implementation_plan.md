@@ -1,43 +1,96 @@
-# Paparazzi Red Carpet Dashboard & Director's Call Sheet Overhaul
+# Hyper-Fluid 3D Red Carpet Engine & Bespoke Studio Doors Overhaul
 
-This plan transforms the main dashboard experience into a first-person Paparazzi Red Carpet journey with parallax scrolling, randomized camera flash bursts, `GoogleFonts.limelight` headlines, 6 vertical "Door" cards, the zero-clutter "Call Sheet" pre-game configuration modal (`lib/ui/game_settings_modal.dart`), and a dedicated Scene Vault screen (`lib/ui/scene_vault_screen.dart`), while keeping all Supabase matchmaking, Realtime channel synchronization, and LiveKit WebRTC SFU logic 100% untouched.
+Transforms the **ACT LIKE IT** home dashboard and lobby entry experience into a 60/120fps first-person 3D Hollywood premiere engine featuring volumetric searchlights, a touch-reactive 3D holographic marquee, a scroll-velocity-reactive 3D red carpet with swinging stanchion ropes and 4-point star-burst paparazzi lens flares, 12-degree finger-tracking 3D tilt physics, and six custom-crafted architectural studio doors—while preserving 100% of existing backend services, navigation routes, and compiler configurations.
 
-## Visual Direction & Domain Exemplars
+## User Review & Critical Decisions
 
-- **Exemplars**: Netflix Studio Premiere Showcase & MasterClass Mobile Stage—tactile obsidian cards (`#07090E`), dramatic crimson red-carpet perspective lighting, and crisp studio soundboard controls.
-- **Color & Atmospheric Polarity**: Intentional Dark Mode (`#07090E` deep obsidian canvas, `#13080D` velvet carpet shadow, `#E11D48` carpet crimson, `#F59E0B` limelight gold, `#06B6D4` soundstage cyan, `#A855F7` after-hours violet).
-- **Typography**: `GoogleFonts.limelight` exclusively for the `"ACT LIKE IT"` marquee title and the 6 Door headers; crisp monospace for room codes, slate numbers, and studio soundboard readouts.
-- **Layout & Spatial Architecture**:
-  - **Interactive Paparazzi Stack**: Base layer renders a custom first-person perspective Red Carpet with velvet stanchion ropes that shifts vertically via a `ScrollController` parallax listener; overlay layer triggers randomized high-key white/amber camera flash bursts driven by an `AnimationController`.
-  - **Zero-Clutter CustomScrollView**: Removes the top Tri-Modal metric rings from the main dashboard and replaces them with a spacious vertical `CustomScrollView` of 6 heavily shadowed cinematic "Doors".
+> [!IMPORTANT]
+> Both Phase 1 preferences have been locked in and incorporated into this architecture:
 
-## Key Changes
+- **Confirmed Scope**: The Interactive 3D Holographic Marquee, First-Person 3D Red Carpet & Paparazzi Engine, `Interactive3DDoorCard` physics wrapper, and all 6 Bespoke Architectural Doors will be rendered on both the primary home dashboard and the lobby entry screen.
+- **Confirmed Physics & Haptics Profile**: Responsive **12-degree** 3D touch-tilt (`rotateX` / `rotateY`) with live finger-tracking specular glare, subtle `HapticFeedback.selectionClick()` ticks when scrolling past each brass stanchion post, `HapticFeedback.mediumImpact()` on mechanical door activation, and `HapticFeedback.heavyImpact()` + 10-flash paparazzi burst on marquee taps.
+- **Strict Non-Destructive Lockdown**: Zero modifications to CI/CD workflows, package dependencies, `SafeBootDiagnostics`, `OfflineManager`, `LobbyRealtimeManager`, WebRTC SFU routing, or Gemini judging logic.
 
-### 1. Dependency Injection (`pubspec.yaml`)
-- Add `google_fonts: ^6.2.1` under `dependencies:` in `pubspec.yaml` while preserving all existing packages and `dependency_overrides: shared_preferences_android: ^2.4.28`.
+---
 
-### 2. The "Call Sheet" Pre-Game Settings Modal (`lib/ui/game_settings_modal.dart` — New File)
-- Create a stateful `GameSettingsModal` designed for `showModalBottomSheet` with a `#07090E` obsidian surface and `SingleChildScrollView(padding: EdgeInsets.all(24.0))` with generous vertical spacing (`24px–28px` between sections).
-- **The Studio Toggles**: Three oversized tactile studio soundboard switches for **AI Telemetrics (45%)**, **Peer Judging (35%)**, and **Social Judging (20%)**.
-- **Improv Roulette**: A glowing neon **Wildcard** toggle switch enabling random mid-scene improvisation modifiers.
-- **Action Button**: A full-width, neon-bordered **"ROLL CAMERA"** CTA at the bottom that closes the modal, returns the selected `GameSettingsConfig`, and advances directly into the lobby or soundstage.
+## 1. Overview & Core Concept
 
-### 3. The Scene Vault Screen (`lib/ui/scene_vault_screen.dart` — New File)
-- Create `SceneVaultScreen` featuring a dedicated swipeable carousel of oversized perforated movie tickets covering **Eras: 1970–1999**, **Eras: 2000–2026**, **Cult Classics**, and **Award Vaults**.
-- Tapping any movie ticket invokes `showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const GameSettingsModal())` before launching the selected era into `LobbyMatchmakingScreen` / `LiveKitSoundstageScreen`.
+- **What It Does**: Replaces static, flat card layouts and literal prompt labels with an interactive 3D Hollywood premiere environment where players walk down a perspective velvet carpet flanked by photographer silhouettes, swinging velvet ropes, golden bokeh particles, and six distinct physical studio entrances.
+- **Target Audience / Persona**: Mobile performers and party players on the Samsung Galaxy S26 Ultra seeking a tactile, high-frame-rate game-engine feel with immediate visual and haptic feedback.
+- **Key Value**: Eliminates all meta-text and developer jargon from the UI while elevating every scroll, drag, and tap into a responsive 3D mechanical interaction.
 
-### 4. First-Person Paparazzi Dashboard (`lib/dashboard_marquee.dart` & `lib/lobby.dart` UI Overhaul Only)
-- **Strict Backend Isolation**: Keep `SceneCategory`, `ScenePrompt`, `LobbyRealtimeManager`, Supabase queries, Realtime channels, and WebRTC SFU calls completely untouched.
-- **Paparazzi Red Carpet & Parallax `CustomScrollView`**:
-  - Update the main dashboard (`LivingMarqueeDashboardScreen` in `lib/dashboard_marquee.dart`, plus the entry form header in `lib/lobby.dart`) to render the First-Person Red Carpet parallax background + randomized Paparazzi Flash overlay.
-  - Strip the top Tri-Modal Judging metric rings from the main screen and render the 6 vertical cinematic Doors inside a `CustomScrollView`:
-    - **The Premiere Door**: *Create Lobby / Quick Play* (Glowing Director's Clapperboard) — triggers `GameSettingsModal` then routes to `LobbyMatchmakingScreen`.
-    - **Door 1**: *Join 6-Digit Room* ("On Air" Stage Light) — triggers `GameSettingsModal` (or routes directly into 6-digit Join mode).
-    - **Door 2**: *18+ After-Hours* (Neon Velvet Rope / VIP Pass) — routes to `LateNightAfterHoursScreen`.
-    - **Door 3**: *Career Trophy Room* (Golden Statuette) — routes to `MatchHistoryScreen`.
-    - **Door 4**: *How to Play / Instructions* (Director's Megaphone) — routes to `InteractiveInstructionsScreen`.
-    - **Door 5**: *The Scene Vault* (Vintage Box Office Window) — routes to `SceneVaultScreen`.
+---
 
-## Verification Plan
-- Run `compile_applet` to verify zero Dart or TypeScript build issues across all new and updated files.
-- Verify all 6 Doors, the `GameSettingsModal` bottom sheet trigger, `SceneVaultScreen` ticket swiper, and `GoogleFonts.limelight` typography render cleanly without touching Supabase or WebRTC backend classes.
+## 2. User Experience & Visual Design
+
+- **Key User Flows**:
+  1. **Premiere Arrival & Paparazzi Frenzy**: Launching the app reveals twin volumetric searchlights sweeping behind the 3D chrome-and-gold **ACT LIKE IT** marquee. Tapping the marquee triggers a heavy haptic thud, a 3D elastic bounce, and an immediate 10-flash camera burst across the screen.
+  2. **Walking the Red Carpet**: Scrolling down advances the player along the 3D royal crimson runner as gold brass stanchions and velvet ropes scale up and rush past peripheral vision, triggering subtle haptic ticks at each post and spiking camera flash frequency with scroll velocity.
+  3. **3D Touch-Tilt & Bespoke Door Activation**: Touching or dragging across any of the 6 doors tilts the door up to 12 degrees toward the finger with a live specular spotlight sweep across its frosted glassmorphic surface. Releasing or tapping triggers the door's bespoke mechanical animation (e.g., snapping the 3D clapperboard shut) before opening the existing `GameSettingsModal` or destination screen.
+- **Visual Identity & Theme**:
+  - *Aesthetic Direction*: AAA Hollywood Premiere Soundstage & Tactile Broadcast Console.
+  - *Color Palette & Mood*: Deep Obsidian Theatre Canvas (`#05070B`), Royal Crimson Velvet (`#9F1239` to `#E11D48`), Molten 24K Gold (`#F59E0B` to `#FDE68A`), Studio Airlock Cyan (`#06B6D4`), Speakeasy Neon Magenta (`#EC4899`), and Academy Emerald (`#10B981`).
+  - *Typography & Hierarchy*:
+    - **Centerpiece Marquee & Scene Vault Door**: `GoogleFonts.limelight` with animated chrome/gold shader sweep and warm filament bulb chaser border.
+    - **Premiere Clapperboard Door**: `GoogleFonts.bebasNeue` blockbuster display headlines.
+    - **Soundstage Airlock Door**: `GoogleFonts.chakraPetch` precision studio typography.
+    - **VIP Velvet Speakeasy Door**: `GoogleFonts.satisfy` flickering neon script paired with `GoogleFonts.montserrat`.
+    - **Academy Vault Door**: `GoogleFonts.cinzel` engraved prestige serif.
+    - **Camera Viewfinder Door**: `GoogleFonts.courierPrime` screenplay & telemetry timecode typography.
+  - *Component Styling & Layout*: Minimum $48 \times 48\text{px}$ touch hitboxes, `<15%` sticky footer footprint for the floating glassmorphic Live Wire broadcast chyron, and zero static pill clutter or developer jargon.
+- **Interactive Feedback & Motion**:
+  - Compositor-friendly `Transform` (`Matrix4.identity()..setEntry(3, 2, 0.0012)`) for cylindrical scroll curvature and 12-degree finger-tracking tilt.
+  - Custom-painted 4-point star-burst flashes, lens flare cores, and radial screen bloom (`MaskFilter.blur`).
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Unified 3D Engine Shared Between Home Dashboard & Lobby Entry**
+  - *Chosen Approach*: Expose the reusable 3D background engine (`PaparazziRedCarpetPainter`, `PaparazziFlashOverlayPainter`), `Interactive3DHolographicMarquee`, `Interactive3DDoorCard`, and the 6 bespoke door builders so both the main dashboard and the lobby entry view share the identical 60/120fps visual architecture.
+  - *Why*: Ensures visual continuity whether the user is on the root launch screen or returning to the lobby entry view, while keeping all `LobbyRealtimeManager` state and callbacks intact.
+- **Decision 2: Pure CustomPainter & Matrix4 Shader/Physics Pipeline**
+  - *Chosen Approach*: Implement all 3D perspective projection, bokeh particles, 12-bar audio equalizers, neon plasma flicker math, rotating sunburst halos, and ticket-notch clippers using built-in `dart:math` and `dart:ui` without adding external pub packages.
+  - *Why*: Guarantees 100% compatibility with the locked Android SDK 36 CI/CD pipeline and zero native plugin conflicts on the S26 Ultra.
+
+---
+
+## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+### Architecture & Component Diagram
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                  60/120FPS 3D PREMIERE ENGINE (Stack)                      │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Layer 1: 3D Red Carpet, Brass Stanchions & 40+ Bokeh Particles Painter    │
+│           (ScrollController offset + velocity -> Stanchion Haptic Ticks)   │
+│                                     │                                      │
+│  Layer 2: Paparazzi Crowd Silhouettes & 4-Point Star-Burst Flash Painter   │
+│           (Scroll velocity multiplier + Marquee Tap 10-Flash Frenzy)       │
+│                                     │                                      │
+│  Layer 3: CustomScrollView + Cylindrical Reel Perspective Transform        │
+│     ├── Interactive3DHolographicMarquee ("ACT LIKE IT" + Dual Searchlights)│
+│     └── Interactive3DDoorCard (12° Pan/Touch Tilt + Specular Glare)        │
+│           ├── 1. Premiere Clapperboard Door ──► GameSettingsModal (Host)   │
+│           ├── 2. Soundstage Airlock Door    ──► GameSettingsModal (Join)   │
+│           ├── 3. VIP Velvet Speakeasy Door  ──► LateNightAfterHoursScreen  │
+│           ├── 4. Academy Trophy Vault Door  ──► MatchHistoryScreen         │
+│           ├── 5. Camera Viewfinder Door     ──► InteractiveInstructions    │
+│           └── 6. Box Office Ticket Door     ──► SceneVaultScreen           │
+│                                     │                                      │
+│  Layer 4: Floating Glassmorphic "LIVE WIRE" Broadcast Chyron Ticker        │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Interactive Component & State Mapping
+
+- **Interactive 3D Holographic Marquee**:
+  - Continuous `AnimationController` drives dual sweeping searchlight cones, a 24K gold/chrome `LinearGradient` `ShaderMask`, and a perimeter of 28 sequencing warm-white filament bulbs.
+  - `onTap` triggers `HapticFeedback.heavyImpact()`, runs a 3D spring scale/tilt bounce, and injects a 10-flash frenzy burst into the paparazzi overlay painter.
+- **First-Person 3D Red Carpet & Stanchion Haptic Choreography**:
+  - Projects 8 pairs of 3D gold stanchion posts and catenary velvet ropes along perspective vanishing lines.
+  - Tracks `scrollOffset` and scroll delta velocity: crossing each virtual stanchion threshold fires `HapticFeedback.selectionClick()` and boosts camera flash spawn rate.
+- **Interactive3DDoorCard Wrapper & Six Bespoke Doors**:
+  - Tracks local touch coordinates via `GestureDetector` (`onPanDown`, `onPanUpdate`, `onPanEnd`, `onTapCancel`, `onTap`) to compute normalized `dx, dy` in `[-1.0, 1.0]`, applying `rotateX(-dy * 0.21)` and `rotateY(dx * 0.21)` ($\approx 12^\circ$) plus a moving radial specular highlight over a blurred glassmorphic surface.
+  - Preserves every existing navigation callback (`_openCallSheetAndNavigate`, `LateNightAfterHoursScreen`, `MatchHistoryScreen`, `InteractiveInstructionsScreen`, `SceneVaultScreen`, audio mute toggle, and cloud credentials sheet).
