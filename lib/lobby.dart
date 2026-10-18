@@ -5,6 +5,8 @@ import 'dart:ui' show ImageFilter, MaskFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
 import 'webrtc_manager.dart';
@@ -126,13 +128,13 @@ class SceneHeroTags {
   }
 }
 
-/// Smooth custom PageRouteBuilder that pairs with the Hero shared element flight
-/// between the Movie Ticket Carousel and the Active Acting Screen.
+/// Smooth 300ms Hollywood shutter/fade-scale PageRouteBuilder that pairs with
+/// the Hero shared element flight and door transitions.
 class StageSharedTransitionRoute<T> extends PageRouteBuilder<T> {
   StageSharedTransitionRoute({required Widget page})
       : super(
-          transitionDuration: const Duration(milliseconds: 520),
-          reverseTransitionDuration: const Duration(milliseconds: 420),
+          transitionDuration: const Duration(milliseconds: 300),
+          reverseTransitionDuration: const Duration(milliseconds: 260),
           pageBuilder: (context, animation, secondaryAnimation) => page,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             final fadeCurve = CurvedAnimation(
@@ -143,7 +145,7 @@ class StageSharedTransitionRoute<T> extends PageRouteBuilder<T> {
             final scaleTween = Tween<double>(begin: 0.96, end: 1.0).animate(
               CurvedAnimation(
                 parent: animation,
-                curve: Curves.easeOutQuart,
+                curve: Curves.easeOutCubic,
               ),
             );
             return FadeTransition(
@@ -605,6 +607,47 @@ class LobbyRealtimeManager extends ChangeNotifier {
     return code.toString();
   }
 
+  static const String _kActiveRoomCodePrefsKey = 'active_room_code';
+  static const String _kTelemetricsTokensPrefsKey = 'telemetrics_tokens';
+
+  static Future<void> saveActiveRoomSession(String roomCode) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kActiveRoomCodePrefsKey, roomCode.trim());
+    } catch (_) {}
+  }
+
+  static Future<void> clearActiveRoomSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kActiveRoomCodePrefsKey);
+    } catch (_) {}
+  }
+
+  static Future<String?> loadActiveRoomSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final code = prefs.getString(_kActiveRoomCodePrefsKey)?.trim();
+      if (code != null && RegExp(r'^[0-9]{6}$').hasMatch(code)) {
+        return code;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<int> loadTelemetricsTokens() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!prefs.containsKey(_kTelemetricsTokensPrefsKey)) {
+        await prefs.setInt(_kTelemetricsTokensPrefsKey, 25);
+        return 25;
+      }
+      return prefs.getInt(_kTelemetricsTokensPrefsKey) ?? 25;
+    } catch (_) {
+      return 25;
+    }
+  }
+
   void _notifySafely() {
     if (!_isDisposed) {
       notifyListeners();
@@ -707,6 +750,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
 
             await _refreshPlayers(_session!.id);
             _subscribeToLobbyRealtime(_session!);
+            unawaited(saveActiveRoomSession(_session!.roomCode));
             _setLoading(false);
             return;
           }
@@ -744,7 +788,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
         id: 'p-remote-1',
         lobbyId: lobbyId,
         userId: 'remote-peer-1',
-        displayName: 'Elena (Remote SFU #2)',
+        displayName: 'Elena (Stage Co-Star)',
         isHost: false,
         isReady: true,
       ),
@@ -752,11 +796,12 @@ class LobbyRealtimeManager extends ChangeNotifier {
         id: 'p-remote-2',
         lobbyId: lobbyId,
         userId: 'remote-peer-2',
-        displayName: 'Marcus (Remote SFU #3)',
+        displayName: 'Marcus (Featured Cast)',
         isHost: false,
         isReady: true,
       ),
     ];
+    unawaited(saveActiveRoomSession(roomCode));
     _setLoading(false);
   }
 
@@ -805,6 +850,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
           _session = lobby;
           await _refreshPlayers(lobby.id);
           _subscribeToLobbyRealtime(lobby);
+          unawaited(saveActiveRoomSession(sanitizedCode));
           _setLoading(false);
           return;
         }
@@ -841,6 +887,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
         isReady: true,
       ),
     ];
+    unawaited(saveActiveRoomSession(sanitizedCode));
     _setLoading(false);
   }
 
@@ -1146,6 +1193,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
     _realtimeChannel = null;
     _session = null;
     _players = [];
+    unawaited(clearActiveRoomSession());
     _notifySafely();
   }
 
@@ -1221,8 +1269,12 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   final TextEditingController _nameController =
       TextEditingController(text: 'Galaxy S26 Actor');
   final TextEditingController _codeController = TextEditingController();
+  final FocusNode _codeFocusNode = FocusNode();
   late SceneCategory _selectedCategory;
   late bool _isJoinMode;
+  String? _detectedClipboardCode;
+  String? _savedActiveRoomCode;
+  int _telemetricsTokens = 25;
 
   @override
   void initState() {
@@ -1232,6 +1284,9 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     _isJoinMode = widget.startInJoinMode;
     _lobbyManager = LobbyRealtimeManager();
     _lobbyManager.addListener(_onLobbyStateChanged);
+    _codeController.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     _parallaxScrollController = ScrollController()
       ..addListener(_onParallaxScroll);
@@ -1247,6 +1302,32 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     );
 
     OfflineManager.instance.ensureInitialized();
+    _loadVipSessionAndClipboard();
+  }
+
+  Future<void> _loadVipSessionAndClipboard() async {
+    final activeCode = await LobbyRealtimeManager.loadActiveRoomSession();
+    final tokens = await LobbyRealtimeManager.loadTelemetricsTokens();
+    if (mounted) {
+      setState(() {
+        _savedActiveRoomCode = activeCode;
+        _telemetricsTokens = tokens;
+      });
+    }
+    await _checkClipboardForSixDigitCode();
+  }
+
+  Future<void> _checkClipboardForSixDigitCode() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = data?.text?.trim() ?? '';
+      final match = RegExp(r'\b([0-9]{6})\b').firstMatch(raw);
+      if (match != null && mounted) {
+        setState(() {
+          _detectedClipboardCode = match.group(1);
+        });
+      }
+    } catch (_) {}
   }
 
   void _onParallaxScroll() {
@@ -1276,6 +1357,8 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
       _lobbyManager.leaveLobby();
+    } else if (state == AppLifecycleState.resumed) {
+      _checkClipboardForSixDigitCode();
     }
   }
 
@@ -1296,6 +1379,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     _lobbyManager.dispose();
     _nameController.dispose();
     _codeController.dispose();
+    _codeFocusNode.dispose();
     super.dispose();
   }
 
@@ -1303,7 +1387,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     VoidCallback onConfirmed, {
     String? modeTitle,
   }) async {
-    HapticFeedback.mediumImpact();
+    HapticFeedback.lightImpact();
     final settings = await showModalBottomSheet<GameSettingsConfig>(
       context: context,
       isScrollControlled: true,
@@ -1412,6 +1496,36 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                VipCredentialHeaderBar(
+                  actorHandle: _nameController.text.trim().isEmpty
+                      ? '@GALAXY_STAR'
+                      : '@${_nameController.text.trim().toUpperCase().replaceAll(' ', '_')}',
+                  telemetricsTokens: _telemetricsTokens,
+                  careerWins: OfflineManager.instance.totalCareerWins,
+                  isOnline: OfflineManager.instance.isOnline,
+                ),
+                const SizedBox(height: 10),
+                if (_savedActiveRoomCode != null) ...[
+                  ActiveSetRejoinBanner(
+                    roomCode: _savedActiveRoomCode!,
+                    onRejoinTap: () {
+                      HapticFeedback.mediumImpact();
+                      setState(() {
+                        _isJoinMode = true;
+                        _codeController.text = _savedActiveRoomCode!;
+                      });
+                      _lobbyManager.joinLobbyByCode(
+                        roomCode: _savedActiveRoomCode!,
+                        displayName: _nameController.text,
+                      );
+                    },
+                    onDismissTap: () {
+                      LobbyRealtimeManager.clearActiveRoomSession();
+                      setState(() => _savedActiveRoomCode = null);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 const TutorialOverlay(
                   tutorialKey: 'lobby_room_code_v1',
                   badgeLabel: 'DIRECTOR\'S PREMIERE CUE',
@@ -1455,40 +1569,47 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                 onAirlockJoinTap: () => _openCallSheetAndExecute(
                   () {
                     setState(() => _isJoinMode = true);
+                    _checkClipboardForSixDigitCode();
                     if (_codeController.text.trim().length == 6) {
                       _lobbyManager.joinLobbyByCode(
                         roomCode: _codeController.text,
                         displayName: _nameController.text,
                       );
+                    } else {
+                      _codeFocusNode.requestFocus();
                     }
                   },
                   modeTitle: 'SOUNDSTAGE AIRLOCK',
                 ),
                 onAfterHoursTap: () {
+                  HapticFeedback.lightImpact();
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const LateNightAfterHoursScreen(),
+                    StageSharedTransitionRoute(
+                      page: const LateNightAfterHoursScreen(),
                     ),
                   );
                 },
                 onTrophyVaultTap: () {
+                  HapticFeedback.lightImpact();
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const MatchHistoryScreen(),
+                    StageSharedTransitionRoute(
+                      page: const MatchHistoryScreen(),
                     ),
                   );
                 },
                 onCameraViewfinderTap: () {
+                  HapticFeedback.lightImpact();
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const InteractiveInstructionsScreen(),
+                    StageSharedTransitionRoute(
+                      page: const InteractiveInstructionsScreen(),
                     ),
                   );
                 },
                 onBoxOfficeVaultTap: () {
+                  HapticFeedback.lightImpact();
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const SceneVaultScreen(),
+                    StageSharedTransitionRoute(
+                      page: const SceneVaultScreen(),
                     ),
                   );
                 },
@@ -1501,6 +1622,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   }
 
   Widget _buildStageCredentialsCard() {
+    final digits = _codeController.text.trim();
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: BackdropFilter(
@@ -1539,7 +1661,10 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                     child: ChoiceChip(
                       label: const Text('Join via 6-Digit Code'),
                       selected: _isJoinMode,
-                      onSelected: (_) => setState(() => _isJoinMode = true),
+                      onSelected: (_) {
+                        setState(() => _isJoinMode = true);
+                        _checkClipboardForSixDigitCode();
+                      },
                     ),
                   ),
                 ],
@@ -1547,6 +1672,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               const SizedBox(height: 14),
               TextField(
                 controller: _nameController,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: 'Stage Display Name',
                   filled: true,
@@ -1555,21 +1681,113 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              if (_isJoinMode)
+              if (_isJoinMode) ...[
+                if (_detectedClipboardCode != null &&
+                    _detectedClipboardCode != digits) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ActionChip(
+                      avatar: const Icon(
+                        Icons.content_paste_go_rounded,
+                        size: 16,
+                        color: Color(0xFF06B6D4),
+                      ),
+                      backgroundColor: const Color(0xFF0E1B2A),
+                      side: const BorderSide(color: Color(0xFF06B6D4)),
+                      label: Text(
+                        'Paste Room Code #$_detectedClipboardCode',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        setState(() {
+                          _codeController.text = _detectedClipboardCode!;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                // Custom 6-Box Auto-Advancing Neon PIN Display + Synchronized Field
+                GestureDetector(
+                  onTap: () => _codeFocusNode.requestFocus(),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(6, (idx) {
+                      final hasChar = idx < digits.length;
+                      final isFocusedBox = idx == digits.length ||
+                          (digits.length == 6 && idx == 5);
+                      final char = hasChar ? digits[idx] : '·';
+                      return Container(
+                        width: 44,
+                        height: 52,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: hasChar
+                              ? const Color(0xFF111C2D)
+                              : const Color(0xFF0B0E17),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: hasChar
+                                ? const Color(0xFF06B6D4)
+                                : (isFocusedBox
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF1E293B)),
+                            width: hasChar || isFocusedBox ? 2.0 : 1.2,
+                          ),
+                          boxShadow: hasChar
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF06B6D4)
+                                        .withValues(alpha: 0.25),
+                                    blurRadius: 10,
+                                  ),
+                                ]
+                              : const [],
+                        ),
+                        child: Text(
+                          char,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: hasChar
+                                ? Colors.white
+                                : const Color(0xFF475569),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _codeController,
+                  focusNode: _codeFocusNode,
                   keyboardType: TextInputType.number,
                   maxLength: 6,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: (val) {
+                    HapticFeedback.selectionClick();
+                    setState(() {});
+                    if (val.trim().length == 6) {
+                      FocusScope.of(context).unfocus();
+                    }
+                  },
                   decoration: const InputDecoration(
-                    labelText: '6-Digit Lobby Code',
+                    labelText: '6-Digit Lobby Code (Auto-Advances Above)',
                     hintText: '482910',
                     filled: true,
                     fillColor: Color(0xFF121722),
                     border: OutlineInputBorder(),
                   ),
-                )
-              else
+                ),
+              ] else
                 DropdownButtonFormField<SceneCategory>(
                   value: _selectedCategory,
                   decoration: const InputDecoration(
@@ -1638,6 +1856,31 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     );
   }
 
+  Future<void> _shareVipSetPass(LobbySession session) async {
+    HapticFeedback.mediumImpact();
+    final passMessage =
+        '🎬 VIP SET PASS · ACT LIKE IT\n'
+        'Step onto my Hollywood Soundstage!\n'
+        '6-Digit Room Code: ${session.roomCode}\n'
+        'Featured Reel: ${session.selectedCategory.label}';
+    await Clipboard.setData(ClipboardData(text: session.roomCode));
+    try {
+      await Share.share(
+        passMessage,
+        subject: 'ACT LIKE IT · VIP Set Pass #${session.roomCode}',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'VIP Set Pass #${session.roomCode} copied to clipboard!',
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildSynchronizedLobbyView(LobbySession session) {
     final players = _lobbyManager.players;
     final activeScene = session.activeScene;
@@ -1645,59 +1888,121 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF121722),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF1E293B)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '6-DIGIT SOUNDSTAGE ACCESS CODE',
-                style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    session.roomCode,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 34,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 6,
-                      color: Color(0xFFF59E0B),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, color: Colors.white70),
-                    tooltip: 'Copy 6-Digit Code',
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: session.roomCode));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Copied room code ${session.roomCode}'),
-                        ),
-                      );
-                    },
-                  ),
+        // Perforated Visual "VIP Ticket Stub" Card
+        ClipPath(
+          clipper: BoxOfficeTicketNotchClipper(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1F1124),
+                  Color(0xFF0E131F),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Reel: ${session.selectedCategory.label} · '
-                'Cast: ${players.length}/${session.maxPlayers} Ensemble Actors',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-              ),
-            ],
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFFF59E0B), width: 2.0),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'ADMIT ONE · VIP SOUNDSTAGE SET PASS',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.3,
+                        color: Color(0xFFFDE68A),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0x2610B981),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF10B981)),
+                      ),
+                      child: const Text(
+                        'STAGE LIVE',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      session.roomCode,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 6,
+                        color: Color(0xFFF59E0B),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, color: Colors.white),
+                      tooltip: 'Copy 6-Digit Code',
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        Clipboard.setData(
+                          ClipboardData(text: session.roomCode),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content:
+                                Text('Copied room code ${session.roomCode}'),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Reel: ${session.selectedCategory.label} · '
+                  'Cast: ${players.length}/${session.maxPlayers} Ensemble Actors',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFFCBD5E1)),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      foregroundColor: const Color(0xFF05070B),
+                    ),
+                    onPressed: () => _shareVipSetPass(session),
+                    icon: const Icon(Icons.ios_share_rounded, size: 18),
+                    label: const Text(
+                      'SHARE VIP SET PASS',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 20),
@@ -3901,5 +4206,212 @@ class PaparazziCinemaDoorCard extends StatelessWidget {
     );
   }
 }
+
+/// Sleek glassmorphic VIP Credential Bar showing the player's Actor Handle,
+/// Rank Icon, live AI Token Balance (`telemetrics_tokens`), and Online/Offline LED.
+class VipCredentialHeaderBar extends StatelessWidget {
+  final String actorHandle;
+  final int telemetricsTokens;
+  final int careerWins;
+  final bool isOnline;
+
+  const VipCredentialHeaderBar({
+    super.key,
+    required this.actorHandle,
+    required this.telemetricsTokens,
+    required this.careerWins,
+    required this.isOnline,
+  });
+
+  String get _rankTitle {
+    if (careerWins >= 10) return 'ACADEMY LEGEND';
+    if (careerWins >= 3) return 'HEADLINER STAR';
+    return 'RISING TALENT';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ledColor =
+        isOnline ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xD9080B14),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
+              width: 1.3,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Online / Offline Status LED Dot
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ledColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: ledColor.withValues(alpha: 0.8),
+                      blurRadius: 8,
+                      spreadRadius: 1.5,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.workspace_premium_rounded,
+                color: Color(0xFFFBBF24),
+                size: 17,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '$actorHandle · $_rankTitle',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.chakraPetch(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0x2606B6D4),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: const Color(0xFF06B6D4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.bolt_rounded,
+                      size: 13,
+                      color: Color(0xFF06B6D4),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '$telemetricsTokens AI TOKENS',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF06B6D4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Glowing, dismissible "ACTIVE SET IN PROGRESS — TAP TO REJOIN" banner at the
+/// top of the Red Carpet for 1-tap reconnection to an unfinished 6-digit room.
+class ActiveSetRejoinBanner extends StatelessWidget {
+  final String roomCode;
+  final VoidCallback onRejoinTap;
+  final VoidCallback onDismissTap;
+
+  const ActiveSetRejoinBanner({
+    super.key,
+    required this.roomCode,
+    required this.onRejoinTap,
+    required this.onDismissTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onRejoinTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xF02B0918),
+              Color(0xF00B1726),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF10B981), width: 1.8),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.28),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.sensors_rounded,
+              color: Color(0xFF10B981),
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'ACTIVE SET IN PROGRESS — TAP TO REJOIN',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                      color: Color(0xFF10B981),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Reconnect immediately to Soundstage Room #$roomCode',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: Color(0xFF94A3B8),
+              ),
+              tooltip: 'Dismiss Active Set Banner',
+              onPressed: onDismissTap,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 

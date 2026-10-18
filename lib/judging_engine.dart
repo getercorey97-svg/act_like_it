@@ -72,8 +72,10 @@ class TriModalJudgingEngine extends ChangeNotifier {
   bool _hasSyncedRoundToSupabase = false;
   bool _lastRoundWasWin = false;
   String? _roundHistoryId;
+  double _improvBonus = 0.0;
 
   AiTelemetricsReport? get aiReport => _aiReport;
+  double get improvBonus => _improvBonus;
   bool get hasSavedMatchHistory => _hasSavedMatchHistory;
   bool get lastRoundWasWin => _lastRoundWasWin;
   String? get roundHistoryId => _roundHistoryId;
@@ -82,6 +84,11 @@ class TriModalJudgingEngine extends ChangeNotifier {
   bool get isEvaluatingAi => _isEvaluatingAi;
   bool get isUploadingLoop => _isUploadingLoop;
   String? get errorMessage => _errorMessage;
+
+  void setImprovTwistCompleted(bool completed) {
+    _improvBonus = completed ? 5.0 : 0.0;
+    _safeNotifyListeners();
+  }
 
   void _safeNotifyListeners() {
     if (!_isDisposed) {
@@ -140,8 +147,42 @@ class TriModalJudgingEngine extends ChangeNotifier {
   }
 
   double get compositeTriModalScore {
-    return ((aiScore * 0.45) + (peerScore * 0.35) + (socialScore * 0.20))
-        .clamp(0.0, 100.0);
+    final baseScore =
+        (aiScore * 0.45) + (peerScore * 0.35) + (socialScore * 0.20);
+    return (baseScore + _improvBonus).clamp(0.0, 100.0);
+  }
+
+  ({String title, String subtitle, Color accent}) get showstopperArchetype {
+    final facial = _aiReport?.facialExpressionScore ?? 86.0;
+    final vocal = _aiReport?.vocalCadenceScore ?? 85.0;
+    final cue = _aiReport?.directorCueFidelity ?? 86.0;
+
+    if (cue >= 92.0) {
+      return (
+        title: "DIRECTOR'S DARLING",
+        subtitle: '92+ Cue Fidelity · Precision Script & Blocking Mastery',
+        accent: const Color(0xFFFFD700),
+      );
+    }
+    if (peerScore >= 90.0) {
+      return (
+        title: 'BOX OFFICE CROWD-PLEASER',
+        subtitle: '90+ Peer Approval · Instant Standing Ovation Magnetism',
+        accent: const Color(0xFF10B981),
+      );
+    }
+    if (facial >= vocal) {
+      return (
+        title: 'THE METHOD CHAMELEON',
+        subtitle: 'Peak Facial Micro-Expression & Emotional Immersion',
+        accent: const Color(0xFFE11D48),
+      );
+    }
+    return (
+      title: 'GOLDEN AGE ORATOR',
+      subtitle: 'Commanding Vocal Cadence & Soundstage Projection',
+      accent: const Color(0xFF06B6D4),
+    );
   }
 
   Future<AiTelemetricsReport> evaluatePerformanceWithGemini({
@@ -375,6 +416,49 @@ Return strict JSON with keys:
     _safeNotifyListeners();
   }
 
+  Future<void> exportAndSharePremiereReel({
+    required ScenePrompt scene,
+    required String actorDisplayName,
+    required int roundNumber,
+  }) async {
+    if (_isDisposed) return;
+    final archetype = showstopperArchetype;
+    final criticQuote = PerformanceFeedbackEngine.selectFeedback(
+      compositeTriModalScore,
+      seed: roundNumber,
+    );
+    final stamp = compositeTriModalScore >= 85.0
+        ? 'STANDING OVATION · CERTIFIED FRESH'
+        : 'OFFICIAL HOLLYWOOD SCREEN TEST';
+    final shareUrl = _supabaseLoopUrl ?? 'https://github.com/act_like_it';
+
+    final payload = '''
+🎬 ACT LIKE IT — HOLLYWOOD CRITIC'S SCORECARD 🎬
+⭐ $stamp ⭐
+Actor: $actorDisplayName
+Archetype Badge: 🏆 ${archetype.title}
+Scene: "${scene.title}" — ${scene.characterName} (${scene.filmOrSeries}, ${scene.releaseYear})
+
+📊 TRI-MODAL VERDICT: ${compositeTriModalScore.toStringAsFixed(1)} / 100${_improvBonus > 0 ? ' (+5.0 IMPROV BONUS)' : ''}
+• Facial Expression: ${(_aiReport?.facialExpressionScore ?? 86).toStringAsFixed(0)}/100
+• Vocal Cadence: ${(_aiReport?.vocalCadenceScore ?? 85).toStringAsFixed(0)}/100
+• Cue Fidelity: ${(_aiReport?.directorCueFidelity ?? 86).toStringAsFixed(0)}/100
+• Peer Score: ${peerScore.toStringAsFixed(0)}/100
+
+🗣️ Critic's Verdict: "$criticQuote"
+Watch Premiere Reel: $shareUrl
+''';
+
+    try {
+      await Share.share(payload.trim());
+    } catch (_) {}
+
+    _externalShares += 1;
+    _externalReactions += 5;
+    _loopCompletions += 6;
+    _safeNotifyListeners();
+  }
+
   /// Auto-saves the completed round's Tri-Modal scores (`ai_score`, `peer_score`,
   /// `social_score`, `final_score`) and `is_win` status into the Supabase
   /// `public.match_history` table (and queues via `OfflineManager` if offline).
@@ -486,6 +570,7 @@ class TriModalJudgingScreen extends StatefulWidget {
   final String? localRecordedVideoPath;
   final Uint8List? recordedMp4Bytes;
   final bool isOfflineLocalParty;
+  final bool improvTwistCompleted;
 
   const TriModalJudgingScreen({
     super.key,
@@ -496,6 +581,7 @@ class TriModalJudgingScreen extends StatefulWidget {
     this.localRecordedVideoPath,
     this.recordedMp4Bytes,
     this.isOfflineLocalParty = false,
+    this.improvTwistCompleted = false,
   });
 
   @override
@@ -517,6 +603,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
   void initState() {
     super.initState();
     _engine = TriModalJudgingEngine();
+    _engine.setImprovTwistCompleted(widget.improvTwistCompleted);
     _engine.addListener(_onEngineUpdated);
 
     _engine
@@ -595,6 +682,8 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
               neonAccent: Color(0xFFF59E0B),
               icon: Icons.thumbs_up_down_rounded,
             ),
+            _buildShowstopperArchetypeBadgeCard(),
+            const SizedBox(height: 12),
             DynamicFeedbackBanner(
               compositeScore: _engine.compositeTriModalScore,
               seed: widget.lobbySession.roundNumber,
@@ -1031,9 +1120,328 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            _buildHollywoodCriticsScorecard(report),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildShowstopperArchetypeBadgeCard() {
+    final badge = _engine.showstopperArchetype;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF141022), Color(0xFF0B0E17)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: badge.accent, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: badge.accent.withValues(alpha: 0.22),
+            blurRadius: 16,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: badge.accent.withValues(alpha: 0.16),
+              border: Border.all(color: badge.accent),
+            ),
+            child: Icon(
+              Icons.workspace_premium_rounded,
+              color: badge.accent,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'SHOWSTOPPER ARCHETYPE',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                        color: badge.accent,
+                      ),
+                    ),
+                    if (_engine.improvBonus > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0x33F59E0B),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFF59E0B)),
+                        ),
+                        child: const Text(
+                          '+5.0 IMPROV BONUS',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFFD700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  badge.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  badge.subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFCBD5E1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHollywoodCriticsScorecard(AiTelemetricsReport? report) {
+    final facial = report?.facialExpressionScore ?? 86.0;
+    final vocal = report?.vocalCadenceScore ?? 85.0;
+    final cue = report?.directorCueFidelity ?? 86.0;
+    final composite = _engine.compositeTriModalScore;
+    final badge = _engine.showstopperArchetype;
+    final isStandingOvation = composite >= 85.0;
+    final criticQuote = PerformanceFeedbackEngine.selectFeedback(
+      composite,
+      seed: widget.lobbySession.roundNumber,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF171324), Color(0xFF090C14)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: Text(
+                  "HOLLYWOOD CRITIC'S SCORECARD",
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.0,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isStandingOvation
+                      ? const Color(0x2610B981)
+                      : const Color(0x26F59E0B),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isStandingOvation
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF59E0B),
+                  ),
+                ),
+                child: Text(
+                  isStandingOvation ? 'STANDING OVATION' : 'CERTIFIED FRESH',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: isStandingOvation
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFFFD700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: List.generate(
+              5,
+              (idx) => Icon(
+                idx < (composite / 20.0).round()
+                    ? Icons.star_rounded
+                    : Icons.star_half_rounded,
+                size: 16,
+                color: const Color(0xFFFFD700),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 92,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _ThreeAxisPerformancePainter(
+                facialScore: facial,
+                vocalScore: vocal,
+                cueScore: cue,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '"$criticQuote"',
+            style: const TextStyle(
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+              height: 1.4,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Starring ${widget.performerDisplayName} · ${badge.title} · ${_scene.filmOrSeries} (${_scene.releaseYear})',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD700),
+                foregroundColor: const Color(0xFF050508),
+              ),
+              onPressed: () {
+                _engine.exportAndSharePremiereReel(
+                  scene: _scene,
+                  actorDisplayName: widget.performerDisplayName,
+                  roundNumber: widget.lobbySession.roundNumber,
+                );
+              },
+              icon: const Icon(Icons.movie_filter_rounded, size: 18),
+              label: const Text(
+                'EXPORT & SHARE PREMIERE REEL',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThreeAxisPerformancePainter extends CustomPainter {
+  final double facialScore;
+  final double vocalScore;
+  final double cueScore;
+
+  const _ThreeAxisPerformancePainter({
+    required this.facialScore,
+    required this.vocalScore,
+    required this.cueScore,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final axes = <(String label, double value, Color color)>[
+      ('FACIAL EMOTION', facialScore.clamp(0.0, 100.0), const Color(0xFFE11D48)),
+      ('VOCAL CADENCE', vocalScore.clamp(0.0, 100.0), const Color(0xFF06B6D4)),
+      ('CUE FIDELITY', cueScore.clamp(0.0, 100.0), const Color(0xFFFFD700)),
+    ];
+
+    final rowHeight = size.height / axes.length;
+    final trackPaint = Paint()
+      ..color = const Color(0xFF1E293B)
+      ..style = PaintingStyle.fill;
+
+    for (int i = 0; i < axes.length; i++) {
+      final item = axes[i];
+      final yCenter = (i + 0.5) * rowHeight;
+
+      final labelSpan = TextSpan(
+        text: '${item.$1} (${item.$2.toStringAsFixed(0)})',
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFFCBD5E1),
+        ),
+      );
+      final tp = TextPainter(
+        text: labelSpan,
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.width * 0.45);
+      tp.paint(canvas, Offset(0, yCenter - tp.height / 2));
+
+      final barLeft = size.width * 0.48;
+      final barMaxWidth = math.max(10.0, size.width - barLeft);
+      final trackRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(barLeft, yCenter - 5, barMaxWidth, 10),
+        const Radius.circular(5),
+      );
+      canvas.drawRRect(trackRect, trackPaint);
+
+      final fillWidth = (barMaxWidth * (item.$2 / 100.0)).clamp(4.0, barMaxWidth);
+      final fillPaint = Paint()
+        ..color = item.$3
+        ..style = PaintingStyle.fill;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(barLeft, yCenter - 5, fillWidth, 10),
+          const Radius.circular(5),
+        ),
+        fillPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThreeAxisPerformancePainter oldDelegate) {
+    return oldDelegate.facialScore != facialScore ||
+        oldDelegate.vocalScore != vocalScore ||
+        oldDelegate.cueScore != cueScore;
   }
 }

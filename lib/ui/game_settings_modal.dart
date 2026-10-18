@@ -9,12 +9,14 @@ class GameSettingsConfig {
   final bool peerJudgingEnabled;
   final bool socialJudgingEnabled;
   final bool improvRouletteWildcard;
+  final bool screenTestDuetMode;
 
   const GameSettingsConfig({
     this.aiTelemetricsEnabled = true,
     this.peerJudgingEnabled = true,
     this.socialJudgingEnabled = true,
     this.improvRouletteWildcard = false,
+    this.screenTestDuetMode = false,
   });
 }
 
@@ -24,6 +26,8 @@ class GameSettingsConfig {
 /// Judging, an "Improv Roulette" Wildcard switch, and a massive neon-bordered
 /// "ROLL CAMERA" CTA button.
 class GameSettingsModal extends StatefulWidget {
+  static GameSettingsConfig latestConfig = const GameSettingsConfig();
+
   final String? modeTitle;
   final VoidCallback? onRollCamera;
 
@@ -38,10 +42,12 @@ class GameSettingsModal extends StatefulWidget {
 }
 
 class _GameSettingsModalState extends State<GameSettingsModal> {
-  bool _aiTelemetricsEnabled = true;
-  bool _peerJudgingEnabled = true;
-  bool _socialJudgingEnabled = true;
-  bool _improvRouletteWildcard = false;
+  bool _aiTelemetricsEnabled = GameSettingsModal.latestConfig.aiTelemetricsEnabled;
+  bool _peerJudgingEnabled = GameSettingsModal.latestConfig.peerJudgingEnabled;
+  bool _socialJudgingEnabled = GameSettingsModal.latestConfig.socialJudgingEnabled;
+  bool _improvRouletteWildcard =
+      GameSettingsModal.latestConfig.improvRouletteWildcard;
+  bool _screenTestDuetMode = GameSettingsModal.latestConfig.screenTestDuetMode;
 
   void _handleRollCamera() {
     HapticFeedback.heavyImpact();
@@ -50,7 +56,9 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
       peerJudgingEnabled: _peerJudgingEnabled,
       socialJudgingEnabled: _socialJudgingEnabled,
       improvRouletteWildcard: _improvRouletteWildcard,
+      screenTestDuetMode: _screenTestDuetMode,
     );
+    GameSettingsModal.latestConfig = config;
     Navigator.of(context).pop(config);
     widget.onRollCamera?.call();
   }
@@ -228,6 +236,22 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
 
               // Improv Roulette Wildcard Toggle
               _buildImprovWildcardCard(),
+              const SizedBox(height: 18),
+
+              // Screen Test Duet (2-Player Co-Star / Versus Mode) Toggle
+              _buildStudioSoundboardToggle(
+                channelCode: 'DUET MODE · +250 PTS SCENE STEALER BONUS',
+                title: 'Screen Test Duet (2-Player Co-Star Mode)',
+                subtitle:
+                    'Splits the teleprompter into Lead A (Spotlight Gold) & Lead B (Soundstage Cyan) lines',
+                icon: Icons.people_alt_rounded,
+                neonColor: const Color(0xFF10B981),
+                value: _screenTestDuetMode,
+                onChanged: (val) {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _screenTestDuetMode = val);
+                },
+              ),
               const SizedBox(height: 32),
 
               // Massive Neon-Bordered "ROLL CAMERA" Action Button

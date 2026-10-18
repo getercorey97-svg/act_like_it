@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:camera/camera.dart' as hw_cam;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -9,6 +11,7 @@ import 'main.dart';
 import 'lobby.dart';
 import 'judging_engine.dart';
 import 'ui/game_app_bar.dart';
+import 'ui/game_settings_modal.dart';
 import 'ui/tutorial_overlay.dart';
 
 enum SfuParticipantRole {
@@ -660,6 +663,17 @@ class LiveKitSoundstageScreen extends StatefulWidget {
 class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     with WidgetsBindingObserver {
   late final WebRtcStageManager _stageManager;
+  bool _largeTeleprompterFont = false;
+  bool _duetModeEnabled = GameSettingsModal.latestConfig.screenTestDuetMode;
+  bool _improvTwistTriggered = false;
+  String? _activeImprovTwistPrompt;
+
+  static const List<String> _improvTwistDirectives = <String>[
+    'NOW DELIVER THE NEXT LINE AS IF YOU\'RE HIDING A SECRET!',
+    'SWITCH TO WHISPERED INTENSITY & LOCK EYES WITH THE LENS!',
+    'DELIVER THIS BEAT WITH SUDDEN EUPHORIC REALIZATION!',
+    'ACT AS IF TIME IS RUNNING OUT IN 5 SECONDS!',
+  ];
 
   @override
   void initState() {
@@ -680,15 +694,59 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      // Safely finalize active camera recording so Samsung Galaxy S26 Ultra
+      // camera HAL never throws a CameraException when locking or switching apps
+      if (_stageManager.isRecordingTake && !_stageManager.isFinishingTake) {
+        unawaited(_stageManager.finishRecordingTake());
+      }
+    } else if (state == AppLifecycleState.detached) {
       _stageManager.leaveSfuStage();
     }
   }
 
+  void _triggerImprovTwist() {
+    if (_improvTwistTriggered) return;
+    HapticFeedback.heavyImpact();
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      HapticFeedback.mediumImpact();
+    });
+    final idx =
+        (widget.lobbySession.roundNumber + _stageManager.performanceElapsedSeconds) %
+            _improvTwistDirectives.length;
+    setState(() {
+      _improvTwistTriggered = true;
+      _activeImprovTwistPrompt = _improvTwistDirectives[idx];
+    });
+  }
+
   void _onStageUpdated() {
-    if (mounted) {
-      setState(() {});
+    if (!mounted) return;
+    // Automatically fire Improv Twist at t = 5s when Improv Roulette is enabled
+    if (GameSettingsModal.latestConfig.improvRouletteWildcard &&
+        !_improvTwistTriggered &&
+        _stageManager.isRecordingTake &&
+        _stageManager.performanceElapsedSeconds >= 5) {
+      _triggerImprovTwist();
+      return;
     }
+    setState(() {});
+  }
+
+  String _formatSmpteTimecode(int elapsedSeconds) {
+    final mins = (elapsedSeconds ~/ 60).toString().padLeft(2, '0');
+    final secs = (elapsedSeconds % 60).toString().padLeft(2, '0');
+    final frames = ((elapsedSeconds * 24) % 30).toString().padLeft(2, '0');
+    return '00:$mins:$secs:$frames';
+  }
+
+  double get _latestAudioDb {
+    final samples = _stageManager.capturedSamples;
+    if (samples.isEmpty) {
+      return _stageManager.isMicEnabled ? -22.0 : -60.0;
+    }
+    return samples.last.audioDecibels;
   }
 
   @override
@@ -715,6 +773,10 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         activeRoomCode: widget.lobbySession.roomCode,
         isRecordingCountdownActive: isCountdownLocked,
         onStartOver: () async {
+          setState(() {
+            _improvTwistTriggered = false;
+            _activeImprovTwistPrompt = null;
+          });
           await _stageManager.resumeStageAfterJudging(
             targetEmotion:
                 scene?.emotionalTarget ?? 'Dramatic Intensity',
@@ -761,7 +823,9 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                     color: const Color(0xFF121722),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: const Color(0xFFE11D48),
+                      color: _improvTwistTriggered
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFFE11D48),
                       width: 1.5,
                     ),
                   ),
@@ -769,31 +833,211 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _buildPrimaryVideoSurface(),
-                      if (scene != null) _buildTeleprompterOverlay(scene),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black87,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Take: ${_stageManager.performanceElapsedSeconds}s · '
-                            'Frames: ${_stageManager.capturedSamples.length}',
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              color: Color(0xFFF59E0B),
-                            ),
+                      _duetModeEnabled
+                          ? _buildDuetSplitScreenSurface()
+                          : _buildPrimaryVideoSurface(),
+                      // 35mm Anamorphic Cinema Viewfinder (2.39:1 Letterbox + Golden Crosshairs)
+                      IgnorePointer(
+                        child: CustomPaint(
+                          painter: _CinemaViewfinderPainter(
+                            isRecording: _stageManager.isRecordingTake,
+                            improvActive: _improvTwistTriggered,
                           ),
                         ),
                       ),
+                      if (scene != null) _buildTeleprompterOverlay(scene),
+                      // Top-Left Live SMPTE Timecode & Blinking Red Tally Light
+                      Positioned(
+                        top: 10,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xD9050508),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0x66E11D48),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: (_stageManager.isRecordingTake &&
+                                          _stageManager
+                                                  .performanceElapsedSeconds
+                                                  .isEven)
+                                      ? const Color(0xFFE11D48)
+                                      : const Color(0x55E11D48),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x99E11D48),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'REC 720p30 · ${_formatSmpteTimecode(_stageManager.performanceElapsedSeconds)}',
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Top-Right Take & Frame Counter + 1-Tap Font Toggle
+                      Positioned(
+                        top: 10,
+                        right: 12,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _largeTeleprompterFont =
+                                      !_largeTeleprompterFont;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xD9050508),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0x66FFD700),
+                                  ),
+                                ),
+                                child: Text(
+                                  _largeTeleprompterFont ? '19pt' : '15pt',
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFFFD700),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xD9050508),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Take: ${_stageManager.performanceElapsedSeconds}s · '
+                                'Frames: ${_stageManager.capturedSamples.length}',
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Real-Time Vocal Projection VU Meter along right edge
+                      Positioned(
+                        top: 48,
+                        bottom: 118,
+                        right: 12,
+                        child: _buildVocalProjectionVuMeter(),
+                      ),
+                      // Dramatic "DIRECTOR'S CUT TWIST!" mid-take interruption banner
+                      if (_improvTwistTriggered &&
+                          _activeImprovTwistPrompt != null)
+                        Positioned(
+                          top: 44,
+                          left: 14,
+                          right: 40,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xEE991B1B),
+                                  Color(0xEEB45309),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFFFD700),
+                                width: 1.4,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x88F59E0B),
+                                  blurRadius: 12,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.bolt_rounded,
+                                  size: 18,
+                                  color: Color(0xFFFFD700),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'DIRECTOR\'S CUT TWIST! (+5.0 BONUS)',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.8,
+                                          color: Color(0xFFFFD700),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _activeImprovTwistPrompt!,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -864,7 +1108,198 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     );
   }
 
+  Widget _buildDuetSplitScreenSurface() {
+    final remotes = _stageManager.remoteParticipants;
+    RemoteVideoTrack? coStarVideoTrack;
+    String coStarName = 'CO-STAR (LOCAL PIP)';
+    if (remotes.isNotEmpty) {
+      coStarName = remotes.first.name.isNotEmpty
+          ? remotes.first.name.toUpperCase()
+          : 'REMOTE CO-STAR';
+      for (final pub in remotes.first.videoTrackPublications) {
+        if (pub.track is RemoteVideoTrack) {
+          coStarVideoTrack = pub.track as RemoteVideoTrack;
+          break;
+        }
+      }
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _buildPrimaryVideoSurface(),
+              Positioned(
+                bottom: 96,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xCC050508),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0x99FFD700)),
+                  ),
+                  child: const Text(
+                    'LEAD ACTOR',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(width: 2, color: const Color(0xFFFFD700)),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (coStarVideoTrack != null)
+                VideoTrackRenderer(
+                  coStarVideoTrack,
+                  fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                )
+              else
+                Container(
+                  color: const Color(0xFF0B0E17),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.people_alt_rounded,
+                          size: 34,
+                          color: Color(0xFF06B6D4),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          coStarName,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF06B6D4),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          '50/50 Cinema Split Active',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Positioned(
+                bottom: 96,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xCC050508),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0x9906B6D4)),
+                  ),
+                  child: Text(
+                    coStarName,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF06B6D4),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVocalProjectionVuMeter() {
+    // Map [-60 dBFS .. -10 dBFS] to [0.08 .. 1.0]
+    final normalized = ((_latestAudioDb + 60.0) / 50.0).clamp(0.08, 1.0);
+    return Container(
+      width: 16,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xB3050508),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0x44FFFFFF)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          const Text(
+            'dB',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 7,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final maxH =
+                    constraints.maxHeight.isFinite ? constraints.maxHeight : 80.0;
+                final fillH = (maxH * normalized).clamp(4.0, maxH);
+                return Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    width: 8,
+                    height: fillH,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      gradient: const LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Color(0xFF10B981),
+                          Color(0xFFF59E0B),
+                          Color(0xFFE11D48),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTeleprompterOverlay(ScenePrompt scene) {
+    final words = scene.promptScript.split(' ');
+    final elapsed = _stageManager.performanceElapsedSeconds;
+    final highlightedWordCount = words.isEmpty
+        ? 0
+        : ((elapsed + 1) * 3).clamp(1, words.length);
+    final spokenPart = words.take(highlightedWordCount).join(' ');
+    final remainingPart = words.skip(highlightedWordCount).join(' ');
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Hero(
@@ -914,12 +1349,32 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '"${scene.promptScript}"',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                      fontSize: _largeTeleprompterFont ? 19 : 15,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                    children: [
+                      const TextSpan(
+                        text: '"',
+                        style: TextStyle(color: Color(0xFFFFD700)),
+                      ),
+                      TextSpan(
+                        text: spokenPart,
+                        style: const TextStyle(color: Color(0xFFFFD700)),
+                      ),
+                      if (remainingPart.isNotEmpty)
+                        TextSpan(
+                          text: ' $remainingPart',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      const TextSpan(
+                        text: '"',
+                        style: TextStyle(color: Color(0xFFFFD700)),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -992,6 +1447,31 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           icon: const Icon(Icons.cameraswitch_outlined, size: 18),
           label: const Text('Flip Lens'),
         ),
+        OutlinedButton.icon(
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _duetModeEnabled = !_duetModeEnabled;
+            });
+          },
+          icon: Icon(
+            _duetModeEnabled ? Icons.splitscreen : Icons.crop_landscape,
+            size: 18,
+            color: _duetModeEnabled ? const Color(0xFF06B6D4) : null,
+          ),
+          label: Text(_duetModeEnabled ? 'Duet 50/50 On' : 'Duet Split'),
+        ),
+        OutlinedButton.icon(
+          onPressed: _improvTwistTriggered ? null : _triggerImprovTwist,
+          icon: const Icon(
+            Icons.bolt_rounded,
+            size: 18,
+            color: Color(0xFFF59E0B),
+          ),
+          label: Text(
+            _improvTwistTriggered ? 'Twist Active (+5)' : 'Trigger Improv Twist',
+          ),
+        ),
         ElevatedButton.icon(
           onPressed: _stageManager.isFinishingTake
               ? null
@@ -999,6 +1479,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                   final samplesSnapshot = List<TelemetricsFrameSample>.from(
                     _stageManager.capturedSamples,
                   );
+                  final hadImprovTwist = _improvTwistTriggered;
                   final recorded = await _stageManager.finishRecordingTake();
                   if (!mounted) return;
                   await Navigator.of(context).push(
@@ -1010,10 +1491,15 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                         capturedSamples: samplesSnapshot,
                         localRecordedVideoPath: recorded.filePath,
                         recordedMp4Bytes: recorded.bytes,
+                        improvTwistCompleted: hadImprovTwist,
                       ),
                     ),
                   );
                   if (!mounted) return;
+                  setState(() {
+                    _improvTwistTriggered = false;
+                    _activeImprovTwistPrompt = null;
+                  });
                   await _stageManager.resumeStageAfterJudging(
                     targetEmotion:
                         widget.lobbySession.activeScene?.emotionalTarget ??
@@ -1029,5 +1515,57 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         ),
       ],
     );
+  }
+}
+
+class _CinemaViewfinderPainter extends CustomPainter {
+  final bool isRecording;
+  final bool improvActive;
+
+  const _CinemaViewfinderPainter({
+    required this.isRecording,
+    required this.improvActive,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    // 2.39:1 Anamorphic Letterbox subtle top/bottom matte guides
+    final barHeight = math.min(24.0, size.height * 0.06);
+    final mattePaint = Paint()..color = const Color(0x66050508);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, barHeight), mattePaint);
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height - barHeight, size.width, barHeight),
+      mattePaint,
+    );
+
+    // Rule-of-Thirds subtle golden grid lines
+    final gridPaint = Paint()
+      ..color = const Color(0x24FFD700)
+      ..strokeWidth = 0.8;
+    final thirdW = size.width / 3.0;
+    final thirdH = size.height / 3.0;
+    canvas.drawLine(Offset(thirdW, barHeight), Offset(thirdW, size.height - barHeight), gridPaint);
+    canvas.drawLine(Offset(thirdW * 2, barHeight), Offset(thirdW * 2, size.height - barHeight), gridPaint);
+    canvas.drawLine(Offset(0, thirdH), Offset(size.width, thirdH), gridPaint);
+    canvas.drawLine(Offset(0, thirdH * 2), Offset(size.width, thirdH * 2), gridPaint);
+
+    // Center Golden Crosshair
+    final cx = size.width / 2.0;
+    final cy = size.height / 2.0;
+    final crossPaint = Paint()
+      ..color = improvActive
+          ? const Color(0xAAFFD700)
+          : const Color(0x66FFD700)
+      ..strokeWidth = 1.2;
+    canvas.drawLine(Offset(cx - 12, cy), Offset(cx + 12, cy), crossPaint);
+    canvas.drawLine(Offset(cx, cy - 12), Offset(cx, cy + 12), crossPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CinemaViewfinderPainter oldDelegate) {
+    return oldDelegate.isRecording != isRecording ||
+        oldDelegate.improvActive != improvActive;
   }
 }

@@ -123,7 +123,8 @@ class LivingMarqueeDashboardScreen extends StatefulWidget {
 }
 
 class _LivingMarqueeDashboardScreenState
-    extends State<LivingMarqueeDashboardScreen> with TickerProviderStateMixin {
+    extends State<LivingMarqueeDashboardScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   // 1. Continuous Stage Spotlight & Backstage Pulse Controller
   late final AnimationController _spotlightController;
   late final AnimationController _frenzyBurstController;
@@ -141,6 +142,8 @@ class _LivingMarqueeDashboardScreenState
   Offset? _activeTouchPosition;
   double _currentTicketPage = 0.0;
   int _focusedTicketIndex = 0;
+  String? _savedActiveRoomCode;
+  int _telemetricsTokens = 25;
 
   // 4. Global Marquee Continuous Live Ticker Controller
   late final AnimationController _marqueeTickerController;
@@ -148,11 +151,12 @@ class _LivingMarqueeDashboardScreenState
   // 5. Game Show Background Music Loop Controller
   late final AudioPlayer _audioPlayer;
   bool _isMusicPlaying = true;
+  bool _userManuallyMutedMusic = false;
   static const String _gameShowSoundtrackUrl =
       'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
 
   static const List<String> _liveMarqueeFeedItems = [
-    'STAGE LIVE · ROOM #482910 PERFORMING "THE DARK KNIGHT (2008)" — 7 SPECTATORS ON SFU',
+    'STAGE LIVE · ROOM #482910 PERFORMING "THE DARK KNIGHT (2008)" — FULL ENSEMBLE ON SET',
     'HIGH SCORE · @NAOMI_V HIT 98.4 COMPOSITE TRI-MODAL SCORE ON "WHIPLASH"',
     'AI TELEMETRICS · GEMINI 2.5 FLASH EVALUATED 1,420 MICRO-EXPRESSION FRAMES THIS HOUR',
     'VIRAL LOOP · @MARCUS_S26 HIT +410 SOCIAL SHARES IN SPECIALTY: CULT CLASSICS',
@@ -162,6 +166,7 @@ class _LivingMarqueeDashboardScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _spotlightController = AnimationController(
       vsync: this,
@@ -197,6 +202,41 @@ class _LivingMarqueeDashboardScreenState
     OfflineManager.instance.ensureInitialized().then((_) {
       if (mounted) setState(() {});
     });
+    _refreshVipHudState();
+  }
+
+  Future<void> _refreshVipHudState() async {
+    final activeCode = await LobbyRealtimeManager.loadActiveRoomSession();
+    final tokens = await LobbyRealtimeManager.loadTelemetricsTokens();
+    if (mounted) {
+      setState(() {
+        _savedActiveRoomCode = activeCode;
+        _telemetricsTokens = tokens;
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      if (_isMusicPlaying) {
+        _audioPlayer.pause();
+        if (mounted) {
+          setState(() => _isMusicPlaying = false);
+        }
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      _refreshVipHudState();
+      if (!_userManuallyMutedMusic && !_isMusicPlaying) {
+        _audioPlayer.resume();
+        if (mounted) {
+          setState(() => _isMusicPlaying = true);
+        }
+      }
+    }
   }
 
   void _onRedCarpetScroll() {
@@ -245,6 +285,7 @@ class _LivingMarqueeDashboardScreenState
   Future<void> _toggleBackgroundMusic() async {
     try {
       if (_isMusicPlaying) {
+        _userManuallyMutedMusic = true;
         await _audioPlayer.pause();
         if (mounted) {
           setState(() {
@@ -252,6 +293,7 @@ class _LivingMarqueeDashboardScreenState
           });
         }
       } else {
+        _userManuallyMutedMusic = false;
         await _audioPlayer.resume();
         if (mounted) {
           setState(() {
@@ -284,6 +326,7 @@ class _LivingMarqueeDashboardScreenState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _redCarpetScrollController.removeListener(_onRedCarpetScroll);
     _redCarpetScrollController.dispose();
     _ticketPageController.removeListener(_onTicketScroll);
@@ -572,11 +615,58 @@ class _LivingMarqueeDashboardScreenState
                             SliverPadding(
                               padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
                               sliver: SliverToBoxAdapter(
-                                child: Interactive3DHolographicMarquee(
-                                  phase: phase,
-                                  onPaparazziFrenzy: _triggerPaparazziFrenzy,
-                                  trailingControls:
-                                      _buildPaparazziPremiereHeader(),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    VipCredentialHeaderBar(
+                                      actorHandle: '@GALAXY_STAR',
+                                      telemetricsTokens: _telemetricsTokens,
+                                      careerWins: OfflineManager
+                                          .instance.totalCareerWins,
+                                      isOnline:
+                                          OfflineManager.instance.isOnline,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    if (_savedActiveRoomCode != null) ...[
+                                      ActiveSetRejoinBanner(
+                                        roomCode: _savedActiveRoomCode!,
+                                        onRejoinTap: () async {
+                                          HapticFeedback.mediumImpact();
+                                          await _pauseMusicBeforeNavigation();
+                                          if (!mounted) return;
+                                          final selectedTicket =
+                                              kSceneVaultTickets[
+                                                  _focusedTicketIndex];
+                                          await Navigator.of(context).push(
+                                            StageSharedTransitionRoute(
+                                              page: LobbyMatchmakingScreen(
+                                                initialCategory:
+                                                    selectedTicket.category,
+                                                startInJoinMode: true,
+                                              ),
+                                            ),
+                                          );
+                                          _refreshVipHudState();
+                                        },
+                                        onDismissTap: () {
+                                          LobbyRealtimeManager
+                                              .clearActiveRoomSession();
+                                          setState(
+                                            () => _savedActiveRoomCode = null,
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(height: 10),
+                                    ],
+                                    Interactive3DHolographicMarquee(
+                                      phase: phase,
+                                      onPaparazziFrenzy:
+                                          _triggerPaparazziFrenzy,
+                                      trailingControls:
+                                          _buildPaparazziPremiereHeader(),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -604,42 +694,44 @@ class _LivingMarqueeDashboardScreenState
                                       joinMode: true,
                                     ),
                                     onAfterHoursTap: () async {
+                                      HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
                                       Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
+                                        StageSharedTransitionRoute(
+                                          page:
                                               const LateNightAfterHoursScreen(),
                                         ),
                                       );
                                     },
                                     onTrophyVaultTap: () async {
+                                      HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
                                       Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const MatchHistoryScreen(),
+                                        StageSharedTransitionRoute(
+                                          page: const MatchHistoryScreen(),
                                         ),
                                       );
                                     },
                                     onCameraViewfinderTap: () async {
+                                      HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
                                       Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
+                                        StageSharedTransitionRoute(
+                                          page:
                                               const InteractiveInstructionsScreen(),
                                         ),
                                       );
                                     },
                                     onBoxOfficeVaultTap: () async {
+                                      HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
                                       Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const SceneVaultScreen(),
+                                        StageSharedTransitionRoute(
+                                          page: const SceneVaultScreen(),
                                         ),
                                       );
                                     },
