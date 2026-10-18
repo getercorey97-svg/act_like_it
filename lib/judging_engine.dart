@@ -91,17 +91,31 @@ class TriModalJudgingEngine extends ChangeNotifier {
 
   static Map<String, dynamic> _extractJsonObject(String raw) {
     var cleaned = raw.trim();
-    if (cleaned.startsWith('```')) {
+    // 1. Extract inner payload if wrapped in ```json ... ``` anywhere in the response
+    final fencedMatch = RegExp(
+      r'```(?:json)?\s*([\s\S]*?)\s*```',
+      caseSensitive: false,
+    ).firstMatch(cleaned);
+    if (fencedMatch != null && fencedMatch.group(1) != null) {
+      cleaned = fencedMatch.group(1)!.trim();
+    } else {
       cleaned = cleaned
-          .replaceFirst(RegExp(r'^```(?:json)?\s*', caseSensitive: false), '')
-          .replaceFirst(RegExp(r'\s*```$'), '')
+          .replaceAll(RegExp(r'```(?:json)?', caseSensitive: false), '')
+          .replaceAll('```', '')
           .trim();
     }
+
+    // 2. Isolate the outer JSON object braces and strip trailing commas before } or ]
     final firstBrace = cleaned.indexOf('{');
     final lastBrace = cleaned.lastIndexOf('}');
     if (firstBrace >= 0 && lastBrace > firstBrace) {
       cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r',\s*([}\]])'),
+      (match) => match.group(1)!,
+    );
+
     final decoded = jsonDecode(cleaned);
     if (decoded is Map) {
       return Map<String, dynamic>.from(decoded);

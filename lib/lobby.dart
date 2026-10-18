@@ -1149,7 +1149,35 @@ class LobbyRealtimeManager extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    _realtimeChannel?.unsubscribe();
+    final ch = _realtimeChannel;
+    final activeLobbyId = _session?.id;
+    _realtimeChannel = null;
+    _session = null;
+    _players = [];
+
+    if (ch != null) {
+      unawaited(() async {
+        try {
+          await ch.untrack();
+        } catch (_) {}
+        try {
+          await ch.unsubscribe();
+          await supabaseOrNull?.removeChannel(ch);
+        } catch (_) {}
+      }());
+    }
+
+    final client = supabaseOrNull;
+    if (client != null && activeLobbyId != null && _isValidUuid(activeLobbyId)) {
+      unawaited(
+        client
+            .from('lobby_players')
+            .delete()
+            .eq('lobby_id', activeLobbyId)
+            .eq('user_id', _localUserId)
+            .then((_) {}, onError: (_) {}),
+      );
+    }
     super.dispose();
   }
 }
@@ -1170,7 +1198,8 @@ class LobbyMatchmakingScreen extends StatefulWidget {
   State<LobbyMatchmakingScreen> createState() => _LobbyMatchmakingScreenState();
 }
 
-class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
+class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
+    with WidgetsBindingObserver {
   late final LobbyRealtimeManager _lobbyManager;
   final TextEditingController _nameController =
       TextEditingController(text: 'Galaxy S26 Actor');
@@ -1181,11 +1210,19 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedCategory = widget.initialCategory;
     _isJoinMode = widget.startInJoinMode;
     _lobbyManager = LobbyRealtimeManager();
     _lobbyManager.addListener(_onLobbyStateChanged);
     OfflineManager.instance.ensureInitialized();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      _lobbyManager.leaveLobby();
+    }
   }
 
   void _onLobbyStateChanged() {
@@ -1196,6 +1233,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _lobbyManager.removeListener(_onLobbyStateChanged);
     _lobbyManager.dispose();
     _nameController.dispose();

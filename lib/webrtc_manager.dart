@@ -621,6 +621,10 @@ class WebRtcStageManager extends ChangeNotifier {
     _room = null;
     _isConnected = false;
     try {
+      await currentRoom?.localParticipant?.setCameraEnabled(false);
+      await currentRoom?.localParticipant?.setMicrophoneEnabled(false);
+    } catch (_) {}
+    try {
       await currentRoom?.disconnect();
       await currentRoom?.dispose();
     } catch (_) {}
@@ -629,7 +633,7 @@ class WebRtcStageManager extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    leaveSfuStage();
+    unawaited(leaveSfuStage());
     super.dispose();
   }
 }
@@ -651,12 +655,14 @@ class LiveKitSoundstageScreen extends StatefulWidget {
       _LiveKitSoundstageScreenState();
 }
 
-class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
+class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
+    with WidgetsBindingObserver {
   late final WebRtcStageManager _stageManager;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _stageManager = WebRtcStageManager();
     _stageManager.addListener(_onStageUpdated);
 
@@ -670,6 +676,13 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
     );
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      _stageManager.leaveSfuStage();
+    }
+  }
+
   void _onStageUpdated() {
     if (mounted) {
       setState(() {});
@@ -678,6 +691,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stageManager.removeListener(_onStageUpdated);
     _stageManager.dispose();
     super.dispose();

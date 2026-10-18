@@ -49,24 +49,14 @@ jobs:
 
       - name: Force compileSdk 36 for AndroidX
         run: |
-          for cache_dir in "/home/runner/.pub-cache/hosted" "${PUB_CACHE}/hosted"; do
+          for cache_dir in "/home/runner/.pub-cache/hosted" "${PUB_CACHE}/hosted" "$HOME/.pub-cache/hosted"; do
             if [ -d "$cache_dir" ]; then
-              find "$cache_dir" \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i \
-                -e 's/compileSdkVersion 31/compileSdkVersion 36/g' \
-                -e 's/compileSdkVersion 32/compileSdkVersion 36/g' \
-                -e 's/compileSdkVersion 33/compileSdkVersion 36/g' \
-                -e 's/compileSdkVersion 34/compileSdkVersion 36/g' \
-                -e 's/compileSdkVersion 35/compileSdkVersion 36/g' \
-                -e 's/compileSdk 31/compileSdk 36/g' \
-                -e 's/compileSdk 32/compileSdk 36/g' \
-                -e 's/compileSdk 33/compileSdk 36/g' \
-                -e 's/compileSdk 34/compileSdk 36/g' \
-                -e 's/compileSdk 35/compileSdk 36/g' \
-                -e 's/compileSdk = 31/compileSdk = 36/g' \
-                -e 's/compileSdk = 32/compileSdk = 36/g' \
-                -e 's/compileSdk = 33/compileSdk = 36/g' \
-                -e 's/compileSdk = 34/compileSdk = 36/g' \
-                -e 's/compileSdk = 35/compileSdk = 36/g' {} +
+              find "$cache_dir" \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i -E \
+                -e 's/compileSdkVersion[[:space:]]+[0-9]+/compileSdkVersion 36/g' \
+                -e 's/compileSdkVersion[[:space:]]+flutter\.compileSdkVersion/compileSdkVersion 36/g' \
+                -e 's/compileSdk[[:space:]]*=[[:space:]]*[0-9]+/compileSdk = 36/g' \
+                -e 's/compileSdk[[:space:]]*=[[:space:]]*flutter\.compileSdkVersion/compileSdk = 36/g' \
+                -e 's/compileSdk[[:space:]]+[0-9]+/compileSdk 36/g' {} +
             fi
           done
 
