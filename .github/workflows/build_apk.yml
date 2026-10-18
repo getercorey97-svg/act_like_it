@@ -57,8 +57,7 @@ jobs:
                 -e 's/compileSdkVersion[[:space:]]+[0-9]+/compileSdkVersion 36/g' \
                 -e 's/compileSdkVersion[[:space:]]+flutter\.compileSdkVersion/compileSdkVersion 36/g' \
                 -e 's/compileSdk[[:space:]]*=[[:space:]]*[0-9]+/compileSdk = 36/g' \
-                -e 's/compileSdk[[:space:]]*=[[:space:]]*flutter\.compileSdkVersion/compileSdk = 36/g' \
-                -e 's/compileSdk[[:space:]]+[0-9]+/compileSdk 36/g' {} +
+                -e 's/compileSdk[[:space:]]*=[[:space:]]*flutter\.compileSdkVersion/compileSdk = 36/g' {} +
             fi
           done
 
