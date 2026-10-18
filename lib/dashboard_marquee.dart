@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'main.dart';
 import 'lobby.dart';
 import 'webrtc_manager.dart';
@@ -10,6 +11,8 @@ import 'late_night_vault.dart';
 import 'offline_manager.dart';
 import 'match_history_screen.dart';
 import 'ui/interactive_instructions.dart';
+import 'ui/game_settings_modal.dart';
+import 'ui/scene_vault_screen.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
@@ -129,6 +132,8 @@ class _LivingMarqueeDashboardScreenState
 
   // 3. Horizontally Scrolling Glowing Movie Ticket Carousel Controller
   late final PageController _ticketPageController;
+  late final ScrollController _redCarpetScrollController;
+  double _redCarpetScrollOffset = 0.0;
   double _currentTicketPage = 0.0;
   int _focusedTicketIndex = 0;
 
@@ -168,6 +173,9 @@ class _LivingMarqueeDashboardScreenState
       initialPage: 0,
     )..addListener(_onTicketScroll);
 
+    _redCarpetScrollController = ScrollController()
+      ..addListener(_onRedCarpetScroll);
+
     _marqueeTickerController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 24),
@@ -178,6 +186,13 @@ class _LivingMarqueeDashboardScreenState
 
     OfflineManager.instance.ensureInitialized().then((_) {
       if (mounted) setState(() {});
+    });
+  }
+
+  void _onRedCarpetScroll() {
+    if (!mounted || !_redCarpetScrollController.hasClients) return;
+    setState(() {
+      _redCarpetScrollOffset = _redCarpetScrollController.offset;
     });
   }
 
@@ -243,6 +258,8 @@ class _LivingMarqueeDashboardScreenState
 
   @override
   void dispose() {
+    _redCarpetScrollController.removeListener(_onRedCarpetScroll);
+    _redCarpetScrollController.dispose();
     _ticketPageController.removeListener(_onTicketScroll);
     _ticketPageController.dispose();
     _spotlightController.dispose();
@@ -250,6 +267,33 @@ class _LivingMarqueeDashboardScreenState
     _marqueeTickerController.dispose();
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  Future<void> _openCallSheetAndNavigate({
+    required String modeTitle,
+    required bool joinMode,
+  }) async {
+    HapticFeedback.mediumImpact();
+    final settings = await showModalBottomSheet<GameSettingsConfig>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GameSettingsModal(modeTitle: modeTitle),
+    );
+    if (settings == null || !mounted) return;
+
+    await _pauseMusicBeforeNavigation();
+    if (!mounted) return;
+
+    final selectedTicket = kSceneVaultTickets[_focusedTicketIndex];
+    await Navigator.of(context).push(
+      StageSharedTransitionRoute(
+        page: LobbyMatchmakingScreen(
+          initialCategory: selectedTicket.category,
+          startInJoinMode: joinMode,
+        ),
+      ),
+    );
   }
 
   /// Triggers the physical clapperboard "clap" shut animation before navigating
@@ -432,134 +476,180 @@ class _LivingMarqueeDashboardScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF05060A),
+      backgroundColor: const Color(0xFF07090E),
       body: AnimatedBuilder(
         animation: _spotlightController,
         builder: (context, _) {
           final t = _spotlightController.value * 2 * math.pi;
 
-          // Panning stage spotlight coordinates across obsidian black canvas
-          final purpleAlign = Alignment(
-            math.cos(t) * 0.85,
-            math.sin(t * 0.7) * 0.65 - 0.25,
-          );
-          final cyanAlign = Alignment(
-            math.sin(t * 0.9 + 1.8) * 0.85,
-            math.cos(t * 0.6 + 0.9) * 0.65 + 0.15,
-          );
-          final amberAlign = Alignment(
-            math.cos(t * 0.8 + 3.6) * 0.75,
-            math.sin(t * 1.1 + 2.1) * 0.75 + 0.35,
-          );
-
           return Stack(
             fit: StackFit.expand,
             children: [
               // --------------------------------------------------------------
-              // 1. THE DYNAMIC BACKGROUND (Zero Static Assets — Pure RadialGradients)
+              // 1. BASE LAYER: First-Person Perspective Red Carpet + Parallax
               // --------------------------------------------------------------
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF05060A),
-                  gradient: RadialGradient(
-                    center: purpleAlign,
-                    radius: 1.15,
-                    colors: const [
-                      Color(0x4DA855F7), // Stage Spotlight 1: Electric Purple
-                      Color(0x1AA855F7),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.45, 1.0],
-                  ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: cyanAlign,
-                    radius: 1.10,
-                    colors: const [
-                      Color(0x4706B6D4), // Stage Spotlight 2: Cyber Cyan
-                      Color(0x1706B6D4),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.48, 1.0],
-                  ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: amberAlign,
-                    radius: 1.05,
-                    colors: const [
-                      Color(0x42F59E0B), // Stage Spotlight 3: Marquee Amber
-                      Color(0x14F59E0B),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.42, 1.0],
-                  ),
-                ),
-              ),
-              IgnorePointer(
+              RepaintBoundary(
                 child: CustomPaint(
-                  painter: _NeonBackstageBeamsPainter(phase: t),
+                  painter: PaparazziRedCarpetPainter(
+                    scrollOffset: _redCarpetScrollOffset,
+                  ),
                 ),
               ),
 
               // --------------------------------------------------------------
-              // FOREGROUND INTERACTIVE STAGE CONTENT
+              // 2. OVERLAY LAYER: Randomized Paparazzi Camera Flashes
+              // --------------------------------------------------------------
+              IgnorePointer(
+                child: CustomPaint(
+                  painter: PaparazziFlashOverlayPainter(
+                    progress: (_spotlightController.value * 3.5) % 1.0,
+                  ),
+                ),
+              ),
+
+              // --------------------------------------------------------------
+              // 3. FOREGROUND: Zero-Clutter CustomScrollView of 6 Studio Doors
               // --------------------------------------------------------------
               SafeArea(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 2. THE TELEMETRICS HUD (Top Corners Animated Gauges)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                      child: _buildTelemetricsHud(t),
-                    ),
-
-                    // Main Scrollable Backstage Deck
                     Expanded(
-                      child: SingleChildScrollView(
+                      child: CustomScrollView(
+                        controller: _redCarpetScrollController,
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Neon Marquee Header Banner
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 18),
-                              child: _buildLivingMarqueeHeader(t),
+                        slivers: [
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildPaparazziPremiereHeader(),
                             ),
-                            const SizedBox(height: 16),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                            sliver: SliverList(
+                              delegate: SliverChildListDelegate([
+                                // THE PREMIERE DOOR: Create Lobby / Quick Play
+                                PaparazziCinemaDoorCard(
+                                  doorBadge: 'THE PREMIERE DOOR · CLAPPERBOARD',
+                                  title: 'Create Lobby / Quick Play',
+                                  subtitle:
+                                      'Snap the glowing Director\'s Clapperboard, configure your Call Sheet, and launch a 6-digit soundstage.',
+                                  icon: Icons.movie_creation_rounded,
+                                  neonAccent: const Color(0xFFE11D48),
+                                  onTap: () => _openCallSheetAndNavigate(
+                                    modeTitle: 'CREATE LOBBY · QUICK PLAY',
+                                    joinMode: false,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
 
-                            // 3. THE "ACTION" CLAPPERBOARD (Primary CTA)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 18),
-                              child: _buildActionClapperboard(t),
+                                // DOOR 1: Join 6-Digit Room ("On Air" Stage Light)
+                                PaparazziCinemaDoorCard(
+                                  doorBadge: 'DOOR 01 · ON AIR STAGE LIGHT',
+                                  title: 'Join 6-Digit Room',
+                                  subtitle:
+                                      'Step into a live 6-digit remote soundstage and stream over the LiveKit WebRTC SFU.',
+                                  icon: Icons.sensors_rounded,
+                                  neonAccent: const Color(0xFF06B6D4),
+                                  onTap: () => _openCallSheetAndNavigate(
+                                    modeTitle: 'JOIN 6-DIGIT ROOM',
+                                    joinMode: true,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+
+                                // DOOR 2: 18+ After-Hours (Neon Velvet Rope / VIP Pass)
+                                PaparazziCinemaDoorCard(
+                                  doorBadge: 'DOOR 02 · NEON VELVET ROPE',
+                                  title: '18+ After-Hours',
+                                  subtitle:
+                                      'Present your VIP pass for uncut midnight prompts and 15-second mid-take improvisation twists.',
+                                  icon: Icons.verified_user_outlined,
+                                  neonAccent: const Color(0xFFF59E0B),
+                                  onTap: () async {
+                                    await _pauseMusicBeforeNavigation();
+                                    if (!mounted) return;
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const LateNightAfterHoursScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+
+                                // DOOR 3: Career Trophy Room (Golden Statuette)
+                                PaparazziCinemaDoorCard(
+                                  doorBadge: 'DOOR 03 · GOLDEN STATUETTE',
+                                  title: 'Career Trophy Room',
+                                  subtitle:
+                                      'View your Golden Statuettes (${OfflineManager.instance.totalCareerWins} Wins · Avg ${OfflineManager.instance.averageFinalScore.toStringAsFixed(1)}) and past takes.',
+                                  icon: Icons.emoji_events_rounded,
+                                  neonAccent: const Color(0xFF10B981),
+                                  onTap: () async {
+                                    await _pauseMusicBeforeNavigation();
+                                    if (!mounted) return;
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const MatchHistoryScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+
+                                // DOOR 4: How to Play / Instructions (Director's Megaphone)
+                                PaparazziCinemaDoorCard(
+                                  doorBadge: 'DOOR 04 · DIRECTOR\'S MEGAPHONE',
+                                  title: 'How to Play / Instructions',
+                                  subtitle:
+                                      'Swipe through interactive story clapperboards for Pre-Roll, AI Telemetrics, Peer, and Social Judging.',
+                                  icon: Icons.campaign_rounded,
+                                  neonAccent: const Color(0xFFA855F7),
+                                  onTap: () async {
+                                    await _pauseMusicBeforeNavigation();
+                                    if (!mounted) return;
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const InteractiveInstructionsScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+
+                                // DOOR 5: The Scene Vault (Vintage Box Office Window)
+                                PaparazziCinemaDoorCard(
+                                  doorBadge:
+                                      'DOOR 05 · VINTAGE BOX OFFICE WINDOW',
+                                  title: 'The Scene Vault',
+                                  subtitle:
+                                      'Swipe oversized perforated movie tickets across 1970–1999, 2000–2026, and Cult Classics.',
+                                  icon: Icons.confirmation_number_rounded,
+                                  neonAccent: const Color(0xFFEC4899),
+                                  onTap: () async {
+                                    await _pauseMusicBeforeNavigation();
+                                    if (!mounted) return;
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const SceneVaultScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ]),
                             ),
-                            const SizedBox(height: 12),
-
-                            // Backstage Quick Actions (Join 6-Digit Code & 18+ Vault)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 18),
-                              child: _buildBackstageQuickBar(),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // 4. THE SCENE VAULT (Glowing Floating Movie Tickets)
-                            _buildSceneVaultTicketSection(t),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
-                    // 5. THE GLOBAL MARQUEE (Continuous Live Ticker at Bottom)
+                    // Continuous Live Marquee Ticker at Bottom
                     _buildGlobalMarqueeTicker(t),
                   ],
                 ),
@@ -568,6 +658,66 @@ class _LivingMarqueeDashboardScreenState
           );
         },
       ),
+    );
+  }
+
+  Widget _buildPaparazziPremiereHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'FIRST-PERSON PAPARAZZI RED CARPET',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                  color: Color(0xFFF59E0B),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'ACT LIKE IT',
+                style: GoogleFonts.limelight(
+                  fontSize: 38,
+                  color: Colors.white,
+                  letterSpacing: 2.2,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0xFFE11D48),
+                      blurRadius: 22,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: _toggleBackgroundMusic,
+          tooltip: _isMusicPlaying ? 'Mute Stage Music' : 'Unmute Stage Music',
+          icon: Icon(
+            _isMusicPlaying ? Icons.volume_up : Icons.volume_off,
+            color: _isMusicPlaying
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFF64748B),
+            size: 22,
+          ),
+        ),
+        IconButton(
+          onPressed: _openCloudConfigBottomSheet,
+          tooltip: 'Cloud API Settings',
+          icon: const Icon(
+            Icons.tune_rounded,
+            color: Color(0xFF06B6D4),
+            size: 22,
+          ),
+        ),
+      ],
     );
   }
 

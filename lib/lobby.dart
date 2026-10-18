@@ -2,12 +2,18 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
 import 'webrtc_manager.dart';
 import 'offline_manager.dart';
+import 'late_night_vault.dart';
+import 'match_history_screen.dart';
 import 'ui/game_app_bar.dart';
 import 'ui/tutorial_overlay.dart';
+import 'ui/interactive_instructions.dart';
+import 'ui/game_settings_modal.dart';
+import 'ui/scene_vault_screen.dart';
 
 enum SceneCategory {
   era1970To1999(
@@ -1199,8 +1205,12 @@ class LobbyMatchmakingScreen extends StatefulWidget {
 }
 
 class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
-    with WidgetsBindingObserver {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final LobbyRealtimeManager _lobbyManager;
+  late final ScrollController _parallaxScrollController;
+  late final AnimationController _paparazziFlashController;
+  double _scrollOffset = 0.0;
+
   final TextEditingController _nameController =
       TextEditingController(text: 'Galaxy S26 Actor');
   final TextEditingController _codeController = TextEditingController();
@@ -1215,7 +1225,23 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     _isJoinMode = widget.startInJoinMode;
     _lobbyManager = LobbyRealtimeManager();
     _lobbyManager.addListener(_onLobbyStateChanged);
+
+    _parallaxScrollController = ScrollController()
+      ..addListener(_onParallaxScroll);
+
+    _paparazziFlashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    )..repeat();
+
     OfflineManager.instance.ensureInitialized();
+  }
+
+  void _onParallaxScroll() {
+    if (!mounted || !_parallaxScrollController.hasClients) return;
+    setState(() {
+      _scrollOffset = _parallaxScrollController.offset;
+    });
   }
 
   @override
@@ -1234,6 +1260,9 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _parallaxScrollController.removeListener(_onParallaxScroll);
+    _parallaxScrollController.dispose();
+    _paparazziFlashController.dispose();
     _lobbyManager.removeListener(_onLobbyStateChanged);
     _lobbyManager.dispose();
     _nameController.dispose();
@@ -1241,14 +1270,28 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     super.dispose();
   }
 
+  Future<void> _openCallSheetAndExecute(VoidCallback onConfirmed) async {
+    HapticFeedback.mediumImpact();
+    final settings = await showModalBottomSheet<GameSettingsConfig>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const GameSettingsModal(),
+    );
+    if (settings != null && mounted) {
+      onConfirmed();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeSession = _lobbyManager.session;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF07090E),
       appBar: GameAppBar(
         title: activeSession == null
-            ? 'Multiplayer Matchmaking'
+            ? 'Red Carpet Soundstage'
             : 'Lobby #${activeSession.roomCode}',
         activeRoomCode: activeSession?.roomCode,
         onStartOver: () => _lobbyManager.leaveLobby(),
@@ -1263,274 +1306,333 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
             ),
         ],
       ),
-      body: SafeArea(
-        child: activeSession == null
-            ? _buildEntryForm()
-            : _buildSynchronizedLobbyView(activeSession),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Base Layer: First-Person Perspective Red Carpet with Parallax Shift
+          RepaintBoundary(
+            child: CustomPaint(
+              painter: PaparazziRedCarpetPainter(
+                scrollOffset: _scrollOffset,
+              ),
+            ),
+          ),
+          // Overlay Layer: Randomized Animated Paparazzi Camera Flashes
+          IgnorePointer(
+            child: AnimatedBuilder(
+              animation: _paparazziFlashController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: PaparazziFlashOverlayPainter(
+                    progress: _paparazziFlashController.value,
+                  ),
+                );
+              },
+            ),
+          ),
+          // Foreground Content
+          SafeArea(
+            child: activeSession == null
+                ? _buildPaparazziCustomScrollView()
+                : _buildSynchronizedLobbyView(activeSession),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildEntryForm() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const TutorialOverlay(
-          tutorialKey: 'lobby_room_code_v1',
-          badgeLabel: 'LOBBY MATCHMAKING TIP',
-          title: 'Generate or Join a 6-Digit Soundstage',
-          message:
-              'Tap "Generate 6-Digit Room Code" to host up to 8 remote players via LiveKit SFU, or switch to "Join via 6-Digit Code" to enter a friend\'s stage.',
-          neonAccent: Color(0xFF06B6D4),
-          icon: Icons.dialpad_rounded,
-        ),
-        Hero(
-          tag: SceneHeroTags.ticketTag(_selectedCategory),
-          createRectTween: SceneHeroTags.createTicketArcTween,
-          flightShuttleBuilder: SceneHeroTags.buildTicketFlightShuttle,
-          child: Material(
-            type: MaterialType.transparency,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              margin: const EdgeInsets.only(bottom: 18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF121722),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFF59E0B), width: 1.4),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.confirmation_number_outlined,
+  Widget _buildPaparazziCustomScrollView() {
+    return CustomScrollView(
+      controller: _parallaxScrollController,
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const TutorialOverlay(
+                  tutorialKey: 'lobby_room_code_v1',
+                  badgeLabel: 'RED CARPET PREMIERE TIP',
+                  title: 'Step Through a Studio Door or Roll Camera',
+                  message:
+                      'Configure your Call Sheet soundboard toggles, generate a 6-digit LiveKit SFU room code, or step into any of the 6 Studio Doors below.',
+                  neonAccent: Color(0xFFF59E0B),
+                  icon: Icons.camera_enhance_rounded,
+                ),
+                const Text(
+                  'WORLD PREMIERE · RED CARPET ARRIVAL',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
                     color: Color(0xFFF59E0B),
-                    size: 22,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'SELECTED SCENE VAULT TICKET',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFF59E0B),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _selectedCategory.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'ACT LIKE IT',
+                  style: GoogleFonts.limelight(
+                    fontSize: 38,
+                    color: Colors.white,
+                    letterSpacing: 2.2,
+                    shadows: const [
+                      Shadow(
+                        color: Color(0xFFE11D48),
+                        blurRadius: 22,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 18),
+                _buildStageCredentialsCard(),
+              ],
             ),
           ),
         ),
-        Row(
-          children: [
-            Expanded(
-              child: ChoiceChip(
-                label: const Text('Host New 6-Digit Room'),
-                selected: !_isJoinMode,
-                onSelected: (_) => setState(() => _isJoinMode = false),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              // THE PREMIERE DOOR: Create Lobby / Quick Play
+              PaparazziCinemaDoorCard(
+                doorBadge: 'THE PREMIERE DOOR · STUDIO A',
+                title: 'Create Lobby / Quick Play',
+                subtitle:
+                    'Snap the glowing Director\'s Clapperboard, dial in your Call Sheet, and generate a 6-digit room for 2–8 players.',
+                icon: Icons.movie_creation_rounded,
+                neonAccent: const Color(0xFFE11D48),
+                onTap: () => _openCallSheetAndExecute(() {
+                  setState(() => _isJoinMode = false);
+                  _lobbyManager.createLobby(
+                    displayName: _nameController.text,
+                    category: _selectedCategory,
+                    preselectedPrompt: widget.initialPromptOverride,
+                  );
+                }),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ChoiceChip(
-                label: const Text('Join via 6-Digit Code'),
-                selected: _isJoinMode,
-                onSelected: (_) => setState(() => _isJoinMode = true),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        TextField(
-          controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Stage Display Name',
-            filled: true,
-            fillColor: Color(0xFF121722),
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (_isJoinMode)
-          TextField(
-            controller: _codeController,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText: '6-Digit Lobby Code',
-              hintText: '482910',
-              filled: true,
-              fillColor: Color(0xFF121722),
-              border: OutlineInputBorder(),
-            ),
-          )
-        else
-          DropdownButtonFormField<SceneCategory>(
-            value: _selectedCategory,
-            decoration: const InputDecoration(
-              labelText: 'Select Scene Vault Category',
-              filled: true,
-              fillColor: Color(0xFF121722),
-              border: OutlineInputBorder(),
-            ),
-            items: SceneCategory.values
-                .map(
-                  (cat) => DropdownMenuItem(
-                    value: cat,
-                    child: Text(cat.label),
-                  ),
-                )
-                .toList(),
-            onChanged: (val) {
-              if (val != null) {
-                setState(() => _selectedCategory = val);
-              }
-            },
-          ),
-        if (_lobbyManager.errorMessage != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            _lobbyManager.errorMessage!,
-            style: const TextStyle(color: Color(0xFFE11D48), fontSize: 13),
-          ),
-        ],
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: _lobbyManager.isLoading
-              ? null
-              : () {
-                  if (_isJoinMode) {
+              const SizedBox(height: 20),
+
+              // DOOR 1: Join 6-Digit Room ("On Air" Stage Light)
+              PaparazziCinemaDoorCard(
+                doorBadge: 'DOOR 01 · ON AIR STAGE LIGHT',
+                title: 'Join 6-Digit Room',
+                subtitle:
+                    'Enter a friend\'s 6-digit soundstage code and connect directly to the LiveKit WebRTC SFU.',
+                icon: Icons.sensors_rounded,
+                neonAccent: const Color(0xFF06B6D4),
+                onTap: () => _openCallSheetAndExecute(() {
+                  setState(() => _isJoinMode = true);
+                  if (_codeController.text.trim().length == 6) {
                     _lobbyManager.joinLobbyByCode(
                       roomCode: _codeController.text,
                       displayName: _nameController.text,
                     );
-                  } else {
-                    _lobbyManager.createLobby(
-                      displayName: _nameController.text,
-                      category: _selectedCategory,
-                      preselectedPrompt: widget.initialPromptOverride,
-                    );
                   }
+                }),
+              ),
+              const SizedBox(height: 20),
+
+              // DOOR 2: 18+ After-Hours (Neon Velvet Rope / VIP Pass)
+              PaparazziCinemaDoorCard(
+                doorBadge: 'DOOR 02 · NEON VELVET ROPE',
+                title: '18+ After-Hours',
+                subtitle:
+                    'Unlock the VIP pass for uncut midnight prompts and 15-second mid-take improvisation twists.',
+                icon: Icons.verified_user_outlined,
+                neonAccent: const Color(0xFFF59E0B),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const LateNightAfterHoursScreen(),
+                    ),
+                  );
                 },
-          child: Text(
-            _lobbyManager.isLoading
-                ? 'Initializing Soundstage Lobby...'
-                : (_isJoinMode
-                    ? 'Join Remote Lobby'
-                    : 'Generate 6-Digit Room Code'),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF121722),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF06B6D4), width: 1.2),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(
-                    Icons.wifi_off_rounded,
-                    color: Color(0xFF06B6D4),
-                    size: 18,
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'OFFLINE MODE · STORE & FORWARD PARTY',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF06B6D4),
-                      ),
-                    ),
-                  ),
-                ],
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Cache Scene Packs to device storage while online, then play Pass-and-Play Multiplayer offline using native 30s camera clips, local looped 1–10 Peer Judging, and connectivity_plus Queued Gemini AI Judging.',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.4,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final count = await OfflineManager.instance
-                            .downloadAndCacheScenePacks();
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Cached $count scenes locally for Offline Play.',
-                            ),
-                          ),
-                        );
-                        setState(() {});
-                      },
-                      icon: const Icon(
-                        Icons.download_for_offline_outlined,
-                        size: 16,
-                      ),
-                      label: const Text('Cache Scene Packs'),
+              const SizedBox(height: 20),
+
+              // DOOR 3: Career Trophy Room (Golden Statuette)
+              PaparazziCinemaDoorCard(
+                doorBadge: 'DOOR 03 · GOLDEN STATUETTE',
+                title: 'Career Trophy Room',
+                subtitle:
+                    'Inspect your career wins (${OfflineManager.instance.totalCareerWins} Wins · Avg ${OfflineManager.instance.averageFinalScore.toStringAsFixed(1)}) and historical verdicts.',
+                icon: Icons.emoji_events_rounded,
+                neonAccent: const Color(0xFF10B981),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MatchHistoryScreen(),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF06B6D4),
-                        foregroundColor: const Color(0xFF0A0D14),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          StageSharedTransitionRoute(
-                            page: OfflineLocalPartyScreen(
-                              initialCategory: _selectedCategory,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.groups_2_outlined, size: 16),
-                      label: const Text('Offline Local Party'),
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
-            ],
+              const SizedBox(height: 20),
+
+              // DOOR 4: How to Play / Instructions (Director's Megaphone)
+              PaparazziCinemaDoorCard(
+                doorBadge: 'DOOR 04 · DIRECTOR\'S MEGAPHONE',
+                title: 'How to Play / Instructions',
+                subtitle:
+                    'Swipe through interactive digital clapperboards covering Pre-Roll, AI Telemetrics, Peer, and Social Judging.',
+                icon: Icons.campaign_rounded,
+                neonAccent: const Color(0xFFA855F7),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const InteractiveInstructionsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // DOOR 5: The Scene Vault (Vintage Box Office Window)
+              PaparazziCinemaDoorCard(
+                doorBadge: 'DOOR 05 · VINTAGE BOX OFFICE WINDOW',
+                title: 'The Scene Vault',
+                subtitle:
+                    'Step up to the box office window and swipe oversized tickets across 1970–1999, 2000–2026, and Cult Classics.',
+                icon: Icons.confirmation_number_rounded,
+                neonAccent: const Color(0xFFEC4899),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SceneVaultScreen(),
+                    ),
+                  );
+                },
+              ),
+            ]),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStageCredentialsCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xE60B0E17),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF334155), width: 1.4),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x99000000),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('Host New 6-Digit Room'),
+                  selected: !_isJoinMode,
+                  onSelected: (_) => setState(() => _isJoinMode = false),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('Join via 6-Digit Code'),
+                  selected: _isJoinMode,
+                  onSelected: (_) => setState(() => _isJoinMode = true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: 'Stage Display Name',
+              filled: true,
+              fillColor: Color(0xFF121722),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_isJoinMode)
+            TextField(
+              controller: _codeController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: '6-Digit Lobby Code',
+                hintText: '482910',
+                filled: true,
+                fillColor: Color(0xFF121722),
+                border: OutlineInputBorder(),
+              ),
+            )
+          else
+            DropdownButtonFormField<SceneCategory>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(
+                labelText: 'Selected Scene Vault Category',
+                filled: true,
+                fillColor: Color(0xFF121722),
+                border: OutlineInputBorder(),
+              ),
+              items: SceneCategory.values
+                  .map(
+                    (cat) => DropdownMenuItem(
+                      value: cat,
+                      child: Text(cat.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _selectedCategory = val);
+                }
+              },
+            ),
+          if (_lobbyManager.errorMessage != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _lobbyManager.errorMessage!,
+              style: const TextStyle(color: Color(0xFFE11D48), fontSize: 13),
+            ),
+          ],
+          const SizedBox(height: 14),
+          ElevatedButton.icon(
+            onPressed: _lobbyManager.isLoading
+                ? null
+                : () => _openCallSheetAndExecute(() {
+                      if (_isJoinMode) {
+                        _lobbyManager.joinLobbyByCode(
+                          roomCode: _codeController.text,
+                          displayName: _nameController.text,
+                        );
+                      } else {
+                        _lobbyManager.createLobby(
+                          displayName: _nameController.text,
+                          category: _selectedCategory,
+                          preselectedPrompt: widget.initialPromptOverride,
+                        );
+                      }
+                    }),
+            icon: const Icon(Icons.videocam_rounded, size: 18),
+            label: Text(
+              _lobbyManager.isLoading
+                  ? 'Initializing Soundstage Lobby...'
+                  : (_isJoinMode
+                      ? 'Open Call Sheet & Join Remote Lobby'
+                      : 'Open Call Sheet & Generate 6-Digit Code'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1725,3 +1827,289 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     );
   }
 }
+
+/// Tactile, heavily shadowed, neon-trimmed Studio "Door" card rendered along
+/// the First-Person Paparazzi Red Carpet `CustomScrollView`.
+class PaparazziCinemaDoorCard extends StatelessWidget {
+  final String doorBadge;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color neonAccent;
+  final VoidCallback onTap;
+
+  const PaparazziCinemaDoorCard({
+    super.key,
+    required this.doorBadge,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.neonAccent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xF2121725),
+              Color(0xF2080B12),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: neonAccent,
+            width: 2.0,
+          ),
+          boxShadow: [
+            const BoxShadow(
+              color: Color(0xCC000000),
+              blurRadius: 28,
+              spreadRadius: 2,
+              offset: Offset(0, 14),
+            ),
+            BoxShadow(
+              color: neonAccent.withValues(alpha: 0.26),
+              blurRadius: 24,
+              spreadRadius: 1,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: neonAccent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: neonAccent,
+                  width: 1.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: neonAccent.withValues(alpha: 0.35),
+                    blurRadius: 16,
+                  ),
+                ],
+              ),
+              child: Icon(
+                icon,
+                color: neonAccent,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    doorBadge,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                      color: neonAccent,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    title,
+                    style: GoogleFonts.limelight(
+                      fontSize: 22,
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: Color(0xFFCBD5E1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: neonAccent.withValues(alpha: 0.18),
+                border: Border.all(color: neonAccent, width: 1.4),
+              ),
+              child: Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: neonAccent,
+                size: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// First-Person Perspective Red Carpet Painter with Velvet Stanchion Ropes
+/// and scroll-linked vertical parallax lines.
+class PaparazziRedCarpetPainter extends CustomPainter {
+  final double scrollOffset;
+
+  const PaparazziRedCarpetPainter({required this.scrollOffset});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Deep Obsidian Theatre Backdrop
+    final bgPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF07090E),
+          Color(0xFF13080D),
+          Color(0xFF07090E),
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    // 2. Perspective Red Carpet Trapezoid converging toward top horizon
+    final vanishingY = (size.height * 0.12) - (scrollOffset * 0.08).clamp(-40.0, 40.0);
+    final topHalfWidth = size.width * 0.22;
+    final bottomHalfWidth = size.width * 0.48;
+    final centerX = size.width * 0.5;
+
+    final carpetPath = Path()
+      ..moveTo(centerX - topHalfWidth, vanishingY)
+      ..lineTo(centerX + topHalfWidth, vanishingY)
+      ..lineTo(centerX + bottomHalfWidth, size.height)
+      ..lineTo(centerX - bottomHalfWidth, size.height)
+      ..close();
+
+    final carpetPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: const [
+          Color(0xFF4C0519),
+          Color(0xFF9F1239),
+          Color(0xFFE11D48),
+          Color(0xFF881337),
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawPath(carpetPath, carpetPaint);
+
+    // 3. Golden Trim Borders & Velvet Stanchion Lines
+    final goldBorderPaint = Paint()
+      ..color = const Color(0xFFF59E0B).withValues(alpha: 0.65)
+      ..strokeWidth = 2.6
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(
+      Offset(centerX - topHalfWidth, vanishingY),
+      Offset(centerX - bottomHalfWidth, size.height),
+      goldBorderPaint,
+    );
+    canvas.drawLine(
+      Offset(centerX + topHalfWidth, vanishingY),
+      Offset(centerX + bottomHalfWidth, size.height),
+      goldBorderPaint,
+    );
+
+    // 4. Parallax Red Carpet Steps / Velvet Tread Lines
+    final stepPaint = Paint()
+      ..color = const Color(0xFFFDA4AF).withValues(alpha: 0.14)
+      ..strokeWidth = 1.4;
+
+    const int stepCount = 9;
+    final normalizedShift = (scrollOffset * 0.0025) % (1.0 / stepCount);
+    for (int i = 0; i < stepCount; i++) {
+      final t = ((i / stepCount) + normalizedShift).clamp(0.0, 1.0);
+      final easedT = t * t;
+      final y = vanishingY + (size.height - vanishingY) * easedT;
+      final halfW = topHalfWidth + (bottomHalfWidth - topHalfWidth) * easedT;
+      canvas.drawLine(
+        Offset(centerX - halfW, y),
+        Offset(centerX + halfW, y),
+        stepPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant PaparazziRedCarpetPainter oldDelegate) {
+    return oldDelegate.scrollOffset != scrollOffset;
+  }
+}
+
+/// Animated Paparazzi Camera Flash Overlay Painter that renders randomized
+/// high-key white & golden-amber bulb bursts along the edges of the red carpet.
+class PaparazziFlashOverlayPainter extends CustomPainter {
+  final double progress;
+
+  const PaparazziFlashOverlayPainter({required this.progress});
+
+  static const List<Offset> _flashAnchors = [
+    Offset(0.12, 0.18),
+    Offset(0.88, 0.22),
+    Offset(0.08, 0.45),
+    Offset(0.92, 0.48),
+    Offset(0.15, 0.72),
+    Offset(0.85, 0.68),
+    Offset(0.24, 0.30),
+    Offset(0.76, 0.34),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (int i = 0; i < _flashAnchors.length; i++) {
+      final phaseOffset = (i * 0.37) % 1.0;
+      final localPhase = ((progress + phaseOffset) % 1.0);
+      // Sharp camera strobe spike when localPhase is near 0.0–0.12
+      if (localPhase > 0.14) continue;
+
+      final intensity = (1.0 - (localPhase / 0.14)).clamp(0.0, 1.0);
+      final anchor = _flashAnchors[i];
+      final center = Offset(size.width * anchor.dx, size.height * anchor.dy);
+      final radius = 90.0 + (i % 3) * 35.0;
+
+      final flashPaint = Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.75 * intensity),
+            const Color(0xFFFDE68A).withValues(alpha: 0.38 * intensity),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.35, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawCircle(center, radius, flashPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant PaparazziFlashOverlayPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+

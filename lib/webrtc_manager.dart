@@ -8,6 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'main.dart';
 import 'lobby.dart';
 import 'judging_engine.dart';
+import 'ui/game_app_bar.dart';
+import 'ui/tutorial_overlay.dart';
 
 enum SfuParticipantRole {
   activePerformer,
@@ -703,12 +705,24 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     final isPerformer =
         _stageManager.role == SfuParticipantRole.activePerformer;
 
+    final isCountdownLocked = _stageManager.isRecordingTake &&
+        _stageManager.performanceElapsedSeconds < 10;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Stage · Room #${widget.lobbySession.roomCode}'),
-        actions: [
+      backgroundColor: const Color(0xFF07090E),
+      appBar: GameAppBar(
+        title: 'Stage · Room #${widget.lobbySession.roomCode}',
+        activeRoomCode: widget.lobbySession.roomCode,
+        isRecordingCountdownActive: isCountdownLocked,
+        onStartOver: () async {
+          await _stageManager.resumeStageAfterJudging(
+            targetEmotion:
+                scene?.emotionalTarget ?? 'Dramatic Intensity',
+          );
+        },
+        extraActions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: const EdgeInsets.only(right: 14.0),
             child: Center(
               child: Text(
                 _stageManager.isRecordingTake
@@ -716,8 +730,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                     : 'STANDBY · SFU',
                 style: const TextStyle(
                   fontFamily: 'monospace',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
                   color: Color(0xFFE11D48),
                 ),
               ),
@@ -731,6 +745,15 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const TutorialOverlay(
+                tutorialKey: 'stage_preroll_camera_v1',
+                badgeLabel: 'SOUNDSTAGE CAMERA & PRE-ROLL CUE',
+                title: 'Deliver Your Lines Into the Lens',
+                message:
+                    'Your front camera streams 720p30 frames to LiveKit SFU spectators while sampling facial & vocal telemetrics for Gemini AI judging.',
+                neonAccent: Color(0xFFE11D48),
+                icon: Icons.videocam_rounded,
+              ),
               Expanded(
                 flex: 3,
                 child: Container(

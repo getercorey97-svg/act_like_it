@@ -1,66 +1,43 @@
-# Missing `MatchHistoryScreen` Placeholder Fix
+# Paparazzi Red Carpet Dashboard & Director's Call Sheet Overhaul
 
-This plan resolves the GitHub Actions `assembleRelease` compilation failure (`Error when reading 'lib/match_history_screen.dart': No such file or directory`) by generating a clean, standalone stateless `MatchHistoryScreen` widget while leaving all existing codebase files untouched.
+This plan transforms the main dashboard experience into a first-person Paparazzi Red Carpet journey with parallax scrolling, randomized camera flash bursts, `GoogleFonts.limelight` headlines, 6 vertical "Door" cards, the zero-clutter "Call Sheet" pre-game configuration modal (`lib/ui/game_settings_modal.dart`), and a dedicated Scene Vault screen (`lib/ui/scene_vault_screen.dart`), while keeping all Supabase matchmaking, Realtime channel synchronization, and LiveKit WebRTC SFU logic 100% untouched.
 
-## User Review & Critical Decisions
+## Visual Direction & Domain Exemplars
 
-> [!IMPORTANT]
-> **Strict Code Isolation**: Per your instructions, zero existing files, UI themes, or dependencies will be altered, rewritten, or updated. Only the missing `MatchHistoryScreen` placeholder module will be created so the compiler can resolve the import and link the release APK cleanly.
+- **Exemplars**: Netflix Studio Premiere Showcase & MasterClass Mobile Stage—tactile obsidian cards (`#07090E`), dramatic crimson red-carpet perspective lighting, and crisp studio soundboard controls.
+- **Color & Atmospheric Polarity**: Intentional Dark Mode (`#07090E` deep obsidian canvas, `#13080D` velvet carpet shadow, `#E11D48` carpet crimson, `#F59E0B` limelight gold, `#06B6D4` soundstage cyan, `#A855F7` after-hours violet).
+- **Typography**: `GoogleFonts.limelight` exclusively for the `"ACT LIKE IT"` marquee title and the 6 Door headers; crisp monospace for room codes, slate numbers, and studio soundboard readouts.
+- **Layout & Spatial Architecture**:
+  - **Interactive Paparazzi Stack**: Base layer renders a custom first-person perspective Red Carpet with velvet stanchion ropes that shifts vertically via a `ScrollController` parallax listener; overlay layer triggers randomized high-key white/amber camera flash bursts driven by an `AnimationController`.
+  - **Zero-Clutter CustomScrollView**: Removes the top Tri-Modal metric rings from the main dashboard and replaces them with a spacious vertical `CustomScrollView` of 6 heavily shadowed cinematic "Doors".
 
-- **Confirmed Decision 1 — Widget Structure**: Implement `MatchHistoryScreen` as a minimal `StatelessWidget` with a `const MatchHistoryScreen({super.key})` constructor, a `Scaffold`, an `AppBar` titled `"Match History"`, and a centered placeholder body.
-- **Confirmed Decision 2 — Visual Styling**: Apply the app's dark backstage palette (`#07090E` scaffold background and `#0B0E17` dark `AppBar`) so navigating to the screen is visually seamless with the Living Marquee dashboard.
+## Key Changes
 
----
+### 1. Dependency Injection (`pubspec.yaml`)
+- Add `google_fonts: ^6.2.1` under `dependencies:` in `pubspec.yaml` while preserving all existing packages and `dependency_overrides: shared_preferences_android: ^2.4.28`.
 
-## 1. Overview & Core Concept
+### 2. The "Call Sheet" Pre-Game Settings Modal (`lib/ui/game_settings_modal.dart` — New File)
+- Create a stateful `GameSettingsModal` designed for `showModalBottomSheet` with a `#07090E` obsidian surface and `SingleChildScrollView(padding: EdgeInsets.all(24.0))` with generous vertical spacing (`24px–28px` between sections).
+- **The Studio Toggles**: Three oversized tactile studio soundboard switches for **AI Telemetrics (45%)**, **Peer Judging (35%)**, and **Social Judging (20%)**.
+- **Improv Roulette**: A glowing neon **Wildcard** toggle switch enabling random mid-scene improvisation modifiers.
+- **Action Button**: A full-width, neon-bordered **"ROLL CAMERA"** CTA at the bottom that closes the modal, returns the selected `GameSettingsConfig`, and advances directly into the lobby or soundstage.
 
-- **What It Does**: Provides the missing `MatchHistoryScreen` widget imported by the Living Marquee dashboard when pausing the Game Show background music before navigation.
-- **Target Audience / Persona**: Mobile players on Android (Samsung Galaxy S26 Ultra) and the automated GitHub Actions cloud build pipeline (`flutter build apk --release`).
-- **Key Value**: Eliminates the broken import error during `assembleRelease` while guaranteeing zero regression risk to the existing audio engine, dashboard animations, or Android SDK 36 configuration.
+### 3. The Scene Vault Screen (`lib/ui/scene_vault_screen.dart` — New File)
+- Create `SceneVaultScreen` featuring a dedicated swipeable carousel of oversized perforated movie tickets covering **Eras: 1970–1999**, **Eras: 2000–2026**, **Cult Classics**, and **Award Vaults**.
+- Tapping any movie ticket invokes `showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const GameSettingsModal())` before launching the selected era into `LobbyMatchmakingScreen` / `LiveKitSoundstageScreen`.
 
----
+### 4. First-Person Paparazzi Dashboard (`lib/dashboard_marquee.dart` & `lib/lobby.dart` UI Overhaul Only)
+- **Strict Backend Isolation**: Keep `SceneCategory`, `ScenePrompt`, `LobbyRealtimeManager`, Supabase queries, Realtime channels, and WebRTC SFU calls completely untouched.
+- **Paparazzi Red Carpet & Parallax `CustomScrollView`**:
+  - Update the main dashboard (`LivingMarqueeDashboardScreen` in `lib/dashboard_marquee.dart`, plus the entry form header in `lib/lobby.dart`) to render the First-Person Red Carpet parallax background + randomized Paparazzi Flash overlay.
+  - Strip the top Tri-Modal Judging metric rings from the main screen and render the 6 vertical cinematic Doors inside a `CustomScrollView`:
+    - **The Premiere Door**: *Create Lobby / Quick Play* (Glowing Director's Clapperboard) — triggers `GameSettingsModal` then routes to `LobbyMatchmakingScreen`.
+    - **Door 1**: *Join 6-Digit Room* ("On Air" Stage Light) — triggers `GameSettingsModal` (or routes directly into 6-digit Join mode).
+    - **Door 2**: *18+ After-Hours* (Neon Velvet Rope / VIP Pass) — routes to `LateNightAfterHoursScreen`.
+    - **Door 3**: *Career Trophy Room* (Golden Statuette) — routes to `MatchHistoryScreen`.
+    - **Door 4**: *How to Play / Instructions* (Director's Megaphone) — routes to `InteractiveInstructionsScreen`.
+    - **Door 5**: *The Scene Vault* (Vintage Box Office Window) — routes to `SceneVaultScreen`.
 
-## 2. User Experience & Visual Design
-
-- **Key User Flows**:
-  1. The user taps the Career Trophy Room / Match History button on the Living Marquee dashboard.
-  2. The dashboard pauses the looping Game Show background music (`_pauseMusicBeforeNavigation()`) and pushes `const MatchHistoryScreen()`.
-  3. `MatchHistoryScreen` renders a dark backstage `Scaffold` with a `"Match History"` `AppBar` and a clean centered placeholder view, allowing the user to return to the dashboard via the standard back button.
-- **Visual Identity & Theme**:
-  - *Aesthetic Direction*: Backstage Dark (`#07090E` background, `#0B0E17` surface, `#10B981` emerald trophy accent, crisp white typography).
-  - *Typography & Hierarchy*: Bold `AppBar` header (`"Match History"`) paired with a clean centered subtitle indicating the Career Trophy Room & Match History placeholder view.
-  - *Component Styling & Layout*: Pure Flutter Material `StatelessWidget` with zero external package dependencies beyond `package:flutter/material.dart`.
-- **Interactive Feedback & Motion**: Standard Material back navigation returning cleanly to the Living Marquee dashboard.
-
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Standalone `StatelessWidget` with `const` Constructor**
-  - *Chosen Approach*: Define `class MatchHistoryScreen extends StatelessWidget` with `const MatchHistoryScreen({super.key});` importing only `package:flutter/material.dart`.
-  - *Why*: Matches the exact call site (`builder: (_) => const MatchHistoryScreen()`) in the dashboard, requires zero additional imports that could introduce circular dependencies, and compiles deterministically in `flutter build apk --release`.
-  - *Alternatives Considered*: Importing database or offline managers into the placeholder was passed over to keep the module 100% self-contained and isolated.
-
----
-
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
-
-- **Architecture & Component Diagram**:
-```
-┌──────────────────────────────────────────────────────────────┐
-│                LivingMarqueeDashboardScreen                  │
-│  • Pauses AudioPlayer (_pauseMusicBeforeNavigation)          │
-│  • Pushes MaterialPageRoute(builder: (_) => const ...)       │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ Resolves import & const constructor
-                               ▼
-┌──────────────────────────────────────────────────────────────┐
-│               MatchHistoryScreen (StatelessWidget)           │
-│  • Scaffold (backgroundColor: #07090E)                       │
-│  • AppBar   (title: Text('Match History'), bg: #0B0E17)      │
-│  • Body     (Centered backstage placeholder card & message)  │
-└──────────────────────────────────────────────────────────────┘
-```
-
-- **Data Model & State**: Stateless presentation widget (`const MatchHistoryScreen({super.key})`) with no mutable state or asynchronous side effects.
-- **Interactive Component & State Mapping**: The `AppBar` automatically provides a back navigation control (`Navigator.pop`) when pushed onto the navigation stack from the dashboard.
+## Verification Plan
+- Run `compile_applet` to verify zero Dart or TypeScript build issues across all new and updated files.
+- Verify all 6 Doors, the `GameSettingsModal` bottom sheet trigger, `SceneVaultScreen` ticket swiper, and `GoogleFonts.limelight` typography render cleanly without touching Supabase or WebRTC backend classes.
