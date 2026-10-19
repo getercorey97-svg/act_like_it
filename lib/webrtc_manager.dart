@@ -1191,7 +1191,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         _stageManager.isCameraEnabled) {
       return VideoTrackRenderer(
         _stageManager.localVideoTrack!,
-        fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+        fit: VideoViewFit.cover,
       );
     }
 
@@ -1298,7 +1298,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
               if (coStarVideoTrack != null)
                 VideoTrackRenderer(
                   coStarVideoTrack,
-                  fit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                  fit: VideoViewFit.cover,
                 )
               else
                 Container(
