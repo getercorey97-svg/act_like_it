@@ -672,20 +672,20 @@ class _ActLikeItBrandCenterpieceState extends State<ActLikeItBrandCenterpiece>
                           vertical: widget.compact ? 10 : 14,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xEB07090E),
+                          color: const Color(0xF207090E),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: const Color(0xFF05070B),
-                            width: 3.5,
+                            width: 3.8,
                           ),
                           boxShadow: <BoxShadow>[
                             const BoxShadow(
                               color: Color(0xFF05070B),
-                              offset: Offset(5, 6),
+                              offset: Offset(6, 6),
                               blurRadius: 0,
                             ),
                             BoxShadow(
-                              color: const Color(0xFFF59E0B).withValues(
+                              color: const Color(0xFFF5DEB3).withValues(
                                 alpha: 0.32 + 0.18 * math.sin(phase * 2),
                               ),
                               blurRadius: 24,
@@ -701,8 +701,8 @@ class _ActLikeItBrandCenterpieceState extends State<ActLikeItBrandCenterpiece>
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: const Color(0xFFF59E0B),
-                              width: 2.0,
+                              color: const Color(0xFFF5DEB3),
+                              width: 2.2,
                             ),
                           ),
                           child: Image.asset(
@@ -739,10 +739,10 @@ class _ActLikeItBrandCenterpieceState extends State<ActLikeItBrandCenterpiece>
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: <Color>[Color(0xFFE11D48), Color(0xFFF59E0B)],
+              colors: <Color>[Color(0xFF520002), Color(0xFFE11342)],
             ),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF05070B), width: 3.0),
+            border: Border.all(color: const Color(0xFF05070B), width: 3.2),
             boxShadow: const <BoxShadow>[
               BoxShadow(
                 color: Color(0xFF05070B),
@@ -753,7 +753,7 @@ class _ActLikeItBrandCenterpieceState extends State<ActLikeItBrandCenterpiece>
           ),
           child: const Icon(
             Icons.movie_filter_rounded,
-            color: Colors.white,
+            color: Color(0xFFF5DEB3),
             size: 28,
           ),
         ),
@@ -771,26 +771,31 @@ class _ActLikeItBrandCenterpieceState extends State<ActLikeItBrandCenterpiece>
                   fontSize: widget.compact ? 28 : 36,
                   letterSpacing: 2.6,
                   height: 0.98,
-                  color: Colors.white,
+                  color: const Color(0xFFF5DEB3),
                   shadows: const <Shadow>[
                     Shadow(
-                      color: Color(0xFFE11D48),
-                      offset: Offset(2.5, 2.5),
+                      color: Color(0xFF05070B),
+                      offset: Offset(3.0, 3.0),
+                      blurRadius: 0,
+                    ),
+                    Shadow(
+                      color: Color(0xFFE11342),
+                      offset: Offset(-1.5, -1.5),
                       blurRadius: 0,
                     ),
                   ],
                 ),
               ),
-              Text(
+              const Text(
                 '2.5D PREMIERE SOUNDSTAGE · ROLL CAMERA',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 9.5,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.1,
-                  color: Color(0xFFFFD700),
+                  color: Color(0xFF0CB6D4),
                 ),
               ),
             ],
@@ -816,7 +821,7 @@ class _BrandCenterpieceAuraPainter extends CustomPainter {
     final maxR = size.longestSide * 0.55;
 
     final rayPaint = Paint()
-      ..color = const Color(0xFFF59E0B).withValues(alpha: isPressed ? 0.45 : 0.24)
+      ..color = const Color(0xFFF5DEB3).withValues(alpha: isPressed ? 0.45 : 0.24)
       ..strokeWidth = isPressed ? 2.4 : 1.5;
 
     const int rays = 18;
@@ -1014,19 +1019,26 @@ class _CellShadedIntroCinematicScreenState
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xE607090E),
+                              color: const Color(0xF207090E),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: const Color(0xFF05070B),
-                                width: 2.5,
+                                width: 2.8,
                               ),
+                              boxShadow: const <BoxShadow>[
+                                BoxShadow(
+                                  color: Color(0xFF05070B),
+                                  offset: Offset(3, 3),
+                                  blurRadius: 0,
+                                ),
+                              ],
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   Icons.videocam_rounded,
-                                  color: Color(0xFFE11D48),
+                                  color: Color(0xFFE11342),
                                   size: 14,
                                 ),
                                 SizedBox(width: 6),
@@ -1036,7 +1048,7 @@ class _CellShadedIntroCinematicScreenState
                                     fontFamily: 'monospace',
                                     fontSize: 10,
                                     fontWeight: FontWeight.w900,
-                                    color: Colors.white,
+                                    color: Color(0xFFF5DEB3),
                                   ),
                                 ),
                               ],
@@ -1056,11 +1068,11 @@ class _CellShadedIntroCinematicScreenState
                                     vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xD90B0E17),
+                                    color: const Color(0xE607090E),
                                     borderRadius: BorderRadius.circular(999),
                                     border: Border.all(
-                                      color: const Color(0xFFFFD700),
-                                      width: 2.0,
+                                      color: const Color(0xFFF5DEB3),
+                                      width: 2.2,
                                     ),
                                     boxShadow: const <BoxShadow>[
                                       BoxShadow(
@@ -1075,7 +1087,7 @@ class _CellShadedIntroCinematicScreenState
                                     children: [
                                       Icon(
                                         Icons.fast_forward_rounded,
-                                        color: Color(0xFFFFD700),
+                                        color: Color(0xFFF5DEB3),
                                         size: 15,
                                       ),
                                       SizedBox(width: 6),
@@ -1086,7 +1098,7 @@ class _CellShadedIntroCinematicScreenState
                                           fontSize: 10.5,
                                           fontWeight: FontWeight.w900,
                                           letterSpacing: 0.7,
-                                          color: Color(0xFFFFD700),
+                                          color: Color(0xFFF5DEB3),
                                         ),
                                       ),
                                     ],
@@ -1112,7 +1124,7 @@ class _CellShadedIntroCinematicScreenState
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: const Color(0xEB0B0E17),
+                          color: const Color(0xF207090E),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
                             color: const Color(0xFF05070B),
@@ -1174,7 +1186,7 @@ class _CellShadedIntroCinematicScreenState
                                     style: GoogleFonts.bebasNeue(
                                       fontSize: 22,
                                       letterSpacing: 1.4,
-                                      color: Colors.white,
+                                      color: const Color(0xFFF5DEB3),
                                     ),
                                   ),
                                   Text(
@@ -1183,7 +1195,7 @@ class _CellShadedIntroCinematicScreenState
                                       fontSize: 12,
                                       fontStyle: FontStyle.italic,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFFFDE68A),
+                                      color: Color(0xFFF5DEB3),
                                     ),
                                   ),
                                   const SizedBox(height: 3),
@@ -1194,7 +1206,7 @@ class _CellShadedIntroCinematicScreenState
                                     style: const TextStyle(
                                       fontFamily: 'monospace',
                                       fontSize: 10,
-                                      color: Color(0xFF94A3B8),
+                                      color: Color(0xFF0CB6D4),
                                     ),
                                   ),
                                 ],
@@ -1239,14 +1251,14 @@ class _CellShadedIntroCinematicScreenState
                       // Primary CTA: Trigger Director "CUT!" Clapperboard Smash -> Auth
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE11D48),
-                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xFFE11342),
+                          foregroundColor: const Color(0xFFF5DEB3),
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                             side: const BorderSide(
                               color: Color(0xFF05070B),
-                              width: 3.0,
+                              width: 3.2,
                             ),
                           ),
                         ),
@@ -1257,7 +1269,7 @@ class _CellShadedIntroCinematicScreenState
                           style: GoogleFonts.bebasNeue(
                             fontSize: 20,
                             letterSpacing: 1.6,
-                            color: Colors.white,
+                            color: const Color(0xFFF5DEB3),
                           ),
                         ),
                       ),
@@ -1304,7 +1316,7 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
         end: Alignment.bottomCenter,
         colors: <Color>[
           Color(0xFF05070B),
-          Color(0xFF1A0714),
+          Color(0xFF220409),
           Color(0xFF07090E),
         ],
       ).createShader(Offset.zero & size);
@@ -1313,7 +1325,7 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
     final centerX = size.width * 0.5;
     final horizonY = size.height * 0.24;
 
-    // Sweeping cel-shaded searchlights
+    // Sweeping cel-shaded searchlights in Limelight Gold & Soundstage Cyan
     for (int i = 0; i < 3; i++) {
       final swing = math.sin(walkProgress * math.pi * 2 + i * 1.4) * 95.0;
       final beamPath = Path()
@@ -1324,7 +1336,7 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
       canvas.drawPath(
         beamPath,
         Paint()
-          ..color = (i == 1 ? const Color(0x28FFD700) : const Color(0x2206B6D4)),
+          ..color = (i == 1 ? const Color(0x33F5DEB3) : const Color(0x280CB6D4)),
       );
     }
 
@@ -1346,10 +1358,10 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color(0xFF4C0519),
-            Color(0xFFBE123C),
-            Color(0xFFE11D48),
-            Color(0xFF881337),
+            Color(0xFF3A0001),
+            Color(0xFF520002),
+            Color(0xFFE11342),
+            Color(0xFF520002),
           ],
         ).createShader(Offset.zero & size),
     );
@@ -1361,9 +1373,9 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     canvas.drawPath(carpetPath, heavyInk);
 
-    // Gold inner trim lines
+    // Limelight Gold inner trim lines
     final goldTrim = Paint()
-      ..color = const Color(0xFFFFD700)
+      ..color = const Color(0xFFF5DEB3)
       ..strokeWidth = 2.4
       ..style = PaintingStyle.stroke;
     canvas.drawLine(
@@ -1419,7 +1431,7 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
 
     // 4. Peripheral Kinetic Anime Action Lines (First-Person Rush Effect)
     final actionLinePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.14)
+      ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.16)
       ..strokeWidth = 2.0;
     for (int i = 0; i < 16; i++) {
       final angle = (i / 16.0) * math.pi * 2 + walkProgress * 0.8;
@@ -1451,8 +1463,8 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
     final headCenter = Offset(anchor.dx, anchor.dy - scale * 1.05);
 
     // Fill + Cel Rim
-    canvas.drawRRect(bodyRect, Paint()..color = const Color(0xFF0E131F));
-    canvas.drawCircle(headCenter, scale * 0.28, Paint()..color = const Color(0xFF0E131F));
+    canvas.drawRRect(bodyRect, Paint()..color = const Color(0xFF07090E));
+    canvas.drawCircle(headCenter, scale * 0.28, Paint()..color = const Color(0xFF07090E));
 
     // Rim highlight
     canvas.drawRRect(
@@ -1472,7 +1484,7 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
     );
 
     if (flashActive) {
-      // 4-point comic flashburst
+      // 4-point comic flashburst in Limelight Gold
       final flashCenter = Offset(anchor.dx, anchor.dy - scale * 0.85);
       final r = scale * 0.65;
       final path = Path()
@@ -1485,7 +1497,7 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
         ..lineTo(flashCenter.dx, flashCenter.dy + r)
         ..lineTo(flashCenter.dx - 3, flashCenter.dy + 3)
         ..close();
-      canvas.drawPath(path, Paint()..color = const Color(0xFFFFD700));
+      canvas.drawPath(path, Paint()..color = const Color(0xFFF5DEB3));
     }
   }
 
@@ -1526,11 +1538,11 @@ class _DirectorCutClapperSmashPainter extends CustomPainter {
     canvas.drawRect(
       Offset.zero & size,
       Paint()
-        ..color = const Color(0xFF07090E).withValues(alpha: 0.75 * rushT),
+        ..color = const Color(0xFF07090E).withValues(alpha: 0.78 * rushT),
     );
 
     final speedPaint = Paint()
-      ..color = const Color(0xFFFFD700).withValues(alpha: 0.65 * rushT)
+      ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.65 * rushT)
       ..strokeWidth = 3.2;
     for (int i = 0; i < 24; i++) {
       final angle = (i / 24.0) * math.pi * 2;
@@ -1556,7 +1568,7 @@ class _DirectorCutClapperSmashPainter extends CustomPainter {
     );
 
     // Slate body
-    canvas.drawRRect(slateRect, Paint()..color = const Color(0xFF0B0E17));
+    canvas.drawRRect(slateRect, Paint()..color = const Color(0xFF07090E));
     canvas.drawRRect(
       slateRect,
       Paint()
@@ -1567,7 +1579,7 @@ class _DirectorCutClapperSmashPainter extends CustomPainter {
     canvas.drawRRect(
       slateRect.deflate(3),
       Paint()
-        ..color = const Color(0xFFFFD700)
+        ..color = const Color(0xFFF5DEB3)
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke,
     );
@@ -1578,7 +1590,7 @@ class _DirectorCutClapperSmashPainter extends CustomPainter {
     canvas.translate(-slateW * 0.5, -slateH * 0.5);
     canvas.rotate(jawAngle);
     final stickRect = Rect.fromLTWH(0, -32, slateW, 32);
-    canvas.drawRect(stickRect, Paint()..color = const Color(0xFFFFD700));
+    canvas.drawRect(stickRect, Paint()..color = const Color(0xFFF5DEB3));
     canvas.drawRect(
       stickRect,
       Paint()
@@ -1597,10 +1609,10 @@ class _DirectorCutClapperSmashPainter extends CustomPainter {
           fontSize: 54,
           fontWeight: FontWeight.w900,
           letterSpacing: 3.0,
-          color: Color(0xFFE11D48),
+          color: Color(0xFFE11342),
           shadows: <Shadow>[
             Shadow(
-              color: Color(0xFFFFD700),
+              color: Color(0xFFF5DEB3),
               offset: Offset(3, 3),
               blurRadius: 0,
             ),

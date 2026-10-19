@@ -263,9 +263,16 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B0E17),
+            color: const Color(0xF207090E),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+            border: Border.all(color: const Color(0xFFF5DEB3), width: 2.0),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: Color(0xFF05070B),
+                offset: Offset(3, 3),
+                blurRadius: 0,
+              ),
+            ],
           ),
           child: const Text(
             '2.5D PREMIERE CASTING · DUAL-TRACK AUTH',
@@ -274,7 +281,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
               fontSize: 10.5,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.1,
-              color: Color(0xFFF59E0B),
+              color: Color(0xFFF5DEB3),
             ),
           ),
         ),
@@ -284,7 +291,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 12.5,
-            color: Color(0xFF94A3B8),
+            color: Color(0xFFF5DEB3),
             height: 1.35,
           ),
         ),
@@ -366,20 +373,25 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B0E17).withOpacity(0.94),
+        color: const Color(0xF207090E),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: _isSignUpMode
-              ? const Color(0xFFA855F7)
-              : const Color(0xFF06B6D4),
-          width: 1.5,
+              ? const Color(0xFFE11342)
+              : const Color(0xFF0CB6D4),
+          width: 2.5,
         ),
         boxShadow: <BoxShadow>[
+          const BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(6, 6),
+            blurRadius: 0,
+          ),
           BoxShadow(
             color: (_isSignUpMode
-                    ? const Color(0xFFA855F7)
-                    : const Color(0xFF06B6D4))
-                .withOpacity(0.18),
+                    ? const Color(0xFFE11342)
+                    : const Color(0xFF0CB6D4))
+                .withValues(alpha: 0.22),
             blurRadius: 28,
             spreadRadius: 1,
           ),
@@ -789,19 +801,19 @@ class _LivingMarqueeLoginSpotlightPainter extends CustomPainter {
       canvas,
       center: cyanPos,
       radius: size.width * 0.72,
-      color: const Color(0xFF06B6D4).withOpacity(0.16),
+      color: const Color(0xFF0CB6D4).withValues(alpha: 0.18),
     );
     _paintBeam(
       canvas,
       center: purplePos,
       radius: size.width * 0.74,
-      color: const Color(0xFFA855F7).withOpacity(0.15),
+      color: const Color(0xFFE11342).withValues(alpha: 0.18),
     );
     _paintBeam(
       canvas,
       center: amberPos,
       radius: size.width * 0.68,
-      color: const Color(0xFFF59E0B).withOpacity(0.14),
+      color: const Color(0xFFF5DEB3).withValues(alpha: 0.16),
     );
   }
 

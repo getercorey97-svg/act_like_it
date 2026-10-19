@@ -7,16 +7,24 @@ import 'intro_cinematic.dart';
 /// Identifies which bespoke First-Person 2.5D Cell-Shaded transition sequence
 /// plays before routing to a target destination from the Red Carpet.
 enum BespokeTransitionType {
-  /// Door 1 / 6-Digit Room: Heavy soundstage door slams shut in the user's face,
-  /// the crimson "ON AIR" light flares overhead, fading into the Green Room.
+  /// Door 1 (Premiere Clapperboard): Heavy 2.5D cell-shaded clapperboard snaps
+  /// shut directly in the camera lens with Limelight Gold impact rays.
+  clapperboardSnap,
+
+  /// Door 2 ("On Air" Stage Light / 6-Digit Room): Heavy soundstage door slams
+  /// shut in the user's face and the crimson "ON AIR" light flares overhead.
   soundstageDoorSlam,
 
-  /// Door 2 / 18+ After-Hours: The 2.5D cell-shaded "Mob Boss" unhooks the
-  /// crimson velvet rope and exhales thick cigar smoke across the lens.
+  /// Door 3 (Velvet Rope / 18+ After-Hours): The 2.5D cell-shaded "Mob Boss"
+  /// unhooks the crimson velvet rope and exhales thick cigar smoke across the lens.
   mobBossCigarSmoke,
 
-  /// Scene Vault & Doors 3–6: A vintage press flashbulb pops directly in the
-  /// camera lens with halftone rays, triggering a white-out optical fade.
+  /// Door 4 (Golden Statuette / Trophy Vault): Heavy Velvet Carpet Crimson
+  /// stage curtains with Limelight Gold braided tassels draw open in POV.
+  velvetCurtainDraw,
+
+  /// Doors 5–6 (Director's Viewfinder & Vintage Box Office): A vintage press
+  /// flashbulb pops directly in the camera lens with halftone rays.
   vintageFlashbulbPop,
 
   /// Silver Elevator ("The Cutting Room Floor"): Security guards press the
@@ -113,6 +121,10 @@ class _BespokeFirstPersonTransitionStage extends StatelessWidget {
 
   Widget _buildTransitionOverlay(double t) {
     switch (type) {
+      case BespokeTransitionType.clapperboardSnap:
+        return CustomPaint(
+          painter: _ClapperboardSnapTransitionPainter(progress: t),
+        );
       case BespokeTransitionType.soundstageDoorSlam:
         return CustomPaint(
           painter: _SoundstageDoorSlamTransitionPainter(progress: t),
@@ -120,6 +132,10 @@ class _BespokeFirstPersonTransitionStage extends StatelessWidget {
       case BespokeTransitionType.mobBossCigarSmoke:
         return CustomPaint(
           painter: _MobBossCigarSmokeTransitionPainter(progress: t),
+        );
+      case BespokeTransitionType.velvetCurtainDraw:
+        return CustomPaint(
+          painter: _VelvetCurtainDrawTransitionPainter(progress: t),
         );
       case BespokeTransitionType.vintageFlashbulbPop:
         return CustomPaint(
@@ -132,6 +148,191 @@ class _BespokeFirstPersonTransitionStage extends StatelessWidget {
         );
     }
   }
+}
+
+/// 0. DOOR 1 (The Premiere Clapperboard): First-person 2.5D cell-shaded
+/// clapperboard snaps shut right in front of the lens with Limelight Gold rays.
+class _ClapperboardSnapTransitionPainter extends CustomPainter {
+  final double progress;
+
+  const _ClapperboardSnapTransitionPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFF07090E),
+    );
+
+    final center = Offset(size.width * 0.5, size.height * 0.5);
+    final snapT = Curves.easeInBack.transform((progress / 0.52).clamp(0.0, 1.0));
+    final shockT = progress < 0.48
+        ? 0.0
+        : math.sin(((progress - 0.48) / 0.52).clamp(0.0, 1.0) * math.pi);
+
+    // Radial 2.5D speed lines in Limelight Gold & Soundstage Cyan
+    for (int i = 0; i < 20; i++) {
+      final angle = (i / 20.0) * math.pi * 2;
+      canvas.drawLine(
+        Offset(center.dx + math.cos(angle) * 40, center.dy + math.sin(angle) * 40),
+        Offset(
+          center.dx + math.cos(angle) * size.longestSide * 0.7,
+          center.dy + math.sin(angle) * size.longestSide * 0.7,
+        ),
+        Paint()
+          ..color = (i.isEven ? const Color(0xFFF5DEB3) : const Color(0xFF0CB6D4))
+              .withValues(alpha: 0.35 + 0.45 * shockT)
+          ..strokeWidth = 3.0,
+      );
+    }
+
+    final slateW = size.width * 0.78;
+    final slateH = slateW * 0.62;
+    final slateRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: center, width: slateW, height: slateH),
+      const Radius.circular(18),
+    );
+
+    // Slate body in Deep Obsidian with heavy black ink border
+    canvas.drawRRect(slateRect, Paint()..color = const Color(0xFF07090E));
+    canvas.drawRRect(
+      slateRect,
+      Paint()
+        ..color = const Color(0xFF05070B)
+        ..strokeWidth = 6.0
+        ..style = PaintingStyle.stroke,
+    );
+    canvas.drawRRect(
+      slateRect.deflate(3.5),
+      Paint()
+        ..color = const Color(0xFFF5DEB3)
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke,
+    );
+
+    // Hinged top clapper jaw snapping down
+    final jawAngle = -0.46 * (1.0 - snapT.clamp(0.0, 1.0));
+    canvas.save();
+    canvas.translate(slateRect.left, slateRect.top);
+    canvas.rotate(jawAngle);
+    final stickRect = Rect.fromLTWH(0, -34, slateW, 34);
+    canvas.drawRect(stickRect, Paint()..color = const Color(0xFFF5DEB3));
+    for (double x = 0; x < slateW; x += 36) {
+      final stripe = Path()
+        ..moveTo(x, -34)
+        ..lineTo(x + 18, -34)
+        ..lineTo(x + 8, 0)
+        ..lineTo(x - 10, 0)
+        ..close();
+      canvas.drawPath(stripe, Paint()..color = const Color(0xFF05070B));
+    }
+    canvas.drawRect(
+      stickRect,
+      Paint()
+        ..color = const Color(0xFF05070B)
+        ..strokeWidth = 4.5
+        ..style = PaintingStyle.stroke,
+    );
+    canvas.restore();
+
+    final tp = TextPainter(
+      text: const TextSpan(
+        text: 'ACTION!',
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 44,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 3.0,
+          color: Color(0xFFE11342),
+          shadows: <Shadow>[
+            Shadow(
+              color: Color(0xFFF5DEB3),
+              offset: Offset(3, 3),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(
+      canvas,
+      Offset(center.dx - tp.width * 0.5, center.dy - tp.height * 0.5),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ClapperboardSnapTransitionPainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+/// Velvet Curtain Draw Transition (Door 4: Academy Trophy Vault):
+/// Lush Velvet Carpet Crimson (#520002 / #E11342) theater curtains with
+/// Limelight Gold (#F5DEB3) tassels sweep across and part in first-person POV.
+class _VelvetCurtainDrawTransitionPainter extends CustomPainter {
+  final double progress;
+
+  const _VelvetCurtainDrawTransitionPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFF07090E),
+    );
+
+    // Curtains close (0.0 -> 0.45) then part dramatically (0.45 -> 1.0)
+    final closeFactor = progress < 0.45
+        ? Curves.easeOutCubic.transform((progress / 0.45).clamp(0.0, 1.0))
+        : 1.0 - Curves.easeInOutCubic.transform(((progress - 0.45) / 0.55).clamp(0.0, 1.0));
+
+    final panelW = (size.width * 0.54) * closeFactor;
+    final leftCurtain = Rect.fromLTWH(0, 0, panelW, size.height);
+    final rightCurtain =
+        Rect.fromLTWH(size.width - panelW, 0, panelW, size.height);
+
+    final velvetPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          Color(0xFF520002),
+          Color(0xFFE11342),
+          Color(0xFF520002),
+        ],
+      ).createShader(Offset.zero & size);
+
+    canvas.drawRect(leftCurtain, velvetPaint);
+    canvas.drawRect(rightCurtain, velvetPaint);
+
+    // Heavy black comic ink borders & Limelight Gold trim along inner edges
+    final inkPaint = Paint()
+      ..color = const Color(0xFF05070B)
+      ..strokeWidth = 5.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawRect(leftCurtain, inkPaint);
+    canvas.drawRect(rightCurtain, inkPaint);
+
+    final goldRopePaint = Paint()
+      ..color = const Color(0xFFF5DEB3)
+      ..strokeWidth = 4.0;
+    canvas.drawLine(
+      Offset(leftCurtain.right - 8, 0),
+      Offset(leftCurtain.right - 8, size.height),
+      goldRopePaint,
+    );
+    canvas.drawLine(
+      Offset(rightCurtain.left + 8, 0),
+      Offset(rightCurtain.left + 8, size.height),
+      goldRopePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant _VelvetCurtainDrawTransitionPainter oldDelegate,
+  ) =>
+      oldDelegate.progress != progress;
 }
 
 /// 1. DOOR 1 (6-Digit Room): Heavy soundstage door slams shut in the user's face
@@ -152,7 +353,7 @@ class _SoundstageDoorSlamTransitionPainter extends CustomPainter {
 
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = const Color(0xFF05070B),
+      Paint()..color = const Color(0xFF07090E),
     );
 
     final halfW = size.width * 0.5;
@@ -189,8 +390,8 @@ class _SoundstageDoorSlamTransitionPainter extends CustomPainter {
     if (slamT >= 0.92) {
       final center = Offset(halfW, size.height * 0.5);
       final shockPaint = Paint()
-        ..color = const Color(0xFFFFD700).withValues(alpha: 0.75)
-        ..strokeWidth = 3.0;
+        ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.85)
+        ..strokeWidth = 3.2;
       for (int i = 0; i < 16; i++) {
         final angle = (i / 16.0) * math.pi * 2;
         canvas.drawLine(
@@ -215,8 +416,8 @@ class _SoundstageDoorSlamTransitionPainter extends CustomPainter {
       signRect,
       Paint()
         ..color = Color.lerp(
-          const Color(0xFF2B0610),
-          const Color(0xFFE11D48),
+          const Color(0xFF520002),
+          const Color(0xFFE11342),
           flareT,
         )!,
     );
@@ -235,7 +436,7 @@ class _SoundstageDoorSlamTransitionPainter extends CustomPainter {
         Paint()
           ..shader = RadialGradient(
             colors: <Color>[
-              const Color(0xFFE11D48).withValues(alpha: 0.65 * flareT),
+              const Color(0xFFE11342).withValues(alpha: 0.65 * flareT),
               Colors.transparent,
             ],
           ).createShader(

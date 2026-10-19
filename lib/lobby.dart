@@ -2437,25 +2437,30 @@ class _Interactive3DHolographicMarqueeState
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xE6170A12),
-                              Color(0xF2080A12),
+                              Color(0xF2520002),
+                              Color(0xF807090E),
                               Color(0xE6191008),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: const Color(0xFFF59E0B),
-                            width: 2.2,
+                            color: const Color(0xFFF5DEB3),
+                            width: 2.6,
                           ),
                           boxShadow: [
+                            const BoxShadow(
+                              color: Color(0xFF05070B),
+                              offset: Offset(6, 6),
+                              blurRadius: 0,
+                            ),
                             BoxShadow(
-                              color: const Color(0xFFE11D48).withValues(alpha: 0.42),
+                              color: const Color(0xFFE11342).withValues(alpha: 0.44),
                               blurRadius: 32,
                               spreadRadius: 2,
                               offset: const Offset(0, 10),
                             ),
                             BoxShadow(
-                              color: const Color(0xFFF59E0B).withValues(alpha: 0.28),
+                              color: const Color(0xFFF5DEB3).withValues(alpha: 0.28),
                               blurRadius: 20,
                               spreadRadius: 1,
                             ),
@@ -2474,11 +2479,11 @@ class _Interactive3DHolographicMarqueeState
                                         begin: Alignment(-1.2 + sweep * 2.4, -0.4),
                                         end: Alignment(-0.2 + sweep * 2.4, 0.6),
                                         colors: const [
-                                          Color(0xFFFDE68A),
+                                          Color(0xFFF5DEB3),
                                           Colors.white,
                                           Color(0xFFF59E0B),
-                                          Color(0xFFE2E8F0),
-                                          Color(0xFFFBBF24),
+                                          Color(0xFF0CB6D4),
+                                          Color(0xFFF5DEB3),
                                         ],
                                         stops: const [0.0, 0.28, 0.52, 0.76, 1.0],
                                       ).createShader(bounds);
@@ -2495,14 +2500,14 @@ class _Interactive3DHolographicMarqueeState
                                           height: 1.05,
                                           shadows: const [
                                             Shadow(
-                                              color: Color(0xFFE11D48),
-                                              blurRadius: 24,
-                                              offset: Offset(0, 4),
+                                              color: Color(0xFF05070B),
+                                              blurRadius: 0,
+                                              offset: Offset(3.5, 3.5),
                                             ),
                                             Shadow(
-                                              color: Color(0xCC000000),
-                                              blurRadius: 10,
-                                              offset: Offset(0, 6),
+                                              color: Color(0xFFE11342),
+                                              blurRadius: 24,
+                                              offset: Offset(0, 4),
                                             ),
                                           ],
                                         ),
@@ -2511,14 +2516,14 @@ class _Interactive3DHolographicMarqueeState
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Grand Premiere Soundstage · Tap Marquee for Flash Frenzy',
+                                    '2.5D Grand Premiere Soundstage · Tap Marquee for Flash Frenzy',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.montserrat(
                                       fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.w700,
                                       letterSpacing: 0.4,
-                                      color: const Color(0xFFFDE68A),
+                                      color: const Color(0xFFF5DEB3),
                                     ),
                                   ),
                                 ],
@@ -2558,14 +2563,14 @@ class _VolumetricSearchlightsPainter extends CustomPainter {
       size,
       origin: Offset(size.width * 0.16, size.height),
       angle: leftAngle,
-      color: const Color(0x55FDE68A),
+      color: const Color(0x66F5DEB3),
     );
     _drawSearchlightCone(
       canvas,
       size,
       origin: Offset(size.width * 0.84, size.height),
       angle: rightAngle,
-      color: const Color(0x4438BDF8),
+      color: const Color(0x550CB6D4),
     );
   }
 
@@ -2877,7 +2882,7 @@ class BespokePremiereDoorsList {
       Interactive3DDoorCard(
         scrollController: scrollController,
         index: 0,
-        specularColor: const Color(0xFFF59E0B),
+        specularColor: const Color(0xFFF5DEB3),
         onTap: onPremiereDoorTap,
         builder: (context, isPressed, pressValue) => _buildPremiereClapperDoor(
           phase: phase,
@@ -2891,7 +2896,7 @@ class BespokePremiereDoorsList {
       Interactive3DDoorCard(
         scrollController: scrollController,
         index: 1,
-        specularColor: const Color(0xFF06B6D4),
+        specularColor: const Color(0xFF0CB6D4),
         onTap: onAirlockJoinTap,
         builder: (context, isPressed, pressValue) => _buildSoundstageAirlockDoor(
           phase: phase,
@@ -2904,7 +2909,7 @@ class BespokePremiereDoorsList {
       Interactive3DDoorCard(
         scrollController: scrollController,
         index: 2,
-        specularColor: const Color(0xFFEC4899),
+        specularColor: const Color(0xFFE11342),
         onTap: onAfterHoursTap,
         builder: (context, isPressed, pressValue) => _buildVelvetSpeakeasyDoor(
           phase: phase,
@@ -2918,7 +2923,7 @@ class BespokePremiereDoorsList {
         Interactive3DDoorCard(
           scrollController: scrollController,
           index: 3,
-          specularColor: const Color(0xFFE2E8F0),
+          specularColor: const Color(0xFFF5DEB3),
           onTap: onCuttingRoomElevatorTap,
           builder: (context, isPressed, pressValue) =>
               _buildSilverElevatorCuttingRoomDoor(
@@ -2932,8 +2937,8 @@ class BespokePremiereDoorsList {
       // 4. ACADEMY TROPHY VAULT DOOR (Career Trophy Room)
       Interactive3DDoorCard(
         scrollController: scrollController,
-        index: 3,
-        specularColor: const Color(0xFFFBBF24),
+        index: 4,
+        specularColor: const Color(0xFFF5DEB3),
         onTap: onTrophyVaultTap,
         builder: (context, isPressed, pressValue) => _buildAcademyTrophyVaultDoor(
           phase: phase,
@@ -2946,8 +2951,8 @@ class BespokePremiereDoorsList {
       // 5. CINEMA CAMERA VIEWFINDER MONITOR (How to Play / Director's Guide)
       Interactive3DDoorCard(
         scrollController: scrollController,
-        index: 4,
-        specularColor: const Color(0xFFA855F7),
+        index: 5,
+        specularColor: const Color(0xFF0CB6D4),
         onTap: onCameraViewfinderTap,
         builder: (context, isPressed, pressValue) => _buildCameraViewfinderDoor(
           phase: phase,
@@ -2958,8 +2963,8 @@ class BespokePremiereDoorsList {
       // 6. VINTAGE BOX OFFICE WINDOW (The Scene Vault)
       Interactive3DDoorCard(
         scrollController: scrollController,
-        index: 5,
-        specularColor: const Color(0xFFF59E0B),
+        index: 6,
+        specularColor: const Color(0xFFF5DEB3),
         customClipper: BoxOfficeTicketNotchClipper(),
         onTap: onBoxOfficeVaultTap,
         builder: (context, isPressed, pressValue) => _buildBoxOfficeVaultDoor(
@@ -3299,19 +3304,24 @@ class BespokePremiereDoorsList {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xE6310916),
-            Color(0xF2120810),
+            Color(0xF2520002),
+            Color(0xF807090E),
             Color(0xE6291507),
           ],
         ),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
-          color: const Color(0xFFF59E0B),
-          width: 2.2,
+          color: const Color(0xFFF5DEB3),
+          width: 2.5,
         ),
         boxShadow: [
+          const BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(6, 6),
+            blurRadius: 0,
+          ),
           BoxShadow(
-            color: const Color(0xFFE11D48).withValues(alpha: 0.38 * pulse),
+            color: const Color(0xFFE11342).withValues(alpha: 0.40 * pulse),
             blurRadius: 28,
             spreadRadius: 2,
             offset: const Offset(0, 12),
@@ -3329,7 +3339,7 @@ class BespokePremiereDoorsList {
               height: 26,
               child: CustomPaint(
                 painter: _HollywoodClapperboardBarPainter(
-                  accentColor: const Color(0xFFF59E0B),
+                  accentColor: const Color(0xFFF5DEB3),
                 ),
               ),
             ),
@@ -3339,27 +3349,36 @@ class BespokePremiereDoorsList {
             child: Row(
               children: [
                 Container(
-                  width: 62,
-                  height: 62,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFE11D48), Color(0xFFF59E0B)],
+                      colors: [Color(0xFFE11342), Color(0xFF520002)],
                     ),
                     borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFF05070B),
+                      width: 2.5,
+                    ),
                     boxShadow: [
+                      const BoxShadow(
+                        color: Color(0xFF05070B),
+                        offset: Offset(3, 3),
+                        blurRadius: 0,
+                      ),
                       BoxShadow(
-                        color: const Color(0xFFE11D48).withValues(alpha: 0.45),
+                        color: const Color(0xFFE11342).withValues(alpha: 0.45),
                         blurRadius: 18,
                       ),
                     ],
                   ),
                   child: const Icon(
                     Icons.movie_filter_rounded,
-                    color: Colors.white,
-                    size: 34,
+                    color: Color(0xFFF5DEB3),
+                    size: 32,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3390,7 +3409,7 @@ class BespokePremiereDoorsList {
                               fontSize: 10.5,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.4,
-                              color: Color(0xFFFDE68A),
+                              color: Color(0xFFF5DEB3),
                             ),
                           ),
                         ],
@@ -3399,7 +3418,7 @@ class BespokePremiereDoorsList {
                       Text(
                         'CREATE LOBBY / QUICK PLAY',
                         style: GoogleFonts.bebasNeue(
-                          fontSize: 30,
+                          fontSize: 28,
                           color: Colors.white,
                           letterSpacing: 1.8,
                           height: 1.05,
@@ -3409,13 +3428,20 @@ class BespokePremiereDoorsList {
                       Text(
                         'Snap the clapperboard, dial in your Director\'s Call Sheet, and open a private soundstage for 2 to 8 stars.',
                         style: GoogleFonts.montserrat(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           height: 1.35,
                           color: const Color(0xFFE2E8F0),
                         ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: 10),
+                BoondocksAvatarPortrait(
+                  archetype: kFourteenAvatarArchetypes[0], // The Auteur Director
+                  size: 52,
+                  isSelected: true,
+                  animationPhase: phase,
                 ),
               ],
             ),
@@ -3433,8 +3459,8 @@ class BespokePremiereDoorsList {
   }) {
     final onAirPulse = (math.sin(phase * 3.0) + 1.0) * 0.5;
     final capsuleColor = Color.lerp(
-      const Color(0xFF06B6D4),
-      const Color(0xFFE11D48),
+      const Color(0xFF0CB6D4),
+      const Color(0xFFE11342),
       onAirPulse,
     )!;
 
@@ -3447,18 +3473,23 @@ class BespokePremiereDoorsList {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xF00B1926),
-              Color(0xF5070C14),
+              Color(0xF50B1926),
+              Color(0xF807090E),
             ],
           ),
           borderRadius: BorderRadius.circular(26),
           border: Border.all(
-            color: const Color(0xFF06B6D4),
-            width: 2.0,
+            color: const Color(0xFF0CB6D4),
+            width: 2.5,
           ),
           boxShadow: [
+            const BoxShadow(
+              color: Color(0xFF05070B),
+              offset: Offset(6, 6),
+              blurRadius: 0,
+            ),
             BoxShadow(
-              color: const Color(0xFF06B6D4).withValues(alpha: 0.28),
+              color: const Color(0xFF0CB6D4).withValues(alpha: 0.30),
               blurRadius: 24,
               offset: const Offset(0, 10),
             ),
@@ -3506,7 +3537,7 @@ class BespokePremiereDoorsList {
                 ),
                 const Icon(
                   Icons.dialpad_rounded,
-                  color: Color(0xFF06B6D4),
+                  color: Color(0xFF0CB6D4),
                   size: 26,
                 ),
               ],
@@ -3554,7 +3585,7 @@ class BespokePremiereDoorsList {
     // Realistic neon plasma buzz/flicker math
     final flickerWave = math.sin(phase * 7.0) * math.cos(phase * 13.0);
     final neonOpacity = (0.82 + 0.18 * flickerWave).clamp(0.45, 1.0);
-    final neonColor = const Color(0xFFEC4899).withValues(alpha: neonOpacity);
+    final neonColor = const Color(0xFFE11342).withValues(alpha: neonOpacity);
 
     return CustomPaint(
       foregroundPainter: _VelvetSpeakeasyCurtainPainter(phase: phase),
@@ -3565,16 +3596,21 @@ class BespokePremiereDoorsList {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xF02B071E),
-              Color(0xF50B0612),
+              Color(0xF2520002),
+              Color(0xF807090E),
             ],
           ),
           borderRadius: BorderRadius.circular(26),
           border: Border.all(
             color: neonColor,
-            width: 2.2,
+            width: 2.5,
           ),
           boxShadow: [
+            const BoxShadow(
+              color: Color(0xFF05070B),
+              offset: Offset(6, 6),
+              blurRadius: 0,
+            ),
             BoxShadow(
               color: neonColor.withValues(alpha: 0.35),
               blurRadius: 26,
@@ -3588,13 +3624,13 @@ class BespokePremiereDoorsList {
               width: 58,
               height: 58,
               decoration: BoxDecoration(
-                color: const Color(0x33EC4899),
+                color: const Color(0x44520002),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFF59E0B), width: 1.6),
+                border: Border.all(color: const Color(0xFFF5DEB3), width: 2.0),
               ),
               child: const Icon(
                 Icons.nightlife_rounded,
-                color: Color(0xFFF59E0B),
+                color: Color(0xFFF5DEB3),
                 size: 30,
               ),
             ),
@@ -3607,7 +3643,7 @@ class BespokePremiereDoorsList {
                     'Midnight Speakeasy Lounge',
                     style: GoogleFonts.satisfy(
                       fontSize: 22,
-                      color: neonColor,
+                      color: const Color(0xFFF5DEB3),
                       shadows: [
                         Shadow(
                           color: neonColor,
@@ -3666,18 +3702,23 @@ class BespokePremiereDoorsList {
           end: Alignment.bottomRight,
           colors: [
             Color(0xF01C1608),
-            Color(0xF5090D14),
+            Color(0xF807090E),
             Color(0xF0071A14),
           ],
         ),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
-          color: const Color(0xFFFBBF24),
-          width: 2.2,
+          color: const Color(0xFFF5DEB3),
+          width: 2.5,
         ),
         boxShadow: [
+          const BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(6, 6),
+            blurRadius: 0,
+          ),
           BoxShadow(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.28),
+            color: const Color(0xFFF5DEB3).withValues(alpha: 0.25),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -3697,7 +3738,7 @@ class BespokePremiereDoorsList {
                 ),
                 const Icon(
                   Icons.emoji_events_rounded,
-                  color: Color(0xFFFDE68A),
+                  color: Color(0xFFF5DEB3),
                   size: 36,
                 ),
               ],
@@ -3715,7 +3756,7 @@ class BespokePremiereDoorsList {
                     fontSize: 10.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.1,
-                    color: Color(0xFFFBBF24),
+                    color: Color(0xFFF5DEB3),
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -3756,12 +3797,19 @@ class BespokePremiereDoorsList {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         decoration: BoxDecoration(
-          color: const Color(0xEB090C15),
+          color: const Color(0xF507090E),
           borderRadius: BorderRadius.circular(26),
           border: Border.all(
-            color: const Color(0xFFA855F7),
-            width: 1.8,
+            color: const Color(0xFF0CB6D4),
+            width: 2.4,
           ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xFF05070B),
+              offset: Offset(6, 6),
+              blurRadius: 0,
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3773,7 +3821,7 @@ class BespokePremiereDoorsList {
                   opacity: recBlink ? 1.0 : 0.2,
                   child: const Icon(
                     Icons.fiber_manual_record_rounded,
-                    color: Color(0xFFE11D48),
+                    color: Color(0xFFE11342),
                     size: 14,
                   ),
                 ),
@@ -3787,7 +3835,7 @@ class BespokePremiereDoorsList {
                       style: GoogleFonts.courierPrime(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: const Color(0xFFE11D48),
+                        color: const Color(0xFFE11342),
                       ),
                     ),
                   ),
@@ -3799,7 +3847,7 @@ class BespokePremiereDoorsList {
               children: [
                 const Icon(
                   Icons.center_focus_strong_rounded,
-                  color: Color(0xFFA855F7),
+                  color: Color(0xFF0CB6D4),
                   size: 32,
                 ),
                 const SizedBox(width: 14),
@@ -3847,14 +3895,21 @@ class BespokePremiereDoorsList {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xF0241023),
-              Color(0xF50B0D18),
+              Color(0xF0520002),
+              Color(0xF807090E),
             ],
           ),
           border: Border.all(
-            color: const Color(0xFFF59E0B),
-            width: 2.0,
+            color: const Color(0xFFF5DEB3),
+            width: 2.5,
           ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xFF05070B),
+              offset: Offset(6, 6),
+              blurRadius: 0,
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -3865,15 +3920,15 @@ class BespokePremiereDoorsList {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0x26F59E0B),
+                  color: const Color(0x33520002),
                   border: Border.all(
-                    color: const Color(0xFFF59E0B),
-                    width: 2.0,
+                    color: const Color(0xFFF5DEB3),
+                    width: 2.2,
                   ),
                 ),
                 child: const Icon(
                   Icons.album_rounded,
-                  color: Color(0xFFFDE68A),
+                  color: Color(0xFFF5DEB3),
                   size: 34,
                 ),
               ),
@@ -3890,7 +3945,7 @@ class BespokePremiereDoorsList {
                       fontSize: 10.5,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.2,
-                      color: Color(0xFFFDE68A),
+                      color: Color(0xFFF5DEB3),
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -4246,15 +4301,20 @@ class HolographicLiveWireChyron extends StatelessWidget {
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              color: const Color(0xD9080B14),
+              color: const Color(0xE607090E),
               borderRadius: BorderRadius.circular(99),
               border: Border.all(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.75),
-                width: 1.4,
+                color: const Color(0xFFF5DEB3),
+                width: 2.0,
               ),
               boxShadow: [
+                const BoxShadow(
+                  color: Color(0xFF05070B),
+                  blurRadius: 0,
+                  offset: Offset(4, 4),
+                ),
                 BoxShadow(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                  color: const Color(0xFFF5DEB3).withValues(alpha: 0.22),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -4272,10 +4332,10 @@ class HolographicLiveWireChyron extends StatelessWidget {
                       height: 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFE11D48),
+                        color: const Color(0xFFE11342),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFE11D48).withValues(alpha: pulse),
+                            color: const Color(0xFFE11342).withValues(alpha: pulse),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),
@@ -4291,11 +4351,11 @@ class HolographicLiveWireChyron extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.3,
-                    color: const Color(0xFFFDE68A),
+                    color: const Color(0xFFF5DEB3),
                   ),
                 ),
                 Container(
-                  width: 1.2,
+                  width: 1.5,
                   height: 16,
                   margin: const EdgeInsets.symmetric(horizontal: 10),
                   color: const Color(0xFF334155),
@@ -4359,15 +4419,15 @@ class PaparazziRedCarpetPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
-    // 1. Deep Obsidian Premiere Night Sky & Stage Horizon
+    // 1. Deep Obsidian Premiere Night Sky & Stage Horizon (#07090E)
     final bgPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0xFF04060A),
-          Color(0xFF14070E),
-          Color(0xFF05070B),
+          Color(0xFF07090E),
+          Color(0xFF1A050A),
+          Color(0xFF07090E),
         ],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, bgPaint);
@@ -4378,7 +4438,7 @@ class PaparazziRedCarpetPainter extends CustomPainter {
     final bottomHalfWidth = size.width * 0.49;
     final centerX = size.width * 0.5;
 
-    // 2. 42 Floating Depth-of-Field Golden Bokeh Particles in 3D Space
+    // 2. 42 Floating Depth-of-Field Limelight Gold & Cyan Bokeh Particles in 3D Space
     for (int i = 0; i < 42; i++) {
       final seedX = ((i * 73 + 19) % 100) / 100.0;
       final seedY = ((i * 41 + 7) % 100) / 100.0;
@@ -4396,13 +4456,15 @@ class PaparazziRedCarpetPainter extends CustomPainter {
           .clamp(0.05, 0.55);
 
       final bokehPaint = Paint()
-        ..color = (i.isEven ? const Color(0xFFFDE68A) : const Color(0xFFF59E0B))
+        ..color = (i % 5 == 0
+                ? const Color(0xFF0CB6D4)
+                : (i.isEven ? const Color(0xFFF5DEB3) : const Color(0xFFE11342)))
             .withValues(alpha: alpha)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, depth * 3.5);
       canvas.drawCircle(Offset(px, wrappedY), radius, bokehPaint);
     }
 
-    // 3. 3D Royal Crimson Velvet Runner with Perspective Lighting
+    // 3. 3D Velvet Carpet Crimson Runner (#520002 / #E11342) with 2.5D Cell-Shaded Ink Edges
     final carpetPath = Path()
       ..moveTo(centerX - topHalfWidth, vanishingY)
       ..lineTo(centerX + topHalfWidth, vanishingY)
@@ -4415,28 +4477,52 @@ class PaparazziRedCarpetPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0xFF3B0414),
-          Color(0xFF881337),
-          Color(0xFFE11D48),
-          Color(0xFF6B0F2B),
+          Color(0xFF520002),
+          Color(0xFF8C081E),
+          Color(0xFFE11342),
+          Color(0xFF520002),
         ],
       ).createShader(Offset.zero & size);
     canvas.drawPath(carpetPath, carpetPaint);
 
-    // 4. Perspective Velvet Tread Steps & Gold Trim Runners
+    // 2.5D Boondocks Comic Cel-Shaded Left & Right Shadow Blocks on the Carpet
+    final leftShadowWing = Path()
+      ..moveTo(centerX - topHalfWidth, vanishingY)
+      ..lineTo(centerX - topHalfWidth + 16, vanishingY)
+      ..lineTo(centerX - bottomHalfWidth + 42, size.height)
+      ..lineTo(centerX - bottomHalfWidth, size.height)
+      ..close();
+    final rightShadowWing = Path()
+      ..moveTo(centerX + topHalfWidth - 16, vanishingY)
+      ..lineTo(centerX + topHalfWidth, vanishingY)
+      ..lineTo(centerX + bottomHalfWidth, size.height)
+      ..lineTo(centerX + bottomHalfWidth - 42, size.height)
+      ..close();
+    final celShadowPaint = Paint()..color = const Color(0x5505070B);
+    canvas.drawPath(leftShadowWing, celShadowPaint);
+    canvas.drawPath(rightShadowWing, celShadowPaint);
+
+    // Sharp Black Ink Outline along Carpet Runner
+    final carpetInkPaint = Paint()
+      ..color = const Color(0xFF05070B)
+      ..strokeWidth = 3.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(carpetPath, carpetInkPaint);
+
+    // 4. Perspective Velvet Tread Steps & Limelight Gold Trim Runners (#F5DEB3)
     final goldTrimPaint = Paint()
-      ..color = const Color(0xFFF59E0B).withValues(alpha: 0.78)
+      ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.85)
       ..strokeWidth = 2.8
       ..style = PaintingStyle.stroke;
 
     canvas.drawLine(
-      Offset(centerX - topHalfWidth, vanishingY),
-      Offset(centerX - bottomHalfWidth, size.height),
+      Offset(centerX - topHalfWidth + 4, vanishingY),
+      Offset(centerX - bottomHalfWidth + 8, size.height),
       goldTrimPaint,
     );
     canvas.drawLine(
-      Offset(centerX + topHalfWidth, vanishingY),
-      Offset(centerX + bottomHalfWidth, size.height),
+      Offset(centerX + topHalfWidth - 4, vanishingY),
+      Offset(centerX + bottomHalfWidth - 8, size.height),
       goldTrimPaint,
     );
 
@@ -4453,10 +4539,10 @@ class PaparazziRedCarpetPainter extends CustomPainter {
       final y = vanishingY + (size.height - vanishingY) * easedT;
       final halfW = topHalfWidth + (bottomHalfWidth - topHalfWidth) * easedT;
 
-      // Cross-step grid line on carpet
+      // Cross-step cel-shaded line on carpet
       final stepPaint = Paint()
-        ..color = const Color(0xFFFDA4AF).withValues(alpha: 0.15 * easedT)
-        ..strokeWidth = 1.0 + easedT * 1.4;
+        ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.18 * easedT)
+        ..strokeWidth = 1.2 + easedT * 1.6;
       canvas.drawLine(
         Offset(centerX - halfW, y),
         Offset(centerX + halfW, y),
@@ -4483,9 +4569,13 @@ class PaparazziRedCarpetPainter extends CustomPainter {
       );
     }
 
-    // Draw Swinging Catenary Velvet Ropes between adjacent stanchions
+    // Draw Swinging Catenary Velvet Ropes between adjacent stanchions with Black Ink Outline
+    final ropeInkPaint = Paint()
+      ..color = const Color(0xFF05070B)
+      ..strokeWidth = 5.6
+      ..style = PaintingStyle.stroke;
     final ropePaint = Paint()
-      ..color = const Color(0xFFBE123C)
+      ..color = const Color(0xFFE11342)
       ..strokeWidth = 3.2
       ..style = PaintingStyle.stroke;
 
@@ -4502,6 +4592,7 @@ class PaparazziRedCarpetPainter extends CustomPainter {
           l2.dx,
           l2.dy + 4,
         );
+      canvas.drawPath(leftRope, ropeInkPaint);
       canvas.drawPath(leftRope, ropePaint);
 
       final r1 = rightPosts[i];
@@ -4514,6 +4605,7 @@ class PaparazziRedCarpetPainter extends CustomPainter {
           r2.dx,
           r2.dy + 4,
         );
+      canvas.drawPath(rightRope, ropeInkPaint);
       canvas.drawPath(rightRope, ropePaint);
     }
   }
@@ -4524,16 +4616,22 @@ class PaparazziRedCarpetPainter extends CustomPainter {
     required Offset top,
     required double scale,
   }) {
+    final postInkPaint = Paint()
+      ..color = const Color(0xFF05070B).withValues(alpha: 0.5 + 0.5 * scale)
+      ..strokeWidth = 4.0 + scale * 4.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(base, top, postInkPaint);
+
     final postPaint = Paint()
-      ..color = const Color(0xFFF59E0B).withValues(alpha: 0.35 + 0.65 * scale)
-      ..strokeWidth = 2.0 + scale * 3.5
+      ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.45 + 0.55 * scale)
+      ..strokeWidth = 2.0 + scale * 3.2
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(base, top, postPaint);
 
-    // Gold finial sphere on top of stanchion
+    // Gold finial sphere on top of stanchion with ink ring
     final finialPaint = Paint()
-      ..color = const Color(0xFFFDE68A).withValues(alpha: 0.45 + 0.55 * scale);
-    canvas.drawCircle(top, 2.5 + scale * 3.8, finialPaint);
+      ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.55 + 0.45 * scale);
+    canvas.drawCircle(top, 2.6 + scale * 3.8, finialPaint);
   }
 
   @override
@@ -4572,31 +4670,36 @@ class PaparazziFlashOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Subtle Photographer Crowd Silhouettes along left and right edges
+    // 1. 2.5D Cel-Shaded Photographer Crowd Silhouettes along left and right edges
     final silhouettePaint = Paint()
-      ..color = const Color(0x8804060B)
+      ..color = const Color(0xAA05070B)
       ..style = PaintingStyle.fill;
+    final rimInkPaint = Paint()
+      ..color = const Color(0x330CB6D4)
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
 
     for (int i = 0; i < 6; i++) {
       final y = size.height * (0.18 + i * 0.13);
       // Left photographer silhouette head & camera lens barrel
       canvas.drawCircle(Offset(14, y), 11, silhouettePaint);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(2, y + 10, 24, 28),
-          const Radius.circular(8),
-        ),
-        silhouettePaint,
+      canvas.drawCircle(Offset(14, y), 11, rimInkPaint);
+      final leftBody = RRect.fromRectAndRadius(
+        Rect.fromLTWH(2, y + 10, 24, 28),
+        const Radius.circular(8),
       );
+      canvas.drawRRect(leftBody, silhouettePaint);
+      canvas.drawRRect(leftBody, rimInkPaint);
+
       // Right photographer silhouette
       canvas.drawCircle(Offset(size.width - 14, y + 8), 11, silhouettePaint);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(size.width - 26, y + 18, 24, 28),
-          const Radius.circular(8),
-        ),
-        silhouettePaint,
+      canvas.drawCircle(Offset(size.width - 14, y + 8), 11, rimInkPaint);
+      final rightBody = RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width - 26, y + 18, 24, 28),
+        const Radius.circular(8),
       );
+      canvas.drawRRect(rightBody, silhouettePaint);
+      canvas.drawRRect(rightBody, rimInkPaint);
     }
 
     // 2. Multi-Stage Lens Flashes (4-Point Star-Burst + Lens Core + Radial Bloom)
@@ -4622,7 +4725,7 @@ class PaparazziFlashOverlayPainter extends CustomPainter {
 
       // a) Soft Radial Screen Bloom with MaskFilter.blur
       final bloomPaint = Paint()
-        ..color = const Color(0xFFFDE68A).withValues(alpha: 0.34 * intensity)
+        ..color = const Color(0xFFF5DEB3).withValues(alpha: 0.36 * intensity)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
       canvas.drawCircle(center, bloomRadius * 0.65, bloomPaint);
 
@@ -4641,7 +4744,7 @@ class PaparazziFlashOverlayPainter extends CustomPainter {
         ..close();
 
       final starPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.92 * intensity)
+        ..color = Colors.white.withValues(alpha: 0.94 * intensity)
         ..style = PaintingStyle.fill;
       canvas.drawPath(starPath, starPaint);
 
@@ -4689,10 +4792,15 @@ class PaparazziCinemaDoorCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xD90A0D16),
+          color: const Color(0xE607090E),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: neonAccent, width: 1.8),
+          border: Border.all(color: neonAccent, width: 2.2),
           boxShadow: [
+            const BoxShadow(
+              color: Color(0xFF05070B),
+              blurRadius: 0,
+              offset: Offset(6, 6),
+            ),
             BoxShadow(
               color: neonAccent.withValues(alpha: 0.28),
               blurRadius: 22,
@@ -4768,7 +4876,7 @@ class VipCredentialHeaderBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ledColor =
-        isOnline ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+        isOnline ? const Color(0xFF0CB6D4) : const Color(0xFFF5DEB3);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(99),
@@ -4777,12 +4885,19 @@ class VipCredentialHeaderBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: const Color(0xD9080B14),
+            color: const Color(0xE607090E),
             borderRadius: BorderRadius.circular(99),
             border: Border.all(
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.65),
-              width: 1.3,
+              color: const Color(0xFFF5DEB3),
+              width: 2.0,
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0xFF05070B),
+                blurRadius: 0,
+                offset: Offset(4, 4),
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -4805,7 +4920,7 @@ class VipCredentialHeaderBar extends StatelessWidget {
               const SizedBox(width: 8),
               const Icon(
                 Icons.workspace_premium_rounded,
-                color: Color(0xFFFBBF24),
+                color: Color(0xFFF5DEB3),
                 size: 17,
               ),
               const SizedBox(width: 6),
@@ -4829,9 +4944,9 @@ class VipCredentialHeaderBar extends StatelessWidget {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0x2606B6D4),
+                  color: const Color(0x260CB6D4),
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: const Color(0xFF06B6D4)),
+                  border: Border.all(color: const Color(0xFF0CB6D4), width: 1.5),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -4839,7 +4954,7 @@ class VipCredentialHeaderBar extends StatelessWidget {
                     const Icon(
                       Icons.bolt_rounded,
                       size: 13,
-                      color: Color(0xFF06B6D4),
+                      color: Color(0xFF0CB6D4),
                     ),
                     const SizedBox(width: 3),
                     Text(
@@ -4848,7 +4963,7 @@ class VipCredentialHeaderBar extends StatelessWidget {
                         fontFamily: 'monospace',
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF06B6D4),
+                        color: Color(0xFF0CB6D4),
                       ),
                     ),
                   ],

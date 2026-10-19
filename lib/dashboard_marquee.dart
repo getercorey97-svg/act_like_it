@@ -16,6 +16,7 @@ import 'ui/game_settings_modal.dart';
 import 'ui/scene_vault_screen.dart';
 import 'ui/transitions.dart';
 import 'social/cutting_room_feed.dart';
+import 'auth/auth_service.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
@@ -360,7 +361,9 @@ class _LivingMarqueeDashboardScreenState
     final selectedTicket = kSceneVaultTickets[_focusedTicketIndex];
     await BespokeTransitionEngine.navigate(
       context: context,
-      type: BespokeTransitionType.soundstageDoorSlam,
+      type: joinMode
+          ? BespokeTransitionType.soundstageDoorSlam
+          : BespokeTransitionType.clapperboardSnap,
       destination: LobbyMatchmakingScreen(
         initialCategory: selectedTicket.category,
         startInJoinMode: joinMode,
@@ -450,7 +453,7 @@ class _LivingMarqueeDashboardScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF05070B),
+      backgroundColor: const Color(0xFF07090E),
       body: Listener(
         onPointerDown: (e) {
           if (mounted) setState(() => _activeTouchPosition = e.localPosition);
@@ -471,26 +474,35 @@ class _LivingMarqueeDashboardScreenState
             final frenzy = _frenzyBurstController.isAnimating
                 ? (1.0 - _frenzyBurstController.value)
                 : 0.0;
+            final povStepSwayX =
+                math.sin(_redCarpetScrollOffset * 0.025 + phase * 0.5) *
+                    (1.2 + (_redCarpetScrollVelocity * 0.08).clamp(0.0, 3.5));
+            final povStepBobY =
+                math.cos(_redCarpetScrollOffset * 0.05 + phase) *
+                    (1.5 + (_redCarpetScrollVelocity * 0.10).clamp(0.0, 4.0));
 
             return Stack(
               fit: StackFit.expand,
               children: [
                 // --------------------------------------------------------------
-                // 1. BASE LAYER: 3D Perspective Red Carpet, Brass Stanchions & 42 Bokeh
+                // 1. BASE LAYER: 2.5D First-Person Red Carpet, Brass Stanchions & 42 Bokeh
                 // --------------------------------------------------------------
                 RepaintBoundary(
-                  child: CustomPaint(
-                    painter: PaparazziRedCarpetPainter(
-                      scrollOffset: _redCarpetScrollOffset,
-                      phase: phase,
-                      scrollVelocity: _redCarpetScrollVelocity,
-                      touchPosition: _activeTouchPosition,
+                  child: Transform.translate(
+                    offset: Offset(povStepSwayX, povStepBobY),
+                    child: CustomPaint(
+                      painter: PaparazziRedCarpetPainter(
+                        scrollOffset: _redCarpetScrollOffset,
+                        phase: phase,
+                        scrollVelocity: _redCarpetScrollVelocity,
+                        touchPosition: _activeTouchPosition,
+                      ),
                     ),
                   ),
                 ),
 
                 // --------------------------------------------------------------
-                // 2. OVERLAY LAYER: Paparazzi Silhouettes & 4-Point Star-Burst Flashes
+                // 2. OVERLAY LAYER: 2.5D Cell-Shaded Paparazzi & 4-Point Flashes
                 // --------------------------------------------------------------
                 IgnorePointer(
                   child: RepaintBoundary(
@@ -524,7 +536,12 @@ class _LivingMarqueeDashboardScreenState
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     VipCredentialHeaderBar(
-                                      actorHandle: '@GALAXY_S26_ACTOR',
+                                      actorHandle: AuthService.instance
+                                                  .currentProfile?.username
+                                                  .isNotEmpty ==
+                                              true
+                                          ? '@${AuthService.instance.currentProfile!.username.toUpperCase()}'
+                                          : '@GALAXY_S26_ACTOR',
                                       telemetricsTokens: _telemetricsTokens,
                                       careerWins: OfflineManager
                                           .instance.totalCareerWins,
@@ -628,7 +645,7 @@ class _LivingMarqueeDashboardScreenState
                                       BespokeTransitionEngine.navigate(
                                         context: context,
                                         type: BespokeTransitionType
-                                            .vintageFlashbulbPop,
+                                            .velvetCurtainDraw,
                                         destination: const MatchHistoryScreen(),
                                       );
                                     },

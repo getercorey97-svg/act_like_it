@@ -133,14 +133,19 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xF507090E),
+              color: const Color(0xF807090E),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
               border: const Border(
-                top: BorderSide(color: Color(0xFFF59E0B), width: 2.0),
+                top: BorderSide(color: Color(0xFFF5DEB3), width: 3.0),
               ),
               boxShadow: [
+                const BoxShadow(
+                  color: Color(0xFF05070B),
+                  offset: Offset(0, -6),
+                  blurRadius: 0,
+                ),
                 BoxShadow(
-                  color: const Color(0xFFE11D48).withValues(alpha: 0.28),
+                  color: const Color(0xFFE11342).withValues(alpha: 0.32),
                   blurRadius: 36,
                   spreadRadius: 2,
                   offset: const Offset(0, -8),
@@ -164,11 +169,12 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
               // Drag Handle
               Center(
                 child: Container(
-                  width: 48,
-                  height: 5,
+                  width: 52,
+                  height: 6,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF334155),
+                    color: const Color(0xFFF5DEB3),
                     borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: const Color(0xFF05070B), width: 1.5),
                   ),
                 ),
               ),
@@ -182,16 +188,23 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0x26F59E0B),
+                      color: const Color(0xFF520002),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFFF59E0B),
-                        width: 1.4,
+                        color: const Color(0xFFF5DEB3),
+                        width: 2.2,
                       ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0xFF05070B),
+                          offset: Offset(4, 4),
+                          blurRadius: 0,
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Icons.tune_rounded,
-                      color: Color(0xFFF59E0B),
+                      color: Color(0xFFF5DEB3),
                       size: 26,
                     ),
                   ),
@@ -205,9 +218,9 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                           style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
                             letterSpacing: 1.2,
-                            color: Color(0xFFF59E0B),
+                            color: Color(0xFFF5DEB3),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -217,6 +230,13 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                             fontSize: 24,
                             color: Colors.white,
                             letterSpacing: 1.0,
+                            shadows: const [
+                              Shadow(
+                                color: Color(0xFFE11342),
+                                offset: Offset(2, 2),
+                                blurRadius: 0,
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -234,7 +254,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.4,
-                  color: Color(0xFF94A3B8),
+                  color: Color(0xFFF5DEB3),
                 ),
               ),
               const SizedBox(height: 16),
@@ -245,7 +265,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 title: 'AI Telemetrics',
                 subtitle: 'Gemini facial micro-expressions & vocal prosody scan',
                 icon: Icons.psychology_alt_rounded,
-                neonColor: const Color(0xFFE11D48),
+                neonColor: const Color(0xFFE11342),
                 value: _aiTelemetricsEnabled,
                 onChanged: (val) {
                   HapticFeedback.selectionClick();
@@ -260,7 +280,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 title: 'Peer Judging',
                 subtitle: 'Screening Room loop replay & 1–10 ensemble vote',
                 icon: Icons.thumbs_up_down_rounded,
-                neonColor: const Color(0xFF06B6D4),
+                neonColor: const Color(0xFF0CB6D4),
                 value: _peerJudgingEnabled,
                 onChanged: (val) {
                   HapticFeedback.selectionClick();
@@ -275,7 +295,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 title: 'Social Judging',
                 subtitle: 'External clip shares & crowd reaction multiplier',
                 icon: Icons.share_arrival_time_rounded,
-                neonColor: const Color(0xFFF59E0B),
+                neonColor: const Color(0xFFF5DEB3),
                 value: _socialJudgingEnabled,
                 onChanged: (val) {
                   HapticFeedback.selectionClick();
@@ -292,7 +312,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.4,
-                  color: Color(0xFF94A3B8),
+                  color: Color(0xFFF5DEB3),
                 ),
               ),
               const SizedBox(height: 16),
@@ -306,9 +326,9 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 channelCode: 'DUET MODE · +250 PTS SCENE STEALER BONUS',
                 title: 'Screen Test Duet (2-Player Co-Star Mode)',
                 subtitle:
-                    'Splits the teleprompter into Lead A (Spotlight Gold) & Lead B (Soundstage Cyan) lines',
+                    'Splits the teleprompter into Lead A (Limelight Gold) & Lead B (Soundstage Cyan) lines',
                 icon: Icons.people_alt_rounded,
-                neonColor: const Color(0xFF10B981),
+                neonColor: const Color(0xFF0CB6D4),
                 value: _screenTestDuetMode,
                 onChanged: (val) {
                   HapticFeedback.mediumImpact();
@@ -317,7 +337,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
               ),
               const SizedBox(height: 32),
 
-              // Massive Neon-Bordered "ROLL CAMERA" Action Button
+              // Massive 2.5D Cell-Shaded Neon-Bordered "ROLL CAMERA" Action Button
               GestureDetector(
                 onTap: _handleRollCamera,
                 child: Container(
@@ -325,18 +345,23 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
-                        Color(0xFFE11D48),
-                        Color(0xFFB91C1C),
+                        Color(0xFFE11342),
+                        Color(0xFF520002),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: const Color(0xFFF59E0B),
-                      width: 2.2,
+                      color: const Color(0xFFF5DEB3),
+                      width: 2.8,
                     ),
                     boxShadow: [
+                      const BoxShadow(
+                        color: Color(0xFF05070B),
+                        offset: Offset(6, 6),
+                        blurRadius: 0,
+                      ),
                       BoxShadow(
-                        color: const Color(0xFFE11D48).withValues(alpha: 0.55),
+                        color: const Color(0xFFE11342).withValues(alpha: 0.55),
                         blurRadius: 24,
                         spreadRadius: 2,
                         offset: const Offset(0, 6),
@@ -348,7 +373,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                     children: [
                       const Icon(
                         Icons.videocam_rounded,
-                        color: Colors.white,
+                        color: Color(0xFFF5DEB3),
                         size: 28,
                       ),
                       const SizedBox(width: 12),
@@ -358,6 +383,13 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                           fontSize: 22,
                           color: Colors.white,
                           letterSpacing: 2.0,
+                          shadows: const [
+                            Shadow(
+                              color: Color(0xFF05070B),
+                              offset: Offset(2.5, 2.5),
+                              blurRadius: 0,
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -660,21 +692,25 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
         duration: const Duration(milliseconds: 220),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: value ? const Color(0xFF101624) : const Color(0xFF0B0E17),
+          color: value ? const Color(0xFF101624) : const Color(0xFF07090E),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: value ? neonColor : const Color(0xFF1E293B),
-            width: value ? 1.8 : 1.2,
+            color: value ? neonColor : const Color(0xFF05070B),
+            width: value ? 2.2 : 2.5,
           ),
-          boxShadow: value
-              ? [
-                  BoxShadow(
-                    color: neonColor.withValues(alpha: 0.22),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : const [],
+          boxShadow: [
+            const BoxShadow(
+              color: Color(0xFF05070B),
+              offset: Offset(5, 5),
+              blurRadius: 0,
+            ),
+            if (value)
+              BoxShadow(
+                color: neonColor.withValues(alpha: 0.24),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+          ],
         ),
         child: Row(
           children: [
@@ -688,8 +724,9 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: value
-                      ? neonColor.withValues(alpha: 0.8)
-                      : const Color(0xFF334155),
+                      ? neonColor.withValues(alpha: 0.9)
+                      : const Color(0xFF05070B),
+                  width: 2.0,
                 ),
               ),
               child: Icon(
@@ -747,7 +784,7 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
   }
 
   Widget _buildImprovWildcardCard() {
-    const wildcardColor = Color(0xFFA855F7);
+    const wildcardColor = Color(0xFFE11342);
     return GestureDetector(
       onTap: () {
         HapticFeedback.mediumImpact();
@@ -760,30 +797,34 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
           gradient: LinearGradient(
             colors: _improvRouletteWildcard
                 ? const [
-                    Color(0xFF1F1135),
-                    Color(0xFF110C1D),
+                    Color(0xFF520002),
+                    Color(0xFF14070B),
                   ]
                 : const [
                     Color(0xFF0D111C),
-                    Color(0xFF090C14),
+                    Color(0xFF07090E),
                   ],
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: _improvRouletteWildcard
-                ? wildcardColor
-                : const Color(0xFF334155),
-            width: _improvRouletteWildcard ? 2.0 : 1.2,
+                ? const Color(0xFFF5DEB3)
+                : const Color(0xFF05070B),
+            width: 2.5,
           ),
-          boxShadow: _improvRouletteWildcard
-              ? [
-                  BoxShadow(
-                    color: wildcardColor.withValues(alpha: 0.35),
-                    blurRadius: 22,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : const [],
+          boxShadow: [
+            const BoxShadow(
+              color: Color(0xFF05070B),
+              offset: Offset(5, 5),
+              blurRadius: 0,
+            ),
+            if (_improvRouletteWildcard)
+              BoxShadow(
+                color: wildcardColor.withValues(alpha: 0.35),
+                blurRadius: 22,
+                spreadRadius: 1,
+              ),
+          ],
         ),
         child: Row(
           children: [
