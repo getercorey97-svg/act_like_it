@@ -480,6 +480,49 @@ class AuthService extends ChangeNotifier {
     return updated;
   }
 
+  /// Non-destructively upserts additive profile fields (such as `telemetryOptIn`,
+  /// `avatarArchetypeId`, and `castingTrack`) into `public.profiles` and local cache
+  /// without overwriting existing user preferences or breaking RLS policies.
+  Future<ActorProfileState?> upsertAdditiveProfileFields({
+    String? avatarArchetypeId,
+    String? castingTrack,
+    bool? telemetryOptIn,
+    String? username,
+    int? birthYear,
+    List<String>? favoriteEras,
+    List<String>? actingStrengths,
+  }) async {
+    final current = _currentProfile;
+    final base = current ??
+        ActorProfileState(
+          userId: 'local-s26-actor',
+          email: 'actor@actlikeit.stage',
+          username: username ?? 'StageStar',
+          birthYear: birthYear ?? 1998,
+          favoriteEras: favoriteEras ?? const <String>['1970s', '2000s'],
+          actingStrengths: actingStrengths ?? const <String>['Drama'],
+          aiTokenBalance: kDefaultStarterAiTokens,
+          unlockedScenePacks: const <String>[],
+          onboardingCompleted: true,
+          avatarArchetypeId: avatarArchetypeId ?? 'the_method_actor',
+          castingTrack: castingTrack ?? 'track_a_star',
+          telemetryOptIn: telemetryOptIn ?? true,
+          updatedAt: DateTime.now().toUtc(),
+        );
+    final updated = base.copyWith(
+      username: username ?? base.username,
+      birthYear: birthYear ?? base.birthYear,
+      favoriteEras: favoriteEras ?? base.favoriteEras,
+      actingStrengths: actingStrengths ?? base.actingStrengths,
+      avatarArchetypeId: avatarArchetypeId ?? base.avatarArchetypeId,
+      castingTrack: castingTrack ?? base.castingTrack,
+      telemetryOptIn: telemetryOptIn ?? base.telemetryOptIn,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await persistProfileToSupabaseAndCache(updated);
+    return updated;
+  }
+
   /// Writes the full `ActorProfileState` to `public.profiles` in Supabase
   /// (falling back gracefully if optional extended columns are not yet present),
   /// syncs `auth.users` metadata, and persists to local SharedPreferences.
