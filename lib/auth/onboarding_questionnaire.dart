@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../dashboard_marquee.dart';
+import '../ui/intro_cinematic.dart';
 import 'auth_service.dart';
 
 /// Represents a swipeable, neon-bordered movie ticket inside "The Red Carpet"
@@ -85,16 +86,19 @@ const List<RedCarpetTicketOption> kRedCarpetStrengthTickets =
 
 /// "The Red Carpet" Gamified Onboarding Questionnaire.
 /// Users swipe through dynamic perforated movie tickets to select their
-/// favorite eras (`1970s`, `2000s`) and acting strengths (`Comedy`, `Drama`, `Villain`),
-/// verify their birth year for the 18+ gate, and persist everything to Supabase.
+/// favorite eras (`1970s`, `2000s`), acting strengths (`Comedy`, `Drama`, `Villain`),
+/// and 2.5D Cell-Shaded Avatar Archetype, verify their birth year for the 18+ gate,
+/// and persist everything additively to Supabase.
 class OnboardingQuestionnaireScreen extends StatefulWidget {
   final String initialUsername;
   final int initialBirthYear;
+  final String initialArchetypeId;
 
   const OnboardingQuestionnaireScreen({
     super.key,
     this.initialUsername = '',
     this.initialBirthYear = 1998,
+    this.initialArchetypeId = 'the_method_actor',
   });
 
   @override
@@ -110,10 +114,11 @@ class _OnboardingQuestionnaireScreenState
   late final PageController _strengthTicketController;
   late final TextEditingController _usernameController;
 
-  int _activeStep = 0; // 0: Era Tickets, 1: Strength Tickets, 2: Red Carpet Pass Summary
+  int _activeStep = 0; // 0: Era Tickets, 1: Strength Tickets, 2: 2.5D Archetype & Credentials
   double _eraPageOffset = 0.0;
   double _strengthPageOffset = 0.0;
   late int _selectedBirthYear;
+  late String _selectedArchetypeId;
   final Set<String> _selectedEras = <String>{'1970s'};
   final Set<String> _selectedStrengths = <String>{'Drama'};
   bool _isSaving = false;
@@ -128,6 +133,7 @@ class _OnboardingQuestionnaireScreenState
           : (existing?.username ?? 'StageStar'),
     );
     _selectedBirthYear = existing?.birthYear ?? widget.initialBirthYear;
+    _selectedArchetypeId = existing?.avatarArchetypeId ?? widget.initialArchetypeId;
     if (existing != null) {
       if (existing.favoriteEras.isNotEmpty) {
         _selectedEras
@@ -214,6 +220,8 @@ class _OnboardingQuestionnaireScreenState
         birthYear: _selectedBirthYear,
         favoriteEras: _selectedEras.toList(),
         actingStrengths: _selectedStrengths.toList(),
+        avatarArchetypeId: _selectedArchetypeId,
+        castingTrack: 'track_a_star',
       );
 
       if (!mounted) return;
@@ -691,6 +699,7 @@ class _OnboardingQuestionnaireScreenState
     final currentYear = DateTime.now().year;
     final calculatedAge = currentYear - _selectedBirthYear;
     final is18Plus = calculatedAge >= 18;
+    final chosenArchetype = resolveAvatarArchetype(_selectedArchetypeId);
 
     return SingleChildScrollView(
       key: const ValueKey<String>('step_credentials'),
@@ -698,24 +707,116 @@ class _OnboardingQuestionnaireScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const ActLikeItBrandCenterpiece(
+            height: 98,
+            compact: true,
+          ),
+          const SizedBox(height: 12),
           const Text(
-            'LOCK IN YOUR BACKSTAGE CREDENTIALS',
+            'SELECT YOUR 2.5D CELL-SHADED ARCHETYPE & CREDENTIALS',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 19,
               fontWeight: FontWeight.w900,
               color: Colors.white,
             ),
           ),
           const SizedBox(height: 6),
           const Text(
-            'Your stage handle, 18+ age-gate verification, and starter AI Telemetrics tokens are saved directly to your Supabase profile.',
+            'Your 2.5D Boondocks-inspired avatar physically populates the Red Carpet and reflects inside the Silver Elevator doors.',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12.5,
               color: Color(0xFF94A3B8),
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B0E17),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: chosenArchetype.primaryInkColor,
+                width: 2.2,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    BoondocksAvatarPortrait(
+                      archetype: chosenArchetype,
+                      size: 64,
+                      isSelected: true,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            chosenArchetype.roleBadge,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: chosenArchetype.primaryInkColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            chosenArchetype.name,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            chosenArchetype.catchphrase,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFFFDE68A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 66,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: kFourteenAvatarArchetypes.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final arch = kFourteenAvatarArchetypes[index];
+                      final selected = arch.id == _selectedArchetypeId;
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _selectedArchetypeId = arch.id;
+                          });
+                        },
+                        child: BoondocksAvatarPortrait(
+                          archetype: arch,
+                          size: selected ? 62 : 52,
+                          isSelected: selected,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(

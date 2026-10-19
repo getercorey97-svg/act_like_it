@@ -13,6 +13,9 @@ import 'judging_engine.dart';
 import 'ui/game_app_bar.dart';
 import 'ui/game_settings_modal.dart';
 import 'ui/tutorial_overlay.dart';
+import 'auth/auth_service.dart';
+import 'ui/intro_cinematic.dart';
+import 'ui/transitions.dart';
 
 enum SfuParticipantRole {
   activePerformer,
@@ -340,8 +343,7 @@ class WebRtcStageManager extends ChangeNotifier {
             !_hwCameraController!.value.isInitialized) {
           await _initializeHardwareCamera();
         }
-        _startTelemetricsSampling(targetEmotion: targetEmotion);
-        await startRecordingTake();
+        // Wait for the 10-second Pre-Roll Slate countdown to finish before rolling the 30s take
       }
     } catch (e) {
       if (_role == SfuParticipantRole.activePerformer && !_isDisposed) {
@@ -1045,80 +1047,135 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   }
 
   Widget _buildPreRollClapperboardOverlay(ScenePrompt? scene) {
+    final isFinalThree = _preRollSecondsLeft <= 3;
+    final countdownHeadline = _preRollSecondsLeft <= 1
+        ? '3... 2... 1... ACTION!'
+        : (isFinalThree
+            ? 'CLAPPERBOARD READY · $_preRollSecondsLeft...'
+            : 'DIRECTOR\'S 10s PRE-ROLL · FRAME YOUR SHOT');
+
     return Container(
       color: const Color(0xD905070D),
       padding: const EdgeInsets.all(24),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0x3306B6D4),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF06B6D4)),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xEB0B0E17),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFF05070B),
+              width: 4.0,
+            ),
+            boxShadow: <BoxShadow>[
+              const BoxShadow(
+                color: Color(0xFF05070B),
+                offset: Offset(6, 6),
+                blurRadius: 0,
               ),
-              child: const Text(
-                'DIRECTOR\'S 10s PRE-ROLL · FRAME YOUR SHOT',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                  color: Color(0xFF06B6D4),
+              BoxShadow(
+                color: (isFinalThree
+                        ? const Color(0xFFE11D48)
+                        : const Color(0xFFFFD700))
+                    .withValues(alpha: 0.35),
+                blurRadius: 24,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isFinalThree
+                      ? const Color(0x33E11D48)
+                      : const Color(0x3306B6D4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isFinalThree
+                        ? const Color(0xFFE11D48)
+                        : const Color(0xFF06B6D4),
+                    width: 1.8,
+                  ),
+                ),
+                child: Text(
+                  countdownHeadline,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                    color: isFinalThree
+                        ? const Color(0xFFFFD700)
+                        : const Color(0xFF06B6D4),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '$_preRollSecondsLeft',
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 64,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFFFFD700),
-                shadows: [
-                  Shadow(color: Color(0xFFF59E0B), blurRadius: 28),
-                ],
+              const SizedBox(height: 16),
+              Text(
+                _preRollSecondsLeft <= 1 ? 'ACTION!' : '$_preRollSecondsLeft',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: _preRollSecondsLeft <= 1 ? 52 : 64,
+                  fontWeight: FontWeight.w900,
+                  color: isFinalThree
+                      ? const Color(0xFFE11D48)
+                      : const Color(0xFFFFD700),
+                  shadows: const [
+                    Shadow(
+                      color: Color(0xFF05070B),
+                      offset: Offset(4, 4),
+                      blurRadius: 0,
+                    ),
+                    Shadow(color: Color(0xFFF59E0B), blurRadius: 28),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              scene != null
-                  ? 'Scene: "${scene.title}" · ${scene.characterName}'
-                  : 'Preparing Soundstage...',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+              const SizedBox(height: 10),
+              Text(
+                scene != null
+                    ? 'Scene: "${scene.title}" · ${scene.characterName}'
+                    : 'Preparing Soundstage...',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              scene != null ? 'Cue: ${scene.directorCue}' : '',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF94A3B8),
+              const SizedBox(height: 4),
+              Text(
+                scene != null ? 'Cue: ${scene.directorCue}' : '',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFFFD700),
-                side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFFFD700),
+                  side: const BorderSide(color: Color(0xFFFFD700), width: 2.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                onPressed: _skipPreRollAndRollCamera,
+                icon: const Icon(Icons.fast_forward_rounded, size: 18),
+                label: const Text(
+                  'SNAP CLAPPERBOARD & ROLL CAMERA (30s TAKE)',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
-              onPressed: _skipPreRollAndRollCamera,
-              icon: const Icon(Icons.fast_forward_rounded, size: 18),
-              label: const Text(
-                'Skip Pre-Roll & Roll Camera (30s Take)',
-                style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1558,17 +1615,17 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                   final hadImprovTwist = _improvTwistTriggered;
                   final recorded = await _stageManager.finishRecordingTake();
                   if (!mounted) return;
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => TriModalJudgingScreen(
-                        lobbySession: widget.lobbySession,
-                        performerUserId: widget.localUserId,
-                        performerDisplayName: widget.localDisplayName,
-                        capturedSamples: samplesSnapshot,
-                        localRecordedVideoPath: recorded.filePath,
-                        recordedMp4Bytes: recorded.bytes,
-                        improvTwistCompleted: hadImprovTwist,
-                      ),
+                  await BespokeTransitionEngine.navigate<void>(
+                    context: context,
+                    type: BespokeTransitionType.vintageFlashbulbPop,
+                    destination: TriModalJudgingScreen(
+                      lobbySession: widget.lobbySession,
+                      performerUserId: widget.localUserId,
+                      performerDisplayName: widget.localDisplayName,
+                      capturedSamples: samplesSnapshot,
+                      localRecordedVideoPath: recorded.filePath,
+                      recordedMp4Bytes: recorded.bytes,
+                      improvTwistCompleted: hadImprovTwist,
                     ),
                   );
                   if (!mounted) return;
@@ -1638,6 +1695,70 @@ class _CinemaViewfinderPainter extends CustomPainter {
       ..strokeWidth = 1.2;
     canvas.drawLine(Offset(cx - 12, cy), Offset(cx + 12, cy), crossPaint);
     canvas.drawLine(Offset(cx, cy - 12), Offset(cx, cy + 12), crossPaint);
+
+    // 2.5D Cell-Shaded Manga Speed-Lines along the outer edges during active take
+    if (isRecording) {
+      final speedPaint = Paint()
+        ..color = improvActive
+            ? const Color(0x55FFD700)
+            : const Color(0x40E11D48)
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round;
+      final maxRadius = math.sqrt(cx * cx + cy * cy);
+      final innerRadius = maxRadius * 0.78;
+      for (int i = 0; i < 36; i++) {
+        final angle = (i / 36.0) * math.pi * 2.0;
+        final r0 = innerRadius + ((i % 3) * 14.0);
+        final p0 = Offset(cx + math.cos(angle) * r0, cy + math.sin(angle) * r0);
+        final p1 = Offset(
+          cx + math.cos(angle) * (maxRadius + 16),
+          cy + math.sin(angle) * (maxRadius + 16),
+        );
+        canvas.drawLine(p0, p1, speedPaint);
+      }
+    }
+
+    // Thick 2.5D Cell-Shaded Comic Frame Corner Brackets
+    final bracketPaint = Paint()
+      ..color = improvActive
+          ? const Color(0xFFFFD700)
+          : (isRecording ? const Color(0xFFE11D48) : const Color(0xFF06B6D4))
+      ..strokeWidth = 3.2
+      ..style = PaintingStyle.stroke;
+    const cornerLen = 22.0;
+    const inset = 8.0;
+    // Top-left
+    canvas.drawPath(
+      Path()
+        ..moveTo(inset, inset + cornerLen)
+        ..lineTo(inset, inset)
+        ..lineTo(inset + cornerLen, inset),
+      bracketPaint,
+    );
+    // Top-right
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width - inset - cornerLen, inset)
+        ..lineTo(size.width - inset, inset)
+        ..lineTo(size.width - inset, inset + cornerLen),
+      bracketPaint,
+    );
+    // Bottom-left
+    canvas.drawPath(
+      Path()
+        ..moveTo(inset, size.height - inset - cornerLen)
+        ..lineTo(inset, size.height - inset)
+        ..lineTo(inset + cornerLen, size.height - inset),
+      bracketPaint,
+    );
+    // Bottom-right
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width - inset - cornerLen, size.height - inset)
+        ..lineTo(size.width - inset, size.height - inset)
+        ..lineTo(size.width - inset, size.height - inset - cornerLen),
+      bracketPaint,
+    );
   }
 
   @override

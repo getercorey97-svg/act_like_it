@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lobby.dart';
 import 'late_night_vault.dart';
 import 'dashboard_marquee.dart';
+import 'ui/intro_cinematic.dart';
 import 'offline_manager.dart';
 
 /// Captures startup, plugin, and widget build exceptions in Release APKs so the
@@ -766,7 +767,7 @@ class ActLikeItApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LivingMarqueeDashboardScreen(),
+      home: const CellShadedIntroCinematicScreen(),
     );
   }
 }

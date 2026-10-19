@@ -14,6 +14,8 @@ import 'match_history_screen.dart';
 import 'ui/interactive_instructions.dart';
 import 'ui/game_settings_modal.dart';
 import 'ui/scene_vault_screen.dart';
+import 'ui/transitions.dart';
+import 'social/cutting_room_feed.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
@@ -356,12 +358,12 @@ class _LivingMarqueeDashboardScreenState
     if (!mounted) return;
 
     final selectedTicket = kSceneVaultTickets[_focusedTicketIndex];
-    await Navigator.of(context).push(
-      StageSharedTransitionRoute(
-        page: LobbyMatchmakingScreen(
-          initialCategory: selectedTicket.category,
-          startInJoinMode: joinMode,
-        ),
+    await BespokeTransitionEngine.navigate(
+      context: context,
+      type: BespokeTransitionType.soundstageDoorSlam,
+      destination: LobbyMatchmakingScreen(
+        initialCategory: selectedTicket.category,
+        startInJoinMode: joinMode,
       ),
     );
   }
@@ -599,42 +601,58 @@ class _LivingMarqueeDashboardScreenState
                                       HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
-                                      Navigator.of(context).push(
-                                        StageSharedTransitionRoute(
-                                          page:
-                                              const LateNightAfterHoursScreen(),
-                                        ),
+                                      BespokeTransitionEngine.navigate(
+                                        context: context,
+                                        type: BespokeTransitionType
+                                            .mobBossCigarSmoke,
+                                        destination:
+                                            const LateNightAfterHoursScreen(),
+                                      );
+                                    },
+                                    onCuttingRoomElevatorTap: () async {
+                                      HapticFeedback.heavyImpact();
+                                      await _pauseMusicBeforeNavigation();
+                                      if (!mounted) return;
+                                      BespokeTransitionEngine.navigate(
+                                        context: context,
+                                        type: BespokeTransitionType
+                                            .silverElevatorVelvetRope,
+                                        destination:
+                                            const CuttingRoomFeedScreen(),
                                       );
                                     },
                                     onTrophyVaultTap: () async {
                                       HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
-                                      Navigator.of(context).push(
-                                        StageSharedTransitionRoute(
-                                          page: const MatchHistoryScreen(),
-                                        ),
+                                      BespokeTransitionEngine.navigate(
+                                        context: context,
+                                        type: BespokeTransitionType
+                                            .vintageFlashbulbPop,
+                                        destination: const MatchHistoryScreen(),
                                       );
                                     },
                                     onCameraViewfinderTap: () async {
                                       HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
-                                      Navigator.of(context).push(
-                                        StageSharedTransitionRoute(
-                                          page:
-                                              const InteractiveInstructionsScreen(),
-                                        ),
+                                      BespokeTransitionEngine.navigate(
+                                        context: context,
+                                        type: BespokeTransitionType
+                                            .vintageFlashbulbPop,
+                                        destination:
+                                            const InteractiveInstructionsScreen(),
                                       );
                                     },
                                     onBoxOfficeVaultTap: () async {
                                       HapticFeedback.lightImpact();
                                       await _pauseMusicBeforeNavigation();
                                       if (!mounted) return;
-                                      Navigator.of(context).push(
-                                        StageSharedTransitionRoute(
-                                          page: const SceneVaultScreen(),
-                                        ),
+                                      BespokeTransitionEngine.navigate(
+                                        context: context,
+                                        type: BespokeTransitionType
+                                            .vintageFlashbulbPop,
+                                        destination: const SceneVaultScreen(),
                                       );
                                     },
                                   ),

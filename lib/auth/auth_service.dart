@@ -17,6 +17,9 @@ class ActorProfileState {
   final int aiTokenBalance;
   final List<String> unlockedScenePacks;
   final bool onboardingCompleted;
+  final String avatarArchetypeId;
+  final String castingTrack;
+  final bool telemetryOptIn;
   final DateTime updatedAt;
 
   const ActorProfileState({
@@ -29,6 +32,9 @@ class ActorProfileState {
     required this.aiTokenBalance,
     required this.unlockedScenePacks,
     required this.onboardingCompleted,
+    this.avatarArchetypeId = 'the_method_actor',
+    this.castingTrack = 'track_a_star',
+    this.telemetryOptIn = true,
     required this.updatedAt,
   });
 
@@ -45,6 +51,9 @@ class ActorProfileState {
     int? aiTokenBalance,
     List<String>? unlockedScenePacks,
     bool? onboardingCompleted,
+    String? avatarArchetypeId,
+    String? castingTrack,
+    bool? telemetryOptIn,
     DateTime? updatedAt,
   }) {
     return ActorProfileState(
@@ -57,6 +66,9 @@ class ActorProfileState {
       aiTokenBalance: aiTokenBalance ?? this.aiTokenBalance,
       unlockedScenePacks: unlockedScenePacks ?? this.unlockedScenePacks,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      avatarArchetypeId: avatarArchetypeId ?? this.avatarArchetypeId,
+      castingTrack: castingTrack ?? this.castingTrack,
+      telemetryOptIn: telemetryOptIn ?? this.telemetryOptIn,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -72,6 +84,9 @@ class ActorProfileState {
       'ai_token_balance': aiTokenBalance,
       'unlocked_scene_packs': unlockedScenePacks,
       'onboarding_completed': onboardingCompleted,
+      'avatar_archetype': avatarArchetypeId,
+      'casting_track': castingTrack,
+      'telemetry_opt_in': telemetryOptIn,
       'updated_at': updatedAt.toIso8601String(),
     };
   }
@@ -128,6 +143,13 @@ class ActorProfileState {
         const <String>[],
       ),
       onboardingCompleted: json['onboarding_completed'] == true,
+      avatarArchetypeId:
+          (json['avatar_archetype'] ?? json['avatarArchetypeId'] ?? 'the_method_actor')
+              .toString(),
+      castingTrack:
+          (json['casting_track'] ?? json['castingTrack'] ?? 'track_a_star')
+              .toString(),
+      telemetryOptIn: json['telemetry_opt_in'] != false,
       updatedAt: DateTime.tryParse('${json['updated_at'] ?? ''}') ??
           DateTime.now().toUtc(),
     );
@@ -379,6 +401,9 @@ class AuthService extends ChangeNotifier {
     required int birthYear,
     required List<String> favoriteEras,
     required List<String> actingStrengths,
+    String? avatarArchetypeId,
+    String? castingTrack,
+    bool? telemetryOptIn,
     int? initialAiTokens,
   }) async {
     _setLoading(true);
@@ -410,6 +435,12 @@ class AuthService extends ChangeNotifier {
             initialAiTokens ?? current?.aiTokenBalance ?? kDefaultStarterAiTokens,
         unlockedScenePacks: current?.unlockedScenePacks ?? const <String>[],
         onboardingCompleted: true,
+        avatarArchetypeId:
+            avatarArchetypeId ?? current?.avatarArchetypeId ?? 'the_method_actor',
+        castingTrack:
+            castingTrack ?? current?.castingTrack ?? 'track_a_star',
+        telemetryOptIn:
+            telemetryOptIn ?? current?.telemetryOptIn ?? true,
         updatedAt: DateTime.now().toUtc(),
       );
 
@@ -421,6 +452,32 @@ class AuthService extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  /// Non-destructive additive helper to update the player's chosen 2.5D cell-shaded
+  /// avatar archetype and sync immediately to Supabase `profiles` & local storage.
+  Future<ActorProfileState?> updateAvatarArchetype(String archetypeId) async {
+    final current = _currentProfile;
+    final base = current ??
+        ActorProfileState(
+          userId: 'local-s26-actor',
+          email: 'actor@actlikeit.stage',
+          username: 'StageStar',
+          birthYear: 1998,
+          favoriteEras: const <String>['1970s', '2000s'],
+          actingStrengths: const <String>['Drama'],
+          aiTokenBalance: kDefaultStarterAiTokens,
+          unlockedScenePacks: const <String>[],
+          onboardingCompleted: true,
+          avatarArchetypeId: archetypeId,
+          updatedAt: DateTime.now().toUtc(),
+        );
+    final updated = base.copyWith(
+      avatarArchetypeId: archetypeId,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await persistProfileToSupabaseAndCache(updated);
+    return updated;
   }
 
   /// Writes the full `ActorProfileState` to `public.profiles` in Supabase
@@ -437,9 +494,9 @@ class AuthService extends ChangeNotifier {
 
     final client = Supabase.instance.client;
 
-    // 1. Upsert into `public.profiles`. Try full extended payload first; if the
-    // remote table only has the initial migration columns (id, username, birth_year),
-    // automatically retry with the strict base schema so it never fails.
+    // 1. Additive-only Upsert into `public.profiles`. Try full extended payload
+    // with avatar_archetype & casting_track first; if the remote table only has
+    // earlier migration columns, cascade gracefully without breaking RLS or schema.
     try {
       await client.from('profiles').upsert(<String, dynamic>{
         'id': profile.userId,
@@ -450,6 +507,9 @@ class AuthService extends ChangeNotifier {
         'ai_token_balance': profile.aiTokenBalance,
         'unlocked_scene_packs': profile.unlockedScenePacks,
         'onboarding_completed': profile.onboardingCompleted,
+        'avatar_archetype': profile.avatarArchetypeId,
+        'casting_track': profile.castingTrack,
+        'telemetry_opt_in': profile.telemetryOptIn,
       }).timeout(const Duration(seconds: 5));
     } catch (_) {
       try {
@@ -457,14 +517,27 @@ class AuthService extends ChangeNotifier {
           'id': profile.userId,
           'username': profile.username,
           'birth_year': profile.birthYear,
+          'favorite_eras': profile.favoriteEras,
+          'acting_strengths': profile.actingStrengths,
+          'ai_token_balance': profile.aiTokenBalance,
+          'unlocked_scene_packs': profile.unlockedScenePacks,
+          'onboarding_completed': profile.onboardingCompleted,
         }).timeout(const Duration(seconds: 5));
-      } catch (innerError) {
-        debugPrint('Supabase profiles base upsert notice: $innerError');
+      } catch (_) {
+        try {
+          await client.from('profiles').upsert(<String, dynamic>{
+            'id': profile.userId,
+            'username': profile.username,
+            'birth_year': profile.birthYear,
+          }).timeout(const Duration(seconds: 5));
+        } catch (innerError) {
+          debugPrint('Supabase profiles base upsert notice: $innerError');
+        }
       }
     }
 
-    // 2. Also persist questionnaire answers & token balance in Supabase Auth
-    // userMetadata so multi-device sign-ins always recover 100% of fields.
+    // 2. Also persist questionnaire answers, 2.5D avatar archetype, and telemetry
+    // in Supabase Auth userMetadata so multi-device sign-ins always recover 100% of fields.
     if (client.auth.currentUser != null) {
       try {
         await client.auth
@@ -478,6 +551,9 @@ class AuthService extends ChangeNotifier {
                   'ai_token_balance': profile.aiTokenBalance,
                   'unlocked_scene_packs': profile.unlockedScenePacks,
                   'onboarding_completed': profile.onboardingCompleted,
+                  'avatar_archetype': profile.avatarArchetypeId,
+                  'casting_track': profile.castingTrack,
+                  'telemetry_opt_in': profile.telemetryOptIn,
                 },
               ),
             )

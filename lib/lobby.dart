@@ -18,6 +18,7 @@ import 'ui/tutorial_overlay.dart';
 import 'ui/interactive_instructions.dart';
 import 'ui/game_settings_modal.dart';
 import 'ui/scene_vault_screen.dart';
+import 'ui/intro_cinematic.dart';
 
 enum SceneCategory {
   era1970To1999(
@@ -2865,9 +2866,14 @@ class BespokePremiereDoorsList {
     required VoidCallback onTrophyVaultTap,
     required VoidCallback onCameraViewfinderTap,
     required VoidCallback onBoxOfficeVaultTap,
+    VoidCallback? onCuttingRoomElevatorTap,
   }) {
     return [
-      // 1. THE PREMIERE DOOR (Create Lobby / Quick Play)
+      // PERSISTENT FIRST-PERSON 14-ARCHETYPE ECOSYSTEM BANNER ON RED CARPET
+      _buildPersistentFirstPersonArchetypeCrowdBar(phase: phase),
+      const SizedBox(height: 18),
+
+      // 1. THE PREMIERE DOOR (Create Lobby / Quick Play) — Guarded by The Director
       Interactive3DDoorCard(
         scrollController: scrollController,
         index: 0,
@@ -2881,7 +2887,7 @@ class BespokePremiereDoorsList {
       ),
       const SizedBox(height: 22),
 
-      // 2. SOUNDSTAGE AIRLOCK DOOR (Join 6-Digit Room)
+      // 2. SOUNDSTAGE AIRLOCK DOOR (Join 6-Digit Room) — Heavy Door Slam Transition
       Interactive3DDoorCard(
         scrollController: scrollController,
         index: 1,
@@ -2894,7 +2900,7 @@ class BespokePremiereDoorsList {
       ),
       const SizedBox(height: 22),
 
-      // 3. VIP VELVET SPEAKEASY ENTRANCE (18+ After-Hours)
+      // 3. VIP VELVET SPEAKEASY ENTRANCE (18+ After-Hours) — Guarded by The Mob Boss
       Interactive3DDoorCard(
         scrollController: scrollController,
         index: 2,
@@ -2906,6 +2912,22 @@ class BespokePremiereDoorsList {
         ),
       ),
       const SizedBox(height: 22),
+
+      // SILVER ELEVATOR PORTAL: "THE CUTTING ROOM FLOOR" (Red Rope + 2 Security Guards)
+      if (onCuttingRoomElevatorTap != null) ...[
+        Interactive3DDoorCard(
+          scrollController: scrollController,
+          index: 3,
+          specularColor: const Color(0xFFE2E8F0),
+          onTap: onCuttingRoomElevatorTap,
+          builder: (context, isPressed, pressValue) =>
+              _buildSilverElevatorCuttingRoomDoor(
+            phase: phase,
+            isPressed: isPressed,
+          ),
+        ),
+        const SizedBox(height: 22),
+      ],
 
       // 4. ACADEMY TROPHY VAULT DOOR (Career Trophy Room)
       Interactive3DDoorCard(
@@ -2945,6 +2967,320 @@ class BespokePremiereDoorsList {
         ),
       ),
     ];
+  }
+
+  /// Persistent First-Person POV strip showing all 14 2.5D cell-shaded characters
+  /// actively populating the Red Carpet environment (Paparazzi flashing cameras,
+  /// Mob Boss guarding Door 2, Method Actor rehearsing, etc.).
+  static Widget _buildPersistentFirstPersonArchetypeCrowdBar({
+    required double phase,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xEB080B14),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF05070B), width: 3.5),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(5, 5),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.visibility_rounded,
+                color: Color(0xFFFFD700),
+                size: 15,
+              ),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'FIRST-PERSON POV · 14 CELL-SHADED ARCHETYPES ON THE CARPET',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 76,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: kFourteenAvatarArchetypes.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final arch = kFourteenAvatarArchetypes[index];
+                return Container(
+                  width: 186,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B0E17),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: arch.primaryInkColor,
+                      width: 1.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      BoondocksAvatarPortrait(
+                        archetype: arch,
+                        size: 52,
+                        isSelected: true,
+                        animationPhase: phase,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              arch.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              arch.roleBadge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                color: arch.primaryInkColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              arch.redCarpetActivity,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF94A3B8),
+                                height: 1.15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// SILVER ELEVATOR PORTAL: "THE CUTTING ROOM FLOOR"
+  /// Brushed-silver elevator with club-like neon lights, red velvet rope in front,
+  /// and two 2.5D cell-shaded security guards standing outside.
+  static Widget _buildSilverElevatorCuttingRoomDoor({
+    required double phase,
+    required bool isPressed,
+  }) {
+    final neonPulse = 0.72 + 0.28 * math.sin(phase * 4.5);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color(0xF01E293B),
+            Color(0xF50F172A),
+            Color(0xF01E1B4B),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 2.6,
+        ),
+        boxShadow: <BoxShadow>[
+          const BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(6, 6),
+            blurRadius: 0,
+          ),
+          BoxShadow(
+            color: const Color(0xFFEC4899).withValues(alpha: 0.34 * neonPulse),
+            blurRadius: 24,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Club-like Neon Marquee Sign: "THE CUTTING ROOM FLOOR"
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFF07090E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFEC4899),
+                width: 2.0,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.elevator_rounded,
+                  color: Color(0xFFF9A8D4),
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    '★ THE CUTTING ROOM FLOOR · SILVER ELEVATOR ★',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.chakraPetch(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.3,
+                      color: const Color(0xFFF9A8D4),
+                      shadows: const <Shadow>[
+                        Shadow(color: Color(0xFFEC4899), blurRadius: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // Left Security Guard + Silver Doors + Velvet Rope Preview
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Color(0xFFE2E8F0),
+                      Color(0xFF94A3B8),
+                      Color(0xFF475569),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF05070B), width: 3.0),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Center elevator door seam
+                    Container(width: 2.5, color: const Color(0xFF05070B)),
+                    // Red velvet rope draped across the front
+                    Positioned(
+                      bottom: 18,
+                      left: 6,
+                      right: 6,
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE11D48),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                            color: const Color(0xFFFFD700),
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Positioned(
+                      top: 8,
+                      left: 6,
+                      child: Icon(
+                        Icons.security_rounded,
+                        size: 16,
+                        color: Color(0xFF05070B),
+                      ),
+                    ),
+                    const Positioned(
+                      top: 8,
+                      right: 6,
+                      child: Icon(
+                        Icons.security_rounded,
+                        size: 16,
+                        color: Color(0xFF05070B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'VELVET ROPE · 2 SECURITY GUARDS · FIRST-PERSON POV',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF67E8F9),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Enter The Cutting Room Floor',
+                      style: GoogleFonts.bebasNeue(
+                        fontSize: 26,
+                        letterSpacing: 1.4,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Guards press the elevator button & unhook the red rope as the silver doors reflect your 2.5D avatar and open into the vertical social feed.',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   /// DOOR A: The Premiere Door — Crowned with an interactive 3D Hollywood Clapperboard
@@ -3292,7 +3628,7 @@ class BespokePremiereDoorsList {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Slip past the velvet rope for uncut late-night scripts and 15-second mid-scene curveballs.',
+                    'Guarded by Don Corleone Jr. (The Mob Boss) — unhook the crimson rope for uncut scripts & cigar-smoke lounge twists.',
                     style: GoogleFonts.montserrat(
                       fontSize: 12.5,
                       height: 1.35,
@@ -3301,6 +3637,13 @@ class BespokePremiereDoorsList {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 10),
+            BoondocksAvatarPortrait(
+              archetype: kFourteenAvatarArchetypes[2], // The Mob Boss
+              size: 54,
+              isSelected: true,
+              animationPhase: phase,
             ),
           ],
         ),
@@ -3700,13 +4043,15 @@ class _AudioEqualizerWavePainter extends CustomPainter {
     if (size.width <= 0 || size.height <= 0) return;
     const int barCount = 12;
     const double spacing = 6.0;
+    final double safeW = math.max(2.0, size.width);
+    final double safeH = math.max(4.0, size.height);
     final double barWidth =
-        ((size.width - (spacing * (barCount - 1))) / barCount)
-            .clamp(2.0, size.width);
+        ((safeW - (spacing * (barCount - 1))) / barCount)
+            .clamp(2.0, safeW);
 
     for (int i = 0; i < barCount; i++) {
       final wave = (math.sin(phase * 3.2 + i * 0.75) + 1.0) * 0.5;
-      final barHeight = (4.0 + wave * (size.height - 4.0)).clamp(4.0, size.height);
+      final barHeight = (4.0 + wave * (safeH - 4.0)).clamp(4.0, safeH);
       final left = i * (barWidth + spacing);
       final top = size.height - barHeight;
 

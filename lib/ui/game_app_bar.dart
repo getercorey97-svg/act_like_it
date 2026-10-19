@@ -13,6 +13,7 @@ import '../offline_manager.dart';
 ///    so session progress, AI tokens, and match records remain saved when backing out.
 class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final String? subtitle;
   final bool isRecordingCountdownActive;
   final String? activeRoomCode;
   final double? latestCompositeScore;
@@ -23,6 +24,7 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
   const GameAppBar({
     super.key,
     required this.title,
+    this.subtitle,
     this.isRecordingCountdownActive = false,
     this.activeRoomCode,
     this.latestCompositeScore,
@@ -132,14 +134,44 @@ class GameAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
               onPressed: () => _handleSafeBack(context),
             ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-        ),
-      ),
+      title: subtitle == null
+          ? Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFF59E0B),
+                  ),
+                ),
+              ],
+            ),
       actions: [
         if (isRecordingCountdownActive)
           Container(

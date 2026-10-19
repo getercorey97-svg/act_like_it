@@ -15,6 +15,8 @@ import 'offline_manager.dart';
 import 'judging/feedback_engine.dart';
 import 'ui/game_app_bar.dart';
 import 'ui/tutorial_overlay.dart';
+import 'auth/auth_service.dart';
+import 'ui/intro_cinematic.dart';
 
 class AiTelemetricsReport {
   final double overallAiScore;
@@ -640,6 +642,10 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
     )
         .then((_) {
       if (!mounted) return;
+      // Non-destructively sync additive profile telemetry
+      AuthService.instance.upsertAdditiveProfileFields(
+        telemetryOptIn: true,
+      );
       // Auto-save initial round result into `match_history` when evaluation completes
       _engine.saveRoundResultToMatchHistory(
         playerId: widget.performerUserId,
@@ -752,6 +758,10 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                 neonAccent: Color(0xFFF59E0B),
                 icon: Icons.thumbs_up_down_rounded,
               ),
+              _buildAnimeFreezeFrameClimaxBanner(),
+              const SizedBox(height: 14),
+              _buildStaggeredThreePillarCounters(),
+              const SizedBox(height: 14),
               _buildShowstopperArchetypeBadgeCard(),
               const SizedBox(height: 12),
               DynamicFeedbackBanner(
@@ -974,15 +984,8 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
                         color: Color(0xFFF59E0B),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Director Critique: "${report.directorCritique}"',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: Color(0xFFCBD5E1),
-                      ),
-                    ),
+                    const SizedBox(height: 12),
+                    _buildCellShadedDirectorCritiqueCard(report.directorCritique),
                   ],
                 ],
               ),
@@ -1303,6 +1306,340 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen> {
     );
   }
 
+  Widget _buildAnimeFreezeFrameClimaxBanner() {
+    final composite = _engine.compositeTriModalScore;
+    final actorArchetype = resolveAvatarArchetype(
+      AuthService.instance.currentProfile?.avatarArchetypeId,
+    );
+    final isStandingOvation = composite >= 85.0;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: composite),
+      duration: const Duration(milliseconds: 1150),
+      curve: Curves.easeOutBack,
+      builder: (context, animatedComposite, _) {
+        return Container(
+          height: 146,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0D15),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: const Color(0xFF05070B),
+              width: 3.5,
+            ),
+            boxShadow: <BoxShadow>[
+              const BoxShadow(
+                color: Color(0xFF05070B),
+                offset: Offset(6, 6),
+                blurRadius: 0,
+              ),
+              BoxShadow(
+                color: (isStandingOvation
+                        ? const Color(0xFFFFD700)
+                        : const Color(0xFFE11D48))
+                    .withValues(alpha: 0.35),
+                blurRadius: 22,
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CustomPaint(
+                painter: _AnimeClimaxSpeedLinesPainter(
+                  accentColor: isStandingOvation
+                      ? const Color(0xFFFFD700)
+                      : actorArchetype.primaryInkColor,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    BoondocksAvatarPortrait(
+                      archetype: actorArchetype,
+                      size: 86,
+                      isSelected: true,
+                      animationPhase: 0.65,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF05070B),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFFD700),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              isStandingOvation
+                                  ? 'ANIME FREEZE-FRAME · STANDING OVATION!'
+                                  : 'ANIME FREEZE-FRAME VERDICT REVEAL',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.0,
+                                color: Color(0xFFFFD700),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${animatedComposite.clamp(0.0, 100.0).toStringAsFixed(1)} / 100',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Color(0xFF05070B),
+                                        offset: Offset(3, 3),
+                                        blurRadius: 0,
+                                      ),
+                                      Shadow(
+                                        color: Color(0xFFE11D48),
+                                        blurRadius: 16,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${widget.performerDisplayName.toUpperCase()} · ${actorArchetype.name}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: actorArchetype.rimAccentColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStaggeredThreePillarCounters() {
+    final pillars = <({
+      String title,
+      String weight,
+      double score,
+      Color accent,
+      int durationMs,
+    })>[
+      (
+        title: 'AI TELEMETRICS',
+        weight: '45% WEIGHT',
+        score: _engine.aiScore,
+        accent: const Color(0xFFE11D48),
+        durationMs: 750,
+      ),
+      (
+        title: 'PEER LOOP',
+        weight: '35% WEIGHT',
+        score: _engine.peerScore,
+        accent: const Color(0xFF10B981),
+        durationMs: 1050,
+      ),
+      (
+        title: 'SOCIAL VIRAL',
+        weight: '20% WEIGHT',
+        score: _engine.socialScore,
+        accent: const Color(0xFFF59E0B),
+        durationMs: 1350,
+      ),
+    ];
+
+    return Row(
+      children: [
+        for (int i = 0; i < pillars.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0.0, end: pillars[i].score),
+              duration: Duration(milliseconds: pillars[i].durationMs),
+              curve: Curves.easeOutCubic,
+              builder: (context, animatedScore, _) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0E131F),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF05070B),
+                      width: 2.5,
+                    ),
+                    boxShadow: <BoxShadow>[
+                      const BoxShadow(
+                        color: Color(0xFF05070B),
+                        offset: Offset(3, 3),
+                        blurRadius: 0,
+                      ),
+                      BoxShadow(
+                        color: pillars[i].accent.withValues(alpha: 0.22),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pillars[i].title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: pillars[i].accent,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        animatedScore.clamp(0.0, 100.0).toStringAsFixed(1),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        pillars[i].weight,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 8.5,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCellShadedDirectorCritiqueCard(String critique) {
+    final directorArchetype = resolveAvatarArchetype('the_director');
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0E17),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF05070B),
+          width: 2.8,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(4, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BoondocksAvatarPortrait(
+            archetype: directorArchetype,
+            size: 62,
+            isSelected: true,
+            animationPhase: 0.35,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x26FFD700),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: const Color(0xFFFFD700)),
+                  ),
+                  child: const Text(
+                    'THE DIRECTOR · MEGAPHONE VERDICT',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '"$critique"',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildShowstopperArchetypeBadgeCard() {
     final badge = _engine.showstopperArchetype;
     return Container(
@@ -1618,5 +1955,52 @@ class _ThreeAxisPerformancePainter extends CustomPainter {
     return oldDelegate.facialScore != facialScore ||
         oldDelegate.vocalScore != vocalScore ||
         oldDelegate.cueScore != cueScore;
+  }
+}
+
+class _AnimeClimaxSpeedLinesPainter extends CustomPainter {
+  final Color accentColor;
+
+  const _AnimeClimaxSpeedLinesPainter({required this.accentColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final bgPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[
+          const Color(0xFF1A0712),
+          const Color(0xFF0B0E17),
+          accentColor.withValues(alpha: 0.22),
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    final focal = Offset(size.width * 0.22, size.height * 0.5);
+    final maxR = size.width * 1.1;
+    final rayPaint = Paint()
+      ..color = accentColor.withValues(alpha: 0.18)
+      ..strokeWidth = 2.0;
+
+    for (int i = 0; i < 32; i++) {
+      final angle = (i / 32.0) * math.pi * 2.0;
+      final r0 = 28.0 + (i % 3) * 12.0;
+      canvas.drawLine(
+        Offset(focal.dx + math.cos(angle) * r0, focal.dy + math.sin(angle) * r0),
+        Offset(
+          focal.dx + math.cos(angle) * maxR,
+          focal.dy + math.sin(angle) * maxR,
+        ),
+        rayPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnimeClimaxSpeedLinesPainter oldDelegate) {
+    return oldDelegate.accentColor != accentColor;
   }
 }

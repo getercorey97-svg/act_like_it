@@ -2,14 +2,16 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../dashboard_marquee.dart';
+import '../ui/intro_cinematic.dart';
 import 'auth_service.dart';
 import 'onboarding_questionnaire.dart';
 
 /// "The Living Marquee" Login & Persistent Onboarding Entry Screen.
 /// Features a dark obsidian canvas (`#07090E`) with slow-moving Cyan, Purple,
-/// and Amber neon spotlights. Authenticates via Supabase Auth and immediately
-/// queries `public.profiles` to restore historical questionnaire answers,
-/// birth year (for 18+ gating), and AI Token balance into global state.
+/// and Amber neon spotlights, the central `assets/app_logo.png` interactive
+/// centerpiece, and Dual-Track Auth:
+/// - Track A ("Claim Your Star"): Full Cloud Auth + 2.5D Casting Questionnaire
+/// - Track B ("Sneak Backstage"): Instant Express Pass with 2.5D Avatar Selector
 class LivingMarqueeLoginScreen extends StatefulWidget {
   const LivingMarqueeLoginScreen({super.key});
 
@@ -26,6 +28,8 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
   final TextEditingController _usernameController = TextEditingController();
 
   bool _isSignUpMode = false;
+  bool _isTrackBSneakBackstage = false;
+  String _selectedArchetypeId = 'the_method_actor';
   int _birthYear = 1998;
   bool _isSubmitting = false;
   String? _statusMessage;
@@ -48,6 +52,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
       _emailController.text = profile.email;
       _usernameController.text = profile.username;
       _birthYear = profile.birthYear;
+      _selectedArchetypeId = profile.avatarArchetypeId;
       setState(() {});
     }
   }
@@ -203,18 +208,67 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     );
   }
 
+  Future<void> _handleTrackBSneakBackstage() async {
+    if (_isSubmitting) return;
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _isSubmitting = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final archetype = resolveAvatarArchetype(_selectedArchetypeId);
+      final customHandle = _usernameController.text.trim();
+      final stageHandle = customHandle.isNotEmpty
+          ? customHandle
+          : archetype.name.replaceAll(' ', '_');
+
+      await AuthService.instance.saveOnboardingQuestionnaire(
+        username: stageHandle,
+        birthYear: _birthYear,
+        favoriteEras: const <String>['1970s', '2000s'],
+        actingStrengths: const <String>['Drama', 'Comedy'],
+        avatarArchetypeId: _selectedArchetypeId,
+        castingTrack: 'track_b_backstage',
+      );
+
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const LivingMarqueeDashboardScreen(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
   Widget _buildMarqueeCrest() {
     return Column(
       children: [
+        const ActLikeItBrandCenterpiece(
+          height: 122,
+          compact: true,
+        ),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: const Color(0xFF0B0E17),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+            border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
           ),
           child: const Text(
-            'THE LIVING MARQUEE · SUPABASE CLOUD AUTH',
+            '2.5D PREMIERE CASTING · DUAL-TRACK AUTH',
             style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 10.5,
@@ -224,23 +278,12 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
         const Text(
-          'ACT LIKE IT',
+          'Choose Track A to Claim Your Star with full cloud sync, or Track B to Sneak Backstage with an instant 2.5D Archetype Pass.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2.2,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Sign in to sync your Red Carpet questionnaire preferences, 18+ vault clearance, and AI Telemetrics tokens across every performance.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 13,
+            fontSize: 12.5,
             color: Color(0xFF94A3B8),
             height: 1.35,
           ),
@@ -345,6 +388,67 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Dual-Track Selector: Track A (Claim Your Star) vs Track B (Sneak Backstage)
+          Row(
+            children: [
+              Expanded(
+                child: _buildModeTab(
+                  label: 'TRACK A · CLAIM YOUR STAR',
+                  selected: !_isTrackBSneakBackstage,
+                  accent: const Color(0xFFF59E0B),
+                  onTap: () => setState(() => _isTrackBSneakBackstage = false),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildModeTab(
+                  label: 'TRACK B · SNEAK BACKSTAGE',
+                  selected: _isTrackBSneakBackstage,
+                  accent: const Color(0xFF10B981),
+                  onTap: () => setState(() => _isTrackBSneakBackstage = true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // 2.5D Cell-Shaded 14-Archetype Selector Strip
+          _buildCellShadedArchetypePicker(),
+          const SizedBox(height: 14),
+          if (_isTrackBSneakBackstage) ...[
+            TextField(
+              controller: _usernameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration(
+                label: 'EXPRESS STAGE HANDLE (OPTIONAL)',
+                hint: 'Leave blank to use Archetype Title',
+                icon: Icons.badge_outlined,
+                accent: const Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: const Color(0xFF07090E),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF05070B), width: 2.5),
+                ),
+              ),
+              onPressed: _isSubmitting ? null : _handleTrackBSneakBackstage,
+              icon: const Icon(Icons.bolt_rounded),
+              label: const Text(
+                'SNEAK BACKSTAGE NOW · ENTER RED CARPET',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ] else ...[
           Row(
             children: [
               Expanded(
@@ -501,6 +605,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
                   builder: (_) => OnboardingQuestionnaireScreen(
                     initialUsername: _usernameController.text.trim(),
                     initialBirthYear: _birthYear,
+                    initialArchetypeId: _selectedArchetypeId,
                   ),
                 ),
               );
@@ -511,13 +616,81 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
               color: Color(0xFFF59E0B),
             ),
             label: const Text(
-              'OPEN "THE RED CARPET" TICKET QUESTIONNAIRE',
+              'OPEN "THE RED CARPET" 2.5D CASTING QUESTIONNAIRE',
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 color: Color(0xFFF59E0B),
               ),
+            ),
+          ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCellShadedArchetypePicker() {
+    final chosen = resolveAvatarArchetype(_selectedArchetypeId);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07090E),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: chosen.primaryInkColor, width: 2.0),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                chosen.signatureIcon,
+                color: chosen.primaryInkColor,
+                size: 15,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '2.5D AVATAR ARCHETYPE: ${chosen.name} (${chosen.roleBadge})',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    color: chosen.primaryInkColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 64,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: kFourteenAvatarArchetypes.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final arch = kFourteenAvatarArchetypes[index];
+                final selected = arch.id == _selectedArchetypeId;
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _selectedArchetypeId = arch.id;
+                    });
+                    AuthService.instance.updateAvatarArchetype(arch.id);
+                  },
+                  child: BoondocksAvatarPortrait(
+                    archetype: arch,
+                    size: selected ? 60 : 52,
+                    isSelected: selected,
+                  ),
+                );
+              },
             ),
           ),
         ],
