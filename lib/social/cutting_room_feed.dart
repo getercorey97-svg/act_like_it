@@ -350,7 +350,9 @@ Director's Stamp: [$stamp]
 ${take.scriptExcerpt}
 ''';
     try {
-      await Share.share(payload.trim());
+      await SharePlus.instance.share(
+        ShareParams(text: payload.trim()),
+      );
     } catch (_) {}
   }
 

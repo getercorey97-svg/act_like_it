@@ -2064,9 +2064,11 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
         'Featured Reel: ${session.selectedCategory.label}';
     await Clipboard.setData(ClipboardData(text: session.roomCode));
     try {
-      await Share.share(
-        passMessage,
-        subject: 'ACT LIKE IT · VIP Set Pass #${session.roomCode}',
+      await SharePlus.instance.share(
+        ShareParams(
+          text: passMessage,
+          subject: 'ACT LIKE IT · VIP Set Pass #${session.roomCode}',
+        ),
       );
     } catch (_) {
       if (!mounted) return;

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
@@ -308,7 +309,8 @@ Return strict JSON with keys:
 
     try {
       // 1. If a local camera recording exists on the S26 Ultra, play it immediately in a loop
-      if (localFilePath != null &&
+      if (!kIsWeb &&
+          localFilePath != null &&
           localFilePath.isNotEmpty &&
           File(localFilePath).existsSync()) {
         final previousCtrl = _loopController;
@@ -432,8 +434,11 @@ Return strict JSON with keys:
     if (_isDisposed) return;
     final shareUrl = _supabaseLoopUrl ?? 'https://github.com/act_like_it';
     try {
-      await Share.share(
-        'I just scored ${compositeTriModalScore.toStringAsFixed(1)}/100 performing "${scene.title}" (${scene.filmOrSeries}, ${scene.releaseYear}) on Act Like It! $shareUrl',
+      await SharePlus.instance.share(
+        ShareParams(
+          text:
+              'I just scored ${compositeTriModalScore.toStringAsFixed(1)}/100 performing "${scene.title}" (${scene.filmOrSeries}, ${scene.releaseYear}) on Act Like It! $shareUrl',
+        ),
       );
     } catch (_) {}
 
@@ -477,7 +482,9 @@ Watch Premiere Reel: $shareUrl
 ''';
 
     try {
-      await Share.share(payload.trim());
+      await SharePlus.instance.share(
+        ShareParams(text: payload.trim()),
+      );
     } catch (_) {}
 
     _externalShares += 1;

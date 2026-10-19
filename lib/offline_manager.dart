@@ -4,11 +4,13 @@ import 'dart:io';
 import 'dart:math';
 import 'package:camera/camera.dart' as hw_cam;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import 'main.dart';
 import 'lobby.dart';
 import 'judging_engine.dart';
@@ -240,7 +242,8 @@ class OfflineManager extends ChangeNotifier {
       'offline_match_history_log_v1';
 
   final Connectivity _connectivity = Connectivity();
-  StreamSubscription<dynamic>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Database? _sqliteDb;
 
   Future<void>? _initFuture;
   bool _isInitialized = false;
@@ -297,29 +300,91 @@ class OfflineManager extends ChangeNotifier {
   /// Initializes local cache, loads queued performances, and subscribes to
   /// `connectivity_plus` network state changes for automatic Store & Forward syncing.
   /// Uses a memoized `_initFuture` lock so concurrent callers never race while
-  /// awaiting SharedPreferences or connectivity checks.
+  /// awaiting SharedPreferences, sqflite (`if (!kIsWeb)`), or connectivity checks.
   Future<void> ensureInitialized() {
     if (_isInitialized) return Future<void>.value();
     return _initFuture ??= _performInitialization();
   }
 
+  Future<void> _initSqliteDatabaseIfSupported() async {
+    if (kIsWeb) return;
+    try {
+      final dbPath = await getDatabasesPath();
+      _sqliteDb = await openDatabase(
+        '$dbPath/act_like_it_offline_cache.db',
+        version: 1,
+        onCreate: (db, version) async {
+          await db.execute(
+            'CREATE TABLE IF NOT EXISTS offline_kv_store (cache_key TEXT PRIMARY KEY, payload TEXT, updated_at TEXT)',
+          );
+        },
+      );
+    } catch (_) {
+      _sqliteDb = null;
+    }
+  }
+
+  Future<void> _writeSqliteOrPrefs(
+    SharedPreferences prefs,
+    String key,
+    String value,
+  ) async {
+    await prefs.setString(key, value);
+    if (!kIsWeb && _sqliteDb != null) {
+      try {
+        await _sqliteDb!.insert(
+          'offline_kv_store',
+          <String, Object?>{
+            'cache_key': key,
+            'payload': value,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      } catch (_) {}
+    }
+  }
+
+  Future<String?> _readSqliteOrPrefs(
+    SharedPreferences prefs,
+    String key,
+  ) async {
+    if (!kIsWeb && _sqliteDb != null) {
+      try {
+        final rows = await _sqliteDb!.query(
+          'offline_kv_store',
+          columns: <String>['payload'],
+          where: 'cache_key = ?',
+          whereArgs: <Object?>[key],
+          limit: 1,
+        );
+        if (rows.isNotEmpty && rows.first['payload'] is String) {
+          return rows.first['payload'] as String;
+        }
+      } catch (_) {}
+    }
+    return prefs.getString(key);
+  }
+
   Future<void> _performInitialization() async {
     try {
+      await _initSqliteDatabaseIfSupported();
       await _loadCachedScenePacksFromPrefs();
       await _loadQueueFromPrefs();
       await _loadMatchHistoryFromPrefs();
 
       try {
-        final initialStatus = await _connectivity.checkConnectivity();
-        _isOnline = _evaluateConnectivityOnline(initialStatus);
+        final List<ConnectivityResult> initialResults =
+            await _connectivity.checkConnectivity();
+        _isOnline = _evaluateConnectivityOnline(initialResults);
       } catch (_) {
         _isOnline = true;
       }
 
       await _connectivitySubscription?.cancel();
       _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
-        (dynamic statusEvent) async {
-          final nowOnline = _evaluateConnectivityOnline(statusEvent);
+        (List<ConnectivityResult> results) async {
+          final nowOnline = _evaluateConnectivityOnline(results);
           final wasOffline = !_isOnline;
           _isOnline = nowOnline;
           notifyListeners();
@@ -354,17 +419,11 @@ class OfflineManager extends ChangeNotifier {
     }
   }
 
-  /// Safely evaluates connectivity output across `connectivity_plus` versions
-  /// (handles both `List<ConnectivityResult>` and single `ConnectivityResult`).
-  bool _evaluateConnectivityOnline(dynamic result) {
-    if (result is List) {
-      if (result.isEmpty) return false;
-      return result.any((r) => r != ConnectivityResult.none);
-    }
-    if (result is ConnectivityResult) {
-      return result != ConnectivityResult.none;
-    }
-    return true;
+  /// Evaluates `List<ConnectivityResult>` from `connectivity_plus: ^7.3.0`.
+  bool _evaluateConnectivityOnline(List<ConnectivityResult> results) {
+    if (results.isEmpty) return false;
+    return !results.contains(ConnectivityResult.none) ||
+        results.any((r) => r != ConnectivityResult.none);
   }
 
   // --------------------------------------------------------------------------
@@ -373,8 +432,8 @@ class OfflineManager extends ChangeNotifier {
 
   Future<void> _loadCachedScenePacksFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final rawJson = prefs.getString(_kCachedScenesPrefsKey);
-    final rawTs = prefs.getString(_kCachedScenesTimestampKey);
+    final rawJson = await _readSqliteOrPrefs(prefs, _kCachedScenesPrefsKey);
+    final rawTs = await _readSqliteOrPrefs(prefs, _kCachedScenesTimestampKey);
 
     if (rawTs != null) {
       _lastCacheSyncAt = DateTime.tryParse(rawTs);
@@ -469,8 +528,16 @@ class OfflineManager extends ChangeNotifier {
 
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now().toUtc();
-      await prefs.setString(_kCachedScenesPrefsKey, jsonEncode(serializedMap));
-      await prefs.setString(_kCachedScenesTimestampKey, now.toIso8601String());
+      await _writeSqliteOrPrefs(
+        prefs,
+        _kCachedScenesPrefsKey,
+        jsonEncode(serializedMap),
+      );
+      await _writeSqliteOrPrefs(
+        prefs,
+        _kCachedScenesTimestampKey,
+        now.toIso8601String(),
+      );
 
       _cachedSceneCount = totalCached;
       _lastCacheSyncAt = now;
@@ -516,14 +583,19 @@ class OfflineManager extends ChangeNotifier {
     required String sourceFilePath,
     required String performerName,
   }) async {
+    final safeActor =
+        performerName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_').toLowerCase();
+    if (kIsWeb) {
+      return sourceFilePath.isNotEmpty
+          ? sourceFilePath
+          : 'web_take_${safeActor}_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    }
     final tempDir = await getTemporaryDirectory();
     final partyDir = Directory('${tempDir.path}/offline_party_takes');
     if (!partyDir.existsSync()) {
       await partyDir.create(recursive: true);
     }
 
-    final safeActor =
-        performerName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_').toLowerCase();
     final targetPath =
         '${partyDir.path}/take_${safeActor}_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
@@ -541,7 +613,8 @@ class OfflineManager extends ChangeNotifier {
 
   Future<void> _loadQueueFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final rawList = prefs.getString(_kQueuedPerformancesPrefsKey);
+    final rawList =
+        await _readSqliteOrPrefs(prefs, _kQueuedPerformancesPrefsKey);
     _queue.clear();
     if (rawList == null || rawList.isEmpty) return;
 
@@ -560,7 +633,7 @@ class OfflineManager extends ChangeNotifier {
   Future<void> _persistQueueToPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(_queue.map((e) => e.toJson()).toList());
-    await prefs.setString(_kQueuedPerformancesPrefsKey, encoded);
+    await _writeSqliteOrPrefs(prefs, _kQueuedPerformancesPrefsKey, encoded);
   }
 
   /// Enqueues an offline performance (local video path + 1-10 peer scores)
@@ -683,7 +756,7 @@ Return strict JSON:
 ''';
 
             final parts = <Part>[TextPart(promptText)];
-            if (item.localVideoPath.isNotEmpty) {
+            if (!kIsWeb && item.localVideoPath.isNotEmpty) {
               final videoFile = File(item.localVideoPath);
               if (videoFile.existsSync()) {
                 final bytes = await videoFile.readAsBytes();
@@ -763,7 +836,7 @@ Return strict JSON:
 
   Future<void> _loadMatchHistoryFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_kMatchHistoryQueuePrefsKey);
+    final raw = await _readSqliteOrPrefs(prefs, _kMatchHistoryQueuePrefsKey);
     _matchHistoryLog.clear();
 
     if (raw != null && raw.isNotEmpty) {
@@ -835,7 +908,7 @@ Return strict JSON:
     final encoded = jsonEncode(
       _matchHistoryLog.map((e) => e.toJson()).toList(),
     );
-    await prefs.setString(_kMatchHistoryQueuePrefsKey, encoded);
+    await _writeSqliteOrPrefs(prefs, _kMatchHistoryQueuePrefsKey, encoded);
   }
 
   /// Queues a match history record locally (used in Pass-and-Play Offline Mode
@@ -1047,7 +1120,9 @@ class _OfflineLocalPartyScreenState extends State<OfflineLocalPartyScreen> {
 
   Future<void> _initNativeCamera() async {
     try {
-      await [Permission.camera, Permission.microphone].request();
+      if (!kIsWeb) {
+        await [Permission.camera, Permission.microphone].request();
+      }
       _cameras = await hw_cam.availableCameras();
       if (_cameras.isEmpty) return;
 
@@ -1126,6 +1201,9 @@ class _OfflineLocalPartyScreenState extends State<OfflineLocalPartyScreen> {
           performerName: currentPerformer,
         );
       } catch (_) {}
+    } else if (kIsWeb) {
+      savedLocalPath =
+          'web_offline_take_${DateTime.now().millisecondsSinceEpoch}.mp4';
     } else {
       // Create deterministic local temp placeholder path if camera hardware is unavailable
       final tempDir = await getTemporaryDirectory();

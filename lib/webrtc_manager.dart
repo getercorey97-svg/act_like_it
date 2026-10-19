@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:camera/camera.dart' as hw_cam;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -108,6 +109,9 @@ class WebRtcStageManager extends ChangeNotifier {
   }
 
   Future<bool> requestMediaPermissions() async {
+    if (kIsWeb) {
+      return true;
+    }
     if (_isRequestingPermissions) {
       return false;
     }
