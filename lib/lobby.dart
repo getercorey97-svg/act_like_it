@@ -19,6 +19,7 @@ import 'ui/interactive_instructions.dart';
 import 'ui/game_settings_modal.dart';
 import 'ui/scene_vault_screen.dart';
 import 'ui/intro_cinematic.dart';
+import 'auth/auth_service.dart';
 
 enum SceneCategory {
   era1970To1999(
@@ -557,10 +558,16 @@ class LobbyRealtimeManager extends ChangeNotifier {
 
   LobbyRealtimeManager({
     String? userId,
-    this.localDisplayName = 'Galaxy S26 Actor',
-  }) : _localUserId = userId ??
+    String? localDisplayName,
+  })  : _localUserId = userId ??
             supabaseOrNull?.auth.currentUser?.id ??
-            _generateEphemeralUuid();
+            _generateEphemeralUuid(),
+        localDisplayName = (localDisplayName != null &&
+                localDisplayName.trim().isNotEmpty)
+            ? localDisplayName.trim()
+            : (AuthService.instance.currentProfile?.username.isNotEmpty == true
+                ? AuthService.instance.currentProfile!.username
+                : 'StageStar');
 
   String get localUserId => _localUserId;
   LobbySession? get session => _session;
@@ -570,7 +577,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
 
   bool get isHost => _session != null && _session!.hostId == _localUserId;
   bool get canStartMatch =>
-      _players.length >= 2 &&
+      _players.isNotEmpty &&
       _players.length <= 8 &&
       _players.every((p) => p.isReady || p.isHost);
 
@@ -797,25 +804,34 @@ class LobbyRealtimeManager extends ChangeNotifier {
         isHost: true,
         isReady: true,
       ),
+    ];
+    unawaited(saveActiveRoomSession(roomCode));
+    _setLoading(false);
+  }
+
+  /// Adds 1 ready AI Co-Star per tap up to 8 total cast members in the Green Room.
+  void addAiCoStar() {
+    final currentSession = _session;
+    if (currentSession == null) return;
+    if (_players.length >= currentSession.maxPlayers) return;
+
+    final nextIndex = _players.length;
+    final archetype =
+        kFourteenAvatarArchetypes[nextIndex % kFourteenAvatarArchetypes.length];
+    final coStarName = '${archetype.name} (AI Co-Star)';
+
+    _players = [
+      ..._players,
       LobbyPlayer(
-        id: 'p-remote-1',
-        lobbyId: lobbyId,
-        userId: 'remote-peer-1',
-        displayName: 'Elena (Stage Co-Star)',
-        isHost: false,
-        isReady: true,
-      ),
-      LobbyPlayer(
-        id: 'p-remote-2',
-        lobbyId: lobbyId,
-        userId: 'remote-peer-2',
-        displayName: 'Marcus (Featured Cast)',
+        id: 'p-ai-$nextIndex',
+        lobbyId: currentSession.id,
+        userId: 'ai-costar-$nextIndex',
+        displayName: coStarName,
         isHost: false,
         isReady: true,
       ),
     ];
-    unawaited(saveActiveRoomSession(roomCode));
-    _setLoading(false);
+    _notifySafely();
   }
 
   Future<void> joinLobbyByCode({
@@ -1255,12 +1271,14 @@ class LobbyMatchmakingScreen extends StatefulWidget {
   final SceneCategory initialCategory;
   final bool startInJoinMode;
   final ScenePrompt? initialPromptOverride;
+  final bool autoCreateOnInit;
 
   const LobbyMatchmakingScreen({
     super.key,
     this.initialCategory = SceneCategory.era1970To1999,
     this.startInJoinMode = false,
     this.initialPromptOverride,
+    this.autoCreateOnInit = false,
   });
 
   @override
@@ -1279,8 +1297,11 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   int _lastStanchionTickIndex = 0;
   Offset? _activeTouchPosition;
 
-  final TextEditingController _nameController =
-      TextEditingController(text: 'Galaxy S26 Actor');
+  late final TextEditingController _nameController = TextEditingController(
+    text: AuthService.instance.currentProfile?.username.isNotEmpty == true
+        ? AuthService.instance.currentProfile!.username
+        : 'StageStar',
+  );
   final TextEditingController _codeController = TextEditingController();
   final FocusNode _codeFocusNode = FocusNode();
   late SceneCategory _selectedCategory;
@@ -1295,7 +1316,9 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     WidgetsBinding.instance.addObserver(this);
     _selectedCategory = widget.initialCategory;
     _isJoinMode = widget.startInJoinMode;
-    _lobbyManager = LobbyRealtimeManager();
+    _lobbyManager = LobbyRealtimeManager(
+      localDisplayName: _nameController.text,
+    );
     _lobbyManager.addListener(_onLobbyStateChanged);
     _codeController.addListener(() {
       if (mounted) setState(() {});
@@ -1321,13 +1344,21 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   Future<void> _loadVipSessionAndClipboard() async {
     final activeCode = await LobbyRealtimeManager.loadActiveRoomSession();
     final tokens = await LobbyRealtimeManager.loadTelemetricsTokens();
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedActor = prefs.getString('act_like_it_saved_actor_name');
-      if (savedActor != null && savedActor.trim().isNotEmpty && mounted) {
-        _nameController.text = savedActor.trim();
-      }
-    } catch (_) {}
+    final profileName = AuthService.instance.currentProfile?.username.trim();
+    if (profileName != null && profileName.isNotEmpty && mounted) {
+      _nameController.text = profileName;
+    } else {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedActor = prefs.getString('act_like_it_saved_actor_name');
+        if (savedActor != null &&
+            savedActor.trim().isNotEmpty &&
+            savedActor.trim() != 'Galaxy S26 Actor' &&
+            mounted) {
+          _nameController.text = savedActor.trim();
+        }
+      } catch (_) {}
+    }
     if (mounted) {
       setState(() {
         _savedActiveRoomCode = activeCode;
@@ -1335,6 +1366,13 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
       });
     }
     await _checkClipboardForSixDigitCode();
+    if (mounted && widget.autoCreateOnInit && !widget.startInJoinMode) {
+      await _lobbyManager.createLobby(
+        displayName: _nameController.text,
+        category: _selectedCategory,
+        preselectedPrompt: widget.initialPromptOverride,
+      );
+    }
   }
 
   Future<void> _checkClipboardForSixDigitCode() async {
@@ -1518,7 +1556,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               children: [
                 VipCredentialHeaderBar(
                   actorHandle: _nameController.text.trim().isEmpty
-                      ? '@GALAXY_S26_ACTOR'
+                      ? '@STAGESTAR'
                       : '@${_nameController.text.trim().toUpperCase().replaceAll(' ', '_')}',
                   telemetricsTokens: _telemetricsTokens,
                   careerWins: OfflineManager.instance.totalCareerWins,
@@ -1564,11 +1602,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                     } catch (_) {}
                   },
                 ),
-                Interactive3DHolographicMarquee(
-                  phase: phase,
-                  onPaparazziFrenzy: _triggerPaparazziFrenzy,
-                ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 6),
                 _buildStageCredentialsCard(),
               ],
             ),
@@ -2020,32 +2054,28 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               ElevatedButton.icon(
                 onPressed: _lobbyManager.isLoading
                     ? null
-                    : () => _openCallSheetAndExecute(
-                          () {
-                            if (_isJoinMode) {
-                              _lobbyManager.joinLobbyByCode(
-                                roomCode: _codeController.text,
-                                displayName: _nameController.text,
-                              );
-                            } else {
-                              _lobbyManager.createLobby(
-                                displayName: _nameController.text,
-                                category: _selectedCategory,
-                                preselectedPrompt: widget.initialPromptOverride,
-                              );
-                            }
-                          },
-                          modeTitle: _isJoinMode
-                              ? 'SOUNDSTAGE AIRLOCK'
-                              : 'PREMIERE SOUNDSTAGE',
-                        ),
+                    : () {
+                        HapticFeedback.mediumImpact();
+                        if (_isJoinMode) {
+                          _lobbyManager.joinLobbyByCode(
+                            roomCode: _codeController.text,
+                            displayName: _nameController.text,
+                          );
+                        } else {
+                          _lobbyManager.createLobby(
+                            displayName: _nameController.text,
+                            category: _selectedCategory,
+                            preselectedPrompt: widget.initialPromptOverride,
+                          );
+                        }
+                      },
                 icon: const Icon(Icons.videocam_rounded, size: 18),
                 label: Text(
                   _lobbyManager.isLoading
                       ? 'Opening Soundstage Doors...'
                       : (_isJoinMode
-                          ? 'Open Call Sheet & Step Onto Stage'
-                          : 'Open Call Sheet & Generate 6-Digit Pass'),
+                          ? 'Step Onto Stage · Join 6-Digit Room'
+                          : 'Generate 6-Digit Set Pass'),
                 ),
               ),
             ],
@@ -2112,17 +2142,23 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'ADMIT ONE · VIP SOUNDSTAGE SET PASS',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.3,
-                        color: Color(0xFFFDE68A),
+                    const Expanded(
+                      child: Text(
+                        'ADMIT ONE · VIP SOUNDSTAGE SET PASS',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.1,
+                          color: Color(0xFFFDE68A),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
+                      margin: const EdgeInsets.only(right: 4),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 3,
@@ -2132,13 +2168,16 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: const Color(0xFF10B981)),
                       ),
-                      child: const Text(
-                        'STAGE LIVE',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF10B981),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'STAGE LIVE',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF10B981),
+                          ),
                         ),
                       ),
                     ),
@@ -2277,9 +2316,44 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
           ),
           const SizedBox(height: 20),
         ],
-        const Text(
-          'Green Room Cast Roster (2–8 Ensemble Chairs)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Green Room Cast Roster (${players.length}/${session.maxPlayers})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            if (players.length < session.maxPlayers)
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF59E0B),
+                  side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _lobbyManager.addAiCoStar();
+                },
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 15),
+                label: const Text(
+                  '+ Add AI Co-Star',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 10),
         ...players.map(
@@ -2318,13 +2392,27 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
           children: [
             Expanded(
               child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF06B6D4),
+                  side: const BorderSide(
+                    color: Color(0xFF06B6D4),
+                    width: 1.8,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 onPressed: () => _lobbyManager.toggleReadyState(),
-                child: const Text('Toggle Ready'),
+                child: const Text(
+                  'Toggle Ready',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 onPressed: () => _lobbyManager.startPerformanceRound(),
                 child: const Text('Draw New Scene'),
               ),
@@ -2517,15 +2605,18 @@ class _Interactive3DHolographicMarqueeState
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    '2.5D Grand Premiere Soundstage · Tap Marquee for Flash Frenzy',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.montserrat(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.4,
-                                      color: const Color(0xFFF5DEB3),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '2.5D Grand Premiere Soundstage · Tap Marquee for Flash Frenzy',
+                                      maxLines: 1,
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.4,
+                                        color: const Color(0xFFF5DEB3),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -2623,9 +2714,9 @@ class _MarqueeFilamentBulbsPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.width <= 16 || size.height <= 24) return;
-    final rect = Rect.fromLTWH(6, 10, size.width - 12, size.height - 20);
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(22));
+    if (size.width <= 24 || size.height <= 28) return;
+    final rect = Rect.fromLTWH(10, 12, size.width - 20, size.height - 24);
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(20));
     final metrics = (Path()..addRRect(rrect)).computeMetrics().toList();
     if (metrics.isEmpty) return;
     final metric = metrics.first;
@@ -2976,132 +3067,109 @@ class BespokePremiereDoorsList {
     ];
   }
 
-  /// Persistent First-Person POV strip showing all 14 2.5D cell-shaded characters
-  /// actively populating the Red Carpet environment (Paparazzi flashing cameras,
-  /// Mob Boss guarding Door 2, Method Actor rehearsing, etc.).
+  /// Unboxed, interactive Red Carpet Entourage Row where all 14 2.5D articulated
+  /// character rigs stand directly on the velvet carpet and open their full-card
+  /// spotlight bio modal when tapped.
   static Widget _buildPersistentFirstPersonArchetypeCrowdBar({
     required double phase,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xEB080B14),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF05070B), width: 3.5),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0xFF05070B),
-            offset: Offset(5, 5),
-            blurRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
             children: [
-              Icon(
-                Icons.visibility_rounded,
+              const Icon(
+                Icons.auto_awesome_rounded,
                 color: Color(0xFFFFD700),
                 size: 15,
               ),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'FIRST-PERSON POV · 14 CELL-SHADED ARCHETYPES ON THE CARPET',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.8,
-                    color: Color(0xFFFFD700),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'RED CARPET ENTOURAGE · TAP ANY 2.5D STAR FOR SPOTLIGHT BIO',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      color: Color(0xFFFFD700),
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 76,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: kFourteenAvatarArchetypes.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final arch = kFourteenAvatarArchetypes[index];
-                return Container(
-                  width: 186,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0B0E17),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: arch.primaryInkColor,
-                      width: 1.8,
-                    ),
-                  ),
-                  child: Row(
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 112,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            itemCount: kFourteenAvatarArchetypes.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final arch = kFourteenAvatarArchetypes[index];
+              final isEquipped =
+                  AuthService.instance.currentProfile?.avatarArchetypeId ==
+                      arch.id;
+              return GestureDetector(
+                onTap: () => showBoondocksCharacterSpotlightModal(
+                  context,
+                  arch,
+                ),
+                child: SizedBox(
+                  width: 88,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      BoondocksAvatarPortrait(
+                      BoondocksCharacterRig(
                         archetype: arch,
-                        size: 52,
-                        isSelected: true,
-                        animationPhase: phase,
+                        size: 72,
+                        isSelected: isEquipped,
+                        phaseOverride: phase + index * 0.45,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              arch.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              arch.roleBadge,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w800,
-                                color: arch.primaryInkColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              arch.redCarpetActivity,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFF94A3B8),
-                                height: 1.15,
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xEB07090E),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isEquipped
+                                ? const Color(0xFFFFD700)
+                                : arch.primaryInkColor,
+                            width: isEquipped ? 1.8 : 1.2,
+                          ),
+                        ),
+                        child: Text(
+                          arch.name.replaceFirst('The ', ''),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -3273,7 +3341,7 @@ class BespokePremiereDoorsList {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Guards press the elevator button & unhook the red rope as the silver doors reflect your 2.5D avatar and open into the vertical social feed.',
+                      'Step into the VIP Silver Elevator to watch, rate, and roast top audition reels.',
                       style: GoogleFonts.montserrat(
                         fontSize: 12,
                         height: 1.35,
@@ -3439,11 +3507,19 @@ class BespokePremiereDoorsList {
                   ),
                 ),
                 const SizedBox(width: 10),
-                BoondocksAvatarPortrait(
-                  archetype: kFourteenAvatarArchetypes[0], // The Auteur Director
-                  size: 52,
-                  isSelected: true,
-                  animationPhase: phase,
+                Builder(
+                  builder: (ctx) => GestureDetector(
+                    onTap: () => showBoondocksCharacterSpotlightModal(
+                      ctx,
+                      kFourteenAvatarArchetypes[0],
+                    ),
+                    child: BoondocksCharacterRig(
+                      archetype: kFourteenAvatarArchetypes[0],
+                      size: 56,
+                      isSelected: true,
+                      phaseOverride: phase,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -3677,11 +3753,19 @@ class BespokePremiereDoorsList {
               ),
             ),
             const SizedBox(width: 10),
-            BoondocksAvatarPortrait(
-              archetype: kFourteenAvatarArchetypes[2], // The Mob Boss
-              size: 54,
-              isSelected: true,
-              animationPhase: phase,
+            Builder(
+              builder: (ctx) => GestureDetector(
+                onTap: () => showBoondocksCharacterSpotlightModal(
+                  ctx,
+                  kFourteenAvatarArchetypes[2],
+                ),
+                child: BoondocksCharacterRig(
+                  archetype: kFourteenAvatarArchetypes[2],
+                  size: 58,
+                  isSelected: true,
+                  phaseOverride: phase,
+                ),
+              ),
             ),
           ],
         ),

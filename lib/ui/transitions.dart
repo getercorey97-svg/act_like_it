@@ -52,11 +52,15 @@ class BespokeTransitionEngine {
     final duration = type == BespokeTransitionType.silverElevatorVelvetRope
         ? const Duration(milliseconds: 1180)
         : const Duration(milliseconds: 880);
+    final reverseDuration =
+        type == BespokeTransitionType.silverElevatorVelvetRope
+            ? const Duration(milliseconds: 560)
+            : const Duration(milliseconds: 340);
 
     return Navigator.of(context).push<T>(
       PageRouteBuilder<T>(
         transitionDuration: duration,
-        reverseTransitionDuration: const Duration(milliseconds: 340),
+        reverseTransitionDuration: reverseDuration,
         pageBuilder: (context, animation, secondaryAnimation) => destination,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return _BespokeFirstPersonTransitionStage(
@@ -120,6 +124,7 @@ class _BespokeFirstPersonTransitionStage extends StatelessWidget {
   }
 
   Widget _buildTransitionOverlay(double t) {
+    final isReversing = animation.status == AnimationStatus.reverse;
     switch (type) {
       case BespokeTransitionType.clapperboardSnap:
         return CustomPaint(
@@ -144,6 +149,7 @@ class _BespokeFirstPersonTransitionStage extends StatelessWidget {
       case BespokeTransitionType.silverElevatorVelvetRope:
         return _SilverElevatorFirstPersonOverlay(
           progress: t,
+          isReversing: isReversing,
           playerArchetype: playerArchetype,
         );
     }
@@ -661,87 +667,96 @@ class _VintageFlashbulbPopTransitionPainter extends CustomPainter {
 ///   cell-shaded avatar in the polished chrome before opening to the feed.
 class _SilverElevatorFirstPersonOverlay extends StatelessWidget {
   final double progress;
+  final bool isReversing;
   final BoondocksAvatarArchetype playerArchetype;
 
   const _SilverElevatorFirstPersonOverlay({
     required this.progress,
+    this.isReversing = false,
     required this.playerArchetype,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Phase breakdown across progress (0.0 -> 1.0):
-    // 0.00 -> 0.35: Guards press elevator call button & unhook the red velvet rope
-    // 0.35 -> 0.72: First-person camera walks forward into the silver elevator
-    // 0.72 -> 1.00: Brushed-silver doors slide closed reflecting the player's
-    //               chosen 2.5D cell-shaded avatar, then fade into the feed.
-    final ropeDropT = (progress / 0.38).clamp(0.0, 1.0);
-    final walkInZoom = 1.0 + (((progress - 0.25) / 0.55).clamp(0.0, 1.0) * 0.52);
-    final doorCloseT = ((progress - 0.46) / 0.36).clamp(0.0, 1.0);
-    final stepBobY = math.sin(progress * math.pi * 10) * 5.0;
+    // When reversing (exiting The Cutting Room Floor), cleanly reverse the
+    // brushed-silver elevator doors without re-drawing the velvet rope stanchion.
+    final ropeDropT = isReversing ? 1.0 : (progress / 0.38).clamp(0.0, 1.0);
+    final walkInZoom = isReversing
+        ? (1.0 + progress * 0.18)
+        : (1.0 + (((progress - 0.25) / 0.55).clamp(0.0, 1.0) * 0.42));
+    final doorCloseT = isReversing
+        ? (1.0 - ((1.0 - progress) * 1.15).clamp(0.0, 1.0))
+        : ((progress - 0.46) / 0.36).clamp(0.0, 1.0);
+    final stepBobY = isReversing ? 0.0 : math.sin(progress * math.pi * 10) * 4.0;
+    final topSafeInset = MediaQuery.of(context).padding.top;
 
     return Container(
       color: const Color(0xFF05070B),
-      child: Transform.translate(
-        offset: Offset(0, stepBobY),
-        child: Transform.scale(
-          scale: walkInZoom,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. Brushed-Silver Elevator Shaft, Neon Sign, Guards & Velvet Rope
-              CustomPaint(
-                painter: _SilverElevatorPortalPainter(
-                  progress: progress,
-                  ropeDropT: ropeDropT,
-                  doorCloseT: doorCloseT,
-                ),
-              ),
-
-              // 2. Player's Chosen 2.5D Cell-Shaded Avatar Reflected in the
-              //    Polished Brushed-Silver Elevator Doors as they slide shut!
-              if (doorCloseT > 0.22)
-                Center(
-                  child: Opacity(
-                    opacity: ((doorCloseT - 0.22) / 0.78).clamp(0.0, 0.78),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xCC07090E),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: playerArchetype.primaryInkColor,
-                            ),
-                          ),
-                          child: Text(
-                            'CHROME REFLECTION · ${playerArchetype.name}',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w900,
-                              color: playerArchetype.rimAccentColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        BoondocksAvatarPortrait(
-                          archetype: playerArchetype,
-                          size: 138,
-                          isSelected: true,
-                          isMirroredReflection: true,
-                          animationPhase: progress * math.pi * 2,
-                        ),
-                      ],
-                    ),
+      child: SafeArea(
+        bottom: false,
+        child: Transform.translate(
+          offset: Offset(0, stepBobY),
+          child: Transform.scale(
+            scale: walkInZoom,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. Brushed-Silver Elevator Shaft, Neon Sign, Guards & Velvet Rope
+                CustomPaint(
+                  painter: _SilverElevatorPortalPainter(
+                    progress: progress,
+                    ropeDropT: ropeDropT,
+                    doorCloseT: doorCloseT,
+                    showVelvetRope: !isReversing,
+                    topSafeOffset: topSafeInset,
                   ),
                 ),
-            ],
+
+                // 2. Player's Chosen 2.5D Cell-Shaded Avatar Reflected in the
+                //    Polished Brushed-Silver Elevator Doors as they slide shut!
+                if (doorCloseT > 0.22)
+                  Center(
+                    child: Opacity(
+                      opacity: ((doorCloseT - 0.22) / 0.78).clamp(0.0, 0.78),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xCC07090E),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: playerArchetype.primaryInkColor,
+                              ),
+                            ),
+                            child: Text(
+                              'CHROME REFLECTION · ${playerArchetype.name}',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: playerArchetype.rimAccentColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          BoondocksAvatarPortrait(
+                            archetype: playerArchetype,
+                            size: 138,
+                            isSelected: true,
+                            isMirroredReflection: true,
+                            animationPhase: progress * math.pi * 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -753,28 +768,33 @@ class _SilverElevatorPortalPainter extends CustomPainter {
   final double progress;
   final double ropeDropT;
   final double doorCloseT;
+  final bool showVelvetRope;
+  final double topSafeOffset;
 
   const _SilverElevatorPortalPainter({
     required this.progress,
     required this.ropeDropT,
     required this.doorCloseT,
+    this.showVelvetRope = true,
+    this.topSafeOffset = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final centerX = size.width * 0.5;
     final elevatorRect = Rect.fromCenter(
-      center: Offset(centerX, size.height * 0.52),
+      center: Offset(centerX, size.height * 0.56),
       width: size.width * 0.64,
-      height: size.height * 0.66,
+      height: size.height * 0.62,
     );
 
-    // 1. Club-Like Neon Header Sign: "THE CUTTING ROOM FLOOR"
+    // 1. Club-Like Neon Header Sign: "THE CUTTING ROOM FLOOR" (safely below status bar)
+    final signCenterY = math.max(52.0 + topSafeOffset * 0.3, elevatorRect.top - 36);
     final neonRect = RRect.fromRectAndRadius(
       Rect.fromCenter(
-        center: Offset(centerX, elevatorRect.top - 36),
+        center: Offset(centerX, signCenterY),
         width: size.width * 0.78,
-        height: 48,
+        height: 44,
       ),
       const Radius.circular(12),
     );
@@ -792,9 +812,9 @@ class _SilverElevatorPortalPainter extends CustomPainter {
         text: '★ THE CUTTING ROOM FLOOR ★',
         style: TextStyle(
           fontFamily: 'monospace',
-          fontSize: 13.5,
+          fontSize: 13,
           fontWeight: FontWeight.w900,
-          letterSpacing: 1.5,
+          letterSpacing: 1.4,
           color: Color(0xFFF9A8D4),
           shadows: <Shadow>[
             Shadow(color: Color(0xFFEC4899), blurRadius: 14),
@@ -805,7 +825,7 @@ class _SilverElevatorPortalPainter extends CustomPainter {
     )..layout();
     signTp.paint(
       canvas,
-      Offset(centerX - signTp.width * 0.5, elevatorRect.top - 36 - signTp.height * 0.5),
+      Offset(centerX - signTp.width * 0.5, signCenterY - signTp.height * 0.5),
     );
 
     // 2. Elevator Interior Frame + Sliding Brushed-Silver Doors
@@ -879,7 +899,7 @@ class _SilverElevatorPortalPainter extends CustomPainter {
     );
 
     // 4. Red Velvet Rope in Front of the Silver Elevator Being Unhooked
-    if (ropeDropT < 0.98) {
+    if (showVelvetRope && ropeDropT < 0.98) {
       final leftPost = Offset(elevatorRect.left - 8, elevatorRect.bottom - 95);
       final rightPost = Offset(
         elevatorRect.right + 8 - (ropeDropT * elevatorRect.width * 0.65),
@@ -943,6 +963,7 @@ class _SilverElevatorPortalPainter extends CustomPainter {
   bool shouldRepaint(covariant _SilverElevatorPortalPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.ropeDropT != ropeDropT ||
-        oldDelegate.doorCloseT != doorCloseT;
+        oldDelegate.doorCloseT != doorCloseT ||
+        oldDelegate.showVelvetRope != showVelvetRope;
   }
 }

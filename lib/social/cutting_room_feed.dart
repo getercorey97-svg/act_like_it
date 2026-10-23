@@ -261,6 +261,13 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
       text: _customDirectorStamps[take.id] ?? take.directorCommentStamp,
     );
 
+    const presets = <String>[
+      'OSCAR-WORTHY · 10/10',
+      'CHILLS ON SET 🔥',
+      'PURE METHOD ACTING',
+      'GIVE THEM THE STATUETTE',
+    ];
+
     final stamped = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -269,61 +276,94 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            18,
-            20,
-            MediaQuery.of(ctx).viewInsets.bottom + 22,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'STAMP DIRECTOR\'S CRITIQUE ON REEL',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFFFFD700),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: ctrl,
-                maxLength: 56,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'e.g., OSCAR-WORTHY BREAKDOWN · 10/10',
-                  filled: true,
-                  fillColor: const Color(0xFF07090E),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE11D48),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-                icon: const Icon(Icons.approval_rounded),
-                label: const Text(
-                  'SLAM DIRECTOR\'S STAMP ON FRAME',
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              18,
+              20,
+              MediaQuery.of(ctx).viewInsets.bottom + 28,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'STAMP DIRECTOR\'S CRITIQUE ON REEL',
                   style: TextStyle(
                     fontFamily: 'monospace',
+                    fontSize: 12,
                     fontWeight: FontWeight.w900,
+                    color: Color(0xFFFFD700),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: presets.map((preset) {
+                    return ActionChip(
+                      backgroundColor: const Color(0xFF141A29),
+                      side: const BorderSide(color: Color(0xFFFFD700)),
+                      label: Text(
+                        preset,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFFDE68A),
+                        ),
+                      ),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        ctrl.text = preset;
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  maxLength: 56,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'e.g., OSCAR-WORTHY BREAKDOWN · 10/10',
+                    filled: true,
+                    fillColor: const Color(0xFF07090E),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE11D48),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 15,
+                      horizontal: 14,
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+                  icon: const Icon(Icons.approval_rounded),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'SLAM DIRECTOR\'S STAMP ON FRAME',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -362,8 +402,7 @@ ${take.scriptExcerpt}
       backgroundColor: const Color(0xFF07090E),
       appBar: GameAppBar(
         title: 'THE CUTTING ROOM FLOOR',
-        subtitle:
-            'REEL ${_activeIndex + 1} OF ${_takes.length} · SWIPE UP FOR NEXT TAKE',
+        subtitle: 'REEL ${_activeIndex + 1} OF ${_takes.length} · SWIPE UP',
       ),
       body: PageView.builder(
         controller: _verticalPageController,
@@ -430,53 +469,66 @@ ${take.scriptExcerpt}
                 ),
 
                 // 2. Center 2.5D Performer Avatar & Live Audio Wave
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      BoondocksAvatarPortrait(
-                        archetype: archetype,
-                        size: 132,
-                        isSelected: true,
-                        animationPhase: phase,
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xE607090E),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: take.neonAccent,
-                            width: 1.8,
+                Align(
+                  alignment: const Alignment(0.0, -0.18),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 76),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () => showBoondocksCharacterSpotlightModal(
+                            context,
+                            archetype,
+                          ),
+                          child: BoondocksCharacterRig(
+                            archetype: archetype,
+                            size: 136,
+                            isSelected: true,
+                            phaseOverride: phase,
                           ),
                         ),
-                        child: Text(
-                          'LOOPING AUDITION REEL · AI ${take.aiTelemetricsScore.toStringAsFixed(1)}/100',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w900,
-                            color: take.neonAccent,
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xE607090E),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: take.neonAccent,
+                              width: 1.8,
+                            ),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'LOOPING AUDITION REEL · AI ${take.aiTelemetricsScore.toStringAsFixed(1)}/100',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                color: take.neonAccent,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
                 // 3. Angled "DIRECTOR'S COMMENT STAMP" Ink Overlay
                 Positioned(
-                  top: 18,
-                  left: 16,
-                  right: 88,
+                  top: 16,
+                  left: 14,
+                  right: 14,
                   child: GestureDetector(
                     onTap: () => _openDirectorStampModal(take),
                     child: Transform.rotate(
-                      angle: -0.055,
+                      angle: -0.035,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -498,7 +550,6 @@ ${take.scriptExcerpt}
                           ],
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
                               Icons.approval_rounded,
@@ -507,16 +558,19 @@ ${take.scriptExcerpt}
                             ),
                             const SizedBox(width: 6),
                             Expanded(
-                              child: Text(
-                                'DIRECTOR STAMP: $activeStamp',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.6,
-                                  color: Color(0xFFFFD700),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'DIRECTOR STAMP: $activeStamp',
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                    color: Color(0xFFFFD700),
+                                  ),
                                 ),
                               ),
                             ),
@@ -527,10 +581,10 @@ ${take.scriptExcerpt}
                   ),
                 ),
 
-                // 4. Right-Side Vertical Action Column: Viral Share & Stamp Trigger
+                // 4. Right-Side Vertical Action Column: Placed cleanly in upper-right margin
                 Positioned(
                   right: 14,
-                  bottom: 188,
+                  top: 76,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -607,7 +661,10 @@ ${take.scriptExcerpt}
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${take.sceneTitle} · ${take.filmOrSeries} (${take.releaseYear})',
+                              take.filmOrSeries
+                                      .contains(take.releaseYear.toString())
+                                  ? '${take.sceneTitle} · ${take.filmOrSeries}'
+                                  : '${take.sceneTitle} · ${take.filmOrSeries} (${take.releaseYear})',
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 10.5,
@@ -659,24 +716,37 @@ ${take.scriptExcerpt}
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  '5-TO-1 GOLDEN STAR RATING BOX',
-                                  style: TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFFFFD700),
+                                const Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '5-TO-1 GOLDEN STAR RATING BOX',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFFFFD700),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                Text(
-                                  selectedStars != null
-                                      ? 'YOUR VERDICT: $selectedStars ★'
-                                      : 'AVG ${take.averageStarRating.toStringAsFixed(1)} ★ (${take.totalRatingsCount})',
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      selectedStars != null
+                                          ? 'YOUR VERDICT: $selectedStars ★'
+                                          : 'AVG ${take.averageStarRating.toStringAsFixed(1)} ★ (${take.totalRatingsCount})',
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],

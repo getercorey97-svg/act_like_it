@@ -105,6 +105,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
             builder: (_) => OnboardingQuestionnaireScreen(
               initialUsername: createdProfile.username,
               initialBirthYear: createdProfile.birthYear,
+              initialArchetypeId: _selectedArchetypeId,
             ),
           ),
         );
@@ -132,6 +133,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
               builder: (_) => OnboardingQuestionnaireScreen(
                 initialUsername: hydratedProfile.username,
                 initialBirthYear: hydratedProfile.birthYear,
+                initialArchetypeId: hydratedProfile.avatarArchetypeId,
               ),
             ),
           );
@@ -146,7 +148,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _statusMessage = e.toString().replaceFirst('Exception: ', '');
+        _statusMessage = _formatFriendlyAuthError(e);
       });
     } finally {
       if (mounted) {
@@ -155,6 +157,26 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
         });
       }
     }
+  }
+
+  String _formatFriendlyAuthError(Object error) {
+    final raw = error.toString();
+    final lower = raw.toLowerCase();
+    if (lower.contains('invalid_credentials') ||
+        lower.contains('invalid login credentials')) {
+      return 'Invalid stage email or password. Try again, switch to "NEW ACTOR PASS", or tap "TRACK B · SNEAK BACKSTAGE".';
+    }
+    if (lower.contains('user_already_exists') ||
+        lower.contains('already registered')) {
+      return 'That stage email is already registered. Switch to "SIGN IN" to claim your pass.';
+    }
+    if (lower.contains('rate_limit') || lower.contains('too many requests')) {
+      return 'Too many backstage attempts. Wait a moment or use "TRACK B · SNEAK BACKSTAGE".';
+    }
+    return raw
+        .replaceFirst('Exception: ', '')
+        .replaceAll(RegExp(r'AuthApiException\(message:\s*'), '')
+        .replaceAll(RegExp(r',\s*statusCode:.*\)'), '');
   }
 
   @override
@@ -241,7 +263,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _statusMessage = e.toString().replaceFirst('Exception: ', '');
+        _statusMessage = _formatFriendlyAuthError(e);
       });
     } finally {
       if (mounted) {
@@ -408,7 +430,10 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
                   label: 'TRACK A · CLAIM YOUR STAR',
                   selected: !_isTrackBSneakBackstage,
                   accent: const Color(0xFFF59E0B),
-                  onTap: () => setState(() => _isTrackBSneakBackstage = false),
+                  onTap: () => setState(() {
+                    _isTrackBSneakBackstage = false;
+                    _statusMessage = null;
+                  }),
                 ),
               ),
               const SizedBox(width: 8),
@@ -417,7 +442,10 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
                   label: 'TRACK B · SNEAK BACKSTAGE',
                   selected: _isTrackBSneakBackstage,
                   accent: const Color(0xFF10B981),
-                  onTap: () => setState(() => _isTrackBSneakBackstage = true),
+                  onTap: () => setState(() {
+                    _isTrackBSneakBackstage = true;
+                    _statusMessage = null;
+                  }),
                 ),
               ),
             ],
@@ -468,7 +496,10 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
                   label: 'SIGN IN',
                   selected: !_isSignUpMode,
                   accent: const Color(0xFF06B6D4),
-                  onTap: () => setState(() => _isSignUpMode = false),
+                  onTap: () => setState(() {
+                    _isSignUpMode = false;
+                    _statusMessage = null;
+                  }),
                 ),
               ),
               const SizedBox(width: 10),
@@ -477,7 +508,10 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
                   label: 'NEW ACTOR PASS',
                   selected: _isSignUpMode,
                   accent: const Color(0xFFA855F7),
-                  onTap: () => setState(() => _isSignUpMode = true),
+                  onTap: () => setState(() {
+                    _isSignUpMode = true;
+                    _statusMessage = null;
+                  }),
                 ),
               ),
             ],
@@ -519,38 +553,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
               ),
             ),
             const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'BIRTH YEAR (18+ GATE)',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFF59E0B),
-                  ),
-                ),
-                Text(
-                  '$_birthYear (${(currentYear - _birthYear) >= 18 ? "18+ Verified" : "Standard"})',
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            Slider(
-              value: _birthYear.toDouble(),
-              min: 1945,
-              max: (currentYear - 13).toDouble(),
-              divisions: (currentYear - 13) - 1945,
-              activeColor: const Color(0xFFF59E0B),
-              inactiveColor: const Color(0xFF1E293B),
-              onChanged: (v) => setState(() => _birthYear = v.round()),
-            ),
+            _buildBirthYearStepperRow(currentYear),
           ],
           if (_statusMessage != null) ...[
             const SizedBox(height: 12),
@@ -680,11 +683,12 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
           ),
           const SizedBox(height: 8),
           SizedBox(
-            height: 64,
+            height: 66,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               itemCount: kFourteenAvatarArchetypes.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final arch = kFourteenAvatarArchetypes[index];
                 final selected = arch.id == _selectedArchetypeId;
@@ -707,6 +711,180 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBirthYearStepperRow(int currentYear) {
+    final minYear = 1945;
+    final maxYear = currentYear - 13;
+    final is18Plus = (currentYear - _birthYear) >= 18;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07090E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1E293B)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'BIRTH YEAR (18+ GATE)',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFF59E0B),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  is18Plus ? '18+ After-Hours Verified' : 'Standard Access',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    color: is18Plus
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: _birthYear > minYear
+                ? () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _birthYear -= 1);
+                  }
+                : null,
+            icon: const Icon(
+              Icons.remove_circle_outline_rounded,
+              color: Color(0xFFF59E0B),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _openBirthYearPickerModal(minYear, maxYear),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B0E17),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF59E0B), width: 1.4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$_birthYear',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.unfold_more_rounded,
+                    size: 15,
+                    color: Color(0xFFF59E0B),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: _birthYear < maxYear
+                ? () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _birthYear += 1);
+                  }
+                : null,
+            icon: const Icon(
+              Icons.add_circle_outline_rounded,
+              color: Color(0xFFF59E0B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openBirthYearPickerModal(int minYear, int maxYear) async {
+    final years = List<int>.generate(
+      maxYear - minYear + 1,
+      (i) => maxYear - i,
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0B0E17),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: SizedBox(
+            height: 320,
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Text(
+                    'SELECT BIRTH YEAR (18+ VAULT GATE)',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                ),
+                const Divider(color: Color(0xFF1E293B), height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: years.length,
+                    itemBuilder: (context, index) {
+                      final yr = years[index];
+                      final selected = yr == _birthYear;
+                      return ListTile(
+                        dense: true,
+                        selected: selected,
+                        selectedTileColor:
+                            const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                        title: Text(
+                          '$yr',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 15,
+                            fontWeight:
+                                selected ? FontWeight.w900 : FontWeight.w600,
+                            color: selected
+                                ? const Color(0xFFF59E0B)
+                                : Colors.white,
+                          ),
+                        ),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _birthYear = yr);
+                          Navigator.of(ctx).pop();
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

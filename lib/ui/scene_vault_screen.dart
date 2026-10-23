@@ -133,6 +133,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
         page: LobbyMatchmakingScreen(
           initialCategory: ticket.category,
           startInJoinMode: false,
+          autoCreateOnInit: true,
         ),
       ),
     );
@@ -253,19 +254,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
       onTap: () => _onSelectTicket(ticket),
       child: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF141A29),
-              Color(0xFF0A0D16),
-            ],
-          ),
           borderRadius: BorderRadius.circular(26),
-          border: Border.all(
-            color: ticket.neonAccent,
-            width: 2.2,
-          ),
           boxShadow: [
             BoxShadow(
               color: ticket.neonAccent.withValues(alpha: 0.28),
@@ -275,7 +264,24 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
             ),
           ],
         ),
-        padding: const EdgeInsets.all(24),
+        child: ClipPath(
+          clipper: BoxOfficeTicketNotchClipper(),
+          child: CustomPaint(
+            foregroundPainter: _SceneVaultTicketBorderPainter(
+              accentColor: ticket.neonAccent,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF141A29),
+                    Color(0xFF0A0D16),
+                  ],
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(26, 24, 26, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -426,12 +432,15 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                 ),
                 onPressed: () => _onSelectTicket(ticket),
                 icon: const Icon(Icons.confirmation_number_rounded, size: 20),
-                label: Text(
-                  'STAMP TICKET & OPEN CALL SHEET',
-                  style: GoogleFonts.limelight(
-                    fontSize: 14,
-                    letterSpacing: 1.1,
-                    color: const Color(0xFF07090E),
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'STAMP TICKET & OPEN CALL SHEET',
+                    style: GoogleFonts.limelight(
+                      fontSize: 14,
+                      letterSpacing: 1.1,
+                      color: const Color(0xFF07090E),
+                    ),
                   ),
                 ),
               ),
@@ -439,6 +448,38 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
           ],
         ),
       ),
+    ),
+    ),
+    ),
     );
   }
+}
+
+class _SceneVaultTicketBorderPainter extends CustomPainter {
+  final Color accentColor;
+
+  const _SceneVaultTicketBorderPainter({required this.accentColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = BoxOfficeTicketNotchClipper().getClip(size);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFF05070B)
+        ..strokeWidth = 5.0
+        ..style = PaintingStyle.stroke,
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = accentColor
+        ..strokeWidth = 2.4
+        ..style = PaintingStyle.stroke,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SceneVaultTicketBorderPainter oldDelegate) =>
+      oldDelegate.accentColor != accentColor;
 }

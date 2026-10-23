@@ -224,12 +224,127 @@ BoondocksAvatarArchetype resolveAvatarArchetype(String? id) {
 /// Renders a gritty, high-contrast 2.5D Cell-Shaded ("The Boondocks" style)
 /// portrait of any of the 14 Avatar Archetypes using sharp black ink outlines,
 /// hard cel-shaded shadow blocks, halftone speed lines, and urban-satirical flair.
+/// Reusable 5-Layer 2.5D Articulated Puppet Rig ("The Boondocks" / comic-noir style).
+/// Runs at 60fps with an internal continuous [AnimationController] when [externalPhase]
+/// is not supplied, animating:
+/// 1. Secondary Hair/Coat Silhouette (0.4rad phase delay)
+/// 2. Breathing Torso & Shoulders (`math.sin(t * 2.5)`)
+/// 3. Expressive Head & Jaw (dynamic head tilt + talking smirk lines)
+/// 4. Natural Blinking Eyes & Specular Eyewear Sweep (140ms blink every 3.2s)
+/// 5. Active Foreground Prop Hand (megaphone, camera flash, trophy, cigar, etc.)
+class BoondocksCharacterRig extends StatefulWidget {
+  final BoondocksAvatarArchetype archetype;
+  final double size;
+  final bool isSelected;
+  final bool isMirroredReflection;
+  final double? externalPhase;
+  final VoidCallback? onTap;
+
+  const BoondocksCharacterRig({
+    super.key,
+    required this.archetype,
+    this.size = 76,
+    this.isSelected = false,
+    this.isMirroredReflection = false,
+    this.externalPhase,
+    this.onTap,
+  });
+
+  @override
+  State<BoondocksCharacterRig> createState() => _BoondocksCharacterRigState();
+}
+
+class _BoondocksCharacterRigState extends State<BoondocksCharacterRig>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _rigController;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.externalPhase == null) {
+      _rigController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 6400),
+      )..repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant BoondocksCharacterRig oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.externalPhase == null && _rigController == null) {
+      _rigController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 6400),
+      )..repeat();
+    } else if (widget.externalPhase != null && _rigController != null) {
+      _rigController?.dispose();
+      _rigController = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _rigController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final child = _rigController != null
+        ? AnimatedBuilder(
+            animation: _rigController!,
+            builder: (context, _) {
+              final elapsedSec = _rigController!.value * 6.4;
+              return CustomPaint(
+                painter: _BoondocksCellShadedPortraitPainter(
+                  archetype: widget.archetype,
+                  isSelected: widget.isSelected,
+                  phase: elapsedSec,
+                ),
+              );
+            },
+          )
+        : CustomPaint(
+            painter: _BoondocksCellShadedPortraitPainter(
+              archetype: widget.archetype,
+              isSelected: widget.isSelected,
+              phase: widget.externalPhase ?? 0.0,
+            ),
+          );
+
+    final rigBox = Opacity(
+      opacity: widget.isMirroredReflection ? 0.52 : 1.0,
+      child: Transform.scale(
+        scaleX: widget.isMirroredReflection ? -1.0 : 1.0,
+        child: SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: child,
+        ),
+      ),
+    );
+
+    if (widget.onTap != null) {
+      return GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: rigBox,
+      );
+    }
+    return rigBox;
+  }
+}
+
+/// Renders a gritty, high-contrast 2.5D Cell-Shaded ("The Boondocks" style)
+/// articulated 5-layer puppet portrait of any of the 14 Avatar Archetypes.
 class BoondocksAvatarPortrait extends StatelessWidget {
   final BoondocksAvatarArchetype archetype;
   final double size;
   final bool isSelected;
   final bool isMirroredReflection;
   final double animationPhase;
+  final VoidCallback? onTap;
 
   const BoondocksAvatarPortrait({
     super.key,
@@ -238,28 +353,214 @@ class BoondocksAvatarPortrait extends StatelessWidget {
     this.isSelected = false,
     this.isMirroredReflection = false,
     this.animationPhase = 0.0,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: isMirroredReflection ? 0.52 : 1.0,
-      child: Transform.scale(
-        scaleX: isMirroredReflection ? -1.0 : 1.0,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: CustomPaint(
-            painter: _BoondocksCellShadedPortraitPainter(
-              archetype: archetype,
-              isSelected: isSelected,
-              phase: animationPhase,
+    return BoondocksCharacterRig(
+      archetype: archetype,
+      size: size,
+      isSelected: isSelected,
+      isMirroredReflection: isMirroredReflection,
+      externalPhase: animationPhase != 0.0 ? animationPhase : null,
+      onTap: onTap,
+    );
+  }
+}
+
+/// Opens a full-card Spotlight Bio & Live 5-Layer Puppet Preview Modal when a
+/// player taps any 2.5D character rig on the Red Carpet or beside a Soundstage Door.
+Future<void> showBoondocksCharacterSpotlightModal(
+  BuildContext context,
+  BoondocksAvatarArchetype archetype, {
+  VoidCallback? onEquipped,
+}) async {
+  HapticFeedback.mediumImpact();
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (modalContext) {
+      final currentId =
+          AuthService.instance.currentProfile?.avatarArchetypeId ??
+              'the_method_actor';
+      final isAlreadyEquipped = currentId == archetype.id;
+
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xF807090E),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: archetype.primaryInkColor,
+                width: 3.0,
+              ),
+              boxShadow: <BoxShadow>[
+                const BoxShadow(
+                  color: Color(0xFF05070B),
+                  offset: Offset(6, 6),
+                  blurRadius: 0,
+                ),
+                BoxShadow(
+                  color: archetype.primaryInkColor.withValues(alpha: 0.35),
+                  blurRadius: 28,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: archetype.primaryInkColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '2.5D PUPPET RIG · ${archetype.roleBadge}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF05070B),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(modalContext).pop(),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFFF5DEB3),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    BoondocksCharacterRig(
+                      archetype: archetype,
+                      size: 112,
+                      isSelected: true,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            archetype.name,
+                            style: GoogleFonts.bebasNeue(
+                              fontSize: 30,
+                              letterSpacing: 1.5,
+                              color: const Color(0xFFF5DEB3),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            archetype.catchphrase,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFFDE68A),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0B0E17),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            child: Text(
+                              archetype.redCarpetActivity,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                color: Color(0xFF0CB6D4),
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isAlreadyEquipped
+                        ? const Color(0xFF10B981)
+                        : archetype.primaryInkColor,
+                    foregroundColor: const Color(0xFF05070B),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(
+                        color: Color(0xFF05070B),
+                        width: 2.5,
+                      ),
+                    ),
+                  ),
+                  onPressed: () async {
+                    HapticFeedback.heavyImpact();
+                    await AuthService.instance
+                        .updateAvatarArchetype(archetype.id);
+                    onEquipped?.call();
+                    if (modalContext.mounted) {
+                      Navigator.of(modalContext).pop();
+                      ScaffoldMessenger.of(modalContext).showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFF0B0E17),
+                          content: Text(
+                            'Equipped 2.5D Rig: ${archetype.name} (${archetype.roleBadge})',
+                            style: const TextStyle(color: Color(0xFFF5DEB3)),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  icon: Icon(
+                    isAlreadyEquipped
+                        ? Icons.verified_rounded
+                        : Icons.stars_rounded,
+                  ),
+                  label: Text(
+                    isAlreadyEquipped
+                        ? 'CURRENTLY EQUIPPED ON STAGE PASS'
+                        : 'EQUIP ${archetype.name.toUpperCase()} AS MY AVATAR',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
 }
 
 class _BoondocksCellShadedPortraitPainter extends CustomPainter {
@@ -277,6 +578,20 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.5, size.height * 0.5);
     final radius = size.shortestSide * 0.46;
+    final seed = archetype.silhouetteStyle * 0.65;
+    final t = phase;
+
+    // 5-Layer Articulated Kinematics
+    final breathBob = math.sin(t * 2.5 + seed) * (radius * 0.045);
+    final chestExpand = 1.0 + math.sin(t * 2.5 + seed) * 0.032;
+    final secondaryHairOffset =
+        math.sin(t * 2.5 + seed - 0.4) * (radius * 0.055);
+    final headTiltAngle = math.sin(t * 1.8 + seed) * 0.065;
+    final talkPulse = (math.sin(t * 6.2 + seed * 2.0) + 1.0) * 0.5;
+    // Periodic 140ms natural eye blink every 3.2 seconds
+    final cycleSec = (t + (archetype.silhouetteStyle * 0.23)) % 3.2;
+    final isBlinking = cycleSec >= 2.95 && cycleSec <= 3.09;
+    final lensSweepT = ((t * 0.55 + seed) % 1.6).clamp(0.0, 1.0);
 
     // 1. Comic Cell-Shaded Frame Background
     final bgRect = RRect.fromRectAndRadius(
@@ -296,16 +611,17 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
       ).createShader(Offset.zero & size);
     canvas.drawRRect(bgRect, bgPaint);
 
-    // 2. Kinetic Anime Speed Lines inside the frame
+    // Kinetic Anime Speed Lines inside the frame
     canvas.save();
     canvas.clipRRect(bgRect);
     final speedLinePaint = Paint()
-      ..color = archetype.rimAccentColor.withValues(alpha: isSelected ? 0.42 : 0.22)
+      ..color =
+          archetype.rimAccentColor.withValues(alpha: isSelected ? 0.42 : 0.22)
       ..strokeWidth = 1.6
       ..style = PaintingStyle.stroke;
 
     for (int i = 0; i < 10; i++) {
-      final angle = (i * math.pi / 5) + (phase * 0.3);
+      final angle = (i * math.pi / 5) + (t * 0.25);
       final innerR = radius * 0.52;
       final outerR = radius * 1.15;
       canvas.drawLine(
@@ -321,12 +637,42 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
       );
     }
 
-    // 3. Shoulders & Sharp Collar Silhouette (Heavy Ink + Cel Shadow Split)
+    // =========================================================================
+    // LAYER 1: Secondary Hair / Coat Collar Silhouette (0.4rad phase delay)
+    // =========================================================================
+    final capePath = Path()
+      ..moveTo(
+        center.dx - radius * 0.84 + secondaryHairOffset,
+        size.height,
+      )
+      ..lineTo(
+        center.dx - radius * 0.62 + secondaryHairOffset * 0.5,
+        center.dy + radius * 0.14 + breathBob,
+      )
+      ..lineTo(
+        center.dx + radius * 0.62 + secondaryHairOffset * 0.5,
+        center.dy + radius * 0.14 + breathBob,
+      )
+      ..lineTo(
+        center.dx + radius * 0.84 + secondaryHairOffset,
+        size.height,
+      )
+      ..close();
+    canvas.drawPath(
+      capePath,
+      Paint()..color = archetype.shadowBlockColor.withValues(alpha: 0.92),
+    );
+
+    // =========================================================================
+    // LAYER 2: Breathing Torso & Shoulders (`math.sin(t * 2.5)`)
+    // =========================================================================
+    final shoulderTopY = center.dy + radius * 0.25 + breathBob;
+    final halfShoulderW = radius * 0.54 * chestExpand;
     final shoulderPath = Path()
-      ..moveTo(center.dx - radius * 0.78, size.height)
-      ..lineTo(center.dx - radius * 0.52, center.dy + radius * 0.26)
-      ..lineTo(center.dx + radius * 0.52, center.dy + radius * 0.26)
-      ..lineTo(center.dx + radius * 0.78, size.height)
+      ..moveTo(center.dx - radius * 0.80 * chestExpand, size.height)
+      ..lineTo(center.dx - halfShoulderW, shoulderTopY)
+      ..lineTo(center.dx + halfShoulderW, shoulderTopY)
+      ..lineTo(center.dx + radius * 0.80 * chestExpand, size.height)
       ..close();
 
     final suitPaint = Paint()
@@ -336,20 +682,41 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
 
     // Hard cel-shaded lapel highlight on left side
     final lapelHighlight = Path()
-      ..moveTo(center.dx - radius * 0.52, center.dy + radius * 0.26)
-      ..lineTo(center.dx, center.dy + radius * 0.65)
+      ..moveTo(center.dx - halfShoulderW, shoulderTopY)
+      ..lineTo(center.dx, center.dy + radius * 0.64 + breathBob)
       ..lineTo(center.dx - radius * 0.26, size.height)
       ..lineTo(center.dx - radius * 0.72, size.height)
       ..close();
     canvas.drawPath(
       lapelHighlight,
-      Paint()..color = archetype.primaryInkColor.withValues(alpha: 0.72),
+      Paint()..color = archetype.primaryInkColor.withValues(alpha: 0.78),
     );
 
-    // 4. Angular Anime Jawline & Head Silhouette (Boondocks 2.5D geometry)
-    final headCenter = Offset(center.dx, center.dy - radius * 0.08);
+    // Right lapel & tie accent
+    final rightLapel = Path()
+      ..moveTo(center.dx + halfShoulderW, shoulderTopY)
+      ..lineTo(center.dx, center.dy + radius * 0.64 + breathBob)
+      ..lineTo(center.dx + radius * 0.22, size.height)
+      ..close();
+    canvas.drawPath(
+      rightLapel,
+      Paint()..color = archetype.rimAccentColor.withValues(alpha: 0.45),
+    );
+
+    // =========================================================================
+    // LAYER 3: Expressive Head & Jaw (Dynamic Head Tilt + Talking Mouth)
+    // =========================================================================
+    final headCenter = Offset(
+      center.dx + secondaryHairOffset * 0.25,
+      center.dy - radius * 0.08 + breathBob * 0.85,
+    );
     final headW = radius * 0.72;
     final headH = radius * 0.80;
+
+    canvas.save();
+    canvas.translate(headCenter.dx, headCenter.dy);
+    canvas.rotate(headTiltAngle);
+    canvas.translate(-headCenter.dx, -headCenter.dy);
 
     final jawPath = Path()
       ..moveTo(headCenter.dx - headW * 0.5, headCenter.dy - headH * 0.25)
@@ -384,21 +751,21 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
     );
     canvas.restore();
 
-    // 5. Archetype-Specific Hair / Hat / Crown / Afro / Fedora Silhouette
+    // Archetype-Specific Hair / Hat / Crown / Afro / Fedora Silhouette (with secondary sway)
     final hairPaint = Paint()
       ..color = const Color(0xFF07090E)
       ..style = PaintingStyle.fill;
     final styleIndex = archetype.silhouetteStyle % 5;
 
     if (styleIndex == 0 || styleIndex == 3) {
-      // Sharp spiked Boondocks anime hair / afro crown
       final hairPath = Path();
       const int spikes = 7;
       for (int i = 0; i <= spikes; i++) {
-        final t = i / spikes;
-        final angle = math.pi + (t * math.pi);
+        final frac = i / spikes;
+        final angle = math.pi + (frac * math.pi);
         final rOuter = headW * (0.72 + (i.isEven ? 0.22 : 0.04));
-        final px = headCenter.dx + math.cos(angle) * rOuter;
+        final px =
+            headCenter.dx + secondaryHairOffset * 0.35 + math.cos(angle) * rOuter;
         final py = (headCenter.dy - headH * 0.18) + math.sin(angle) * rOuter;
         if (i == 0) {
           hairPath.moveTo(px, py);
@@ -409,10 +776,12 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
       hairPath.close();
       canvas.drawPath(hairPath, hairPaint);
     } else if (styleIndex == 1 || styleIndex == 2) {
-      // Noir Fedora / Director Cap brim with neon band
       final brimRect = RRect.fromRectAndRadius(
         Rect.fromCenter(
-          center: Offset(headCenter.dx, headCenter.dy - headH * 0.34),
+          center: Offset(
+            headCenter.dx + secondaryHairOffset * 0.25,
+            headCenter.dy - headH * 0.34,
+          ),
           width: headW * 1.38,
           height: headH * 0.18,
         ),
@@ -420,7 +789,10 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
       );
       final crownRect = RRect.fromRectAndRadius(
         Rect.fromCenter(
-          center: Offset(headCenter.dx, headCenter.dy - headH * 0.56),
+          center: Offset(
+            headCenter.dx + secondaryHairOffset * 0.25,
+            headCenter.dy - headH * 0.56,
+          ),
           width: headW * 0.88,
           height: headH * 0.38,
         ),
@@ -430,110 +802,218 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
       canvas.drawRRect(brimRect, hairPaint);
       canvas.drawRect(
         Rect.fromCenter(
-          center: Offset(headCenter.dx, headCenter.dy - headH * 0.42),
+          center: Offset(
+            headCenter.dx + secondaryHairOffset * 0.25,
+            headCenter.dy - headH * 0.42,
+          ),
           width: headW * 0.88,
           height: 3.5,
         ),
         Paint()..color = archetype.rimAccentColor,
       );
     } else {
-      // High-volume cel-shaded sculpted waves
       canvas.drawCircle(
-        Offset(headCenter.dx - headW * 0.26, headCenter.dy - headH * 0.38),
+        Offset(
+          headCenter.dx - headW * 0.26 + secondaryHairOffset * 0.3,
+          headCenter.dy - headH * 0.38,
+        ),
         headW * 0.36,
         hairPaint,
       );
       canvas.drawCircle(
-        Offset(headCenter.dx + headW * 0.26, headCenter.dy - headH * 0.38),
+        Offset(
+          headCenter.dx + headW * 0.26 + secondaryHairOffset * 0.3,
+          headCenter.dy - headH * 0.38,
+        ),
         headW * 0.36,
         hairPaint,
       );
       canvas.drawCircle(
-        Offset(headCenter.dx, headCenter.dy - headH * 0.48),
+        Offset(
+          headCenter.dx + secondaryHairOffset * 0.3,
+          headCenter.dy - headH * 0.48,
+        ),
         headW * 0.42,
         hairPaint,
       );
     }
 
-    // 6. Sharp Anime Eyes / Cel-Shaded Visor Shades & Furrowed Brows
+    // =========================================================================
+    // LAYER 4: Natural Blinking Eyes & Specular Eyewear Sweep
+    // =========================================================================
     final eyeY = headCenter.dy - headH * 0.04;
+    final browLift = math.sin(t * 2.8 + seed) * 1.6;
     final browPaint = Paint()
       ..color = const Color(0xFF05070B)
       ..strokeWidth = 2.8
       ..strokeCap = StrokeCap.square;
 
-    // Furrowed confident Boondocks eyebrows
     canvas.drawLine(
-      Offset(headCenter.dx - headW * 0.34, eyeY - 6),
-      Offset(headCenter.dx - headW * 0.08, eyeY - 3),
+      Offset(headCenter.dx - headW * 0.34, eyeY - 6 - browLift),
+      Offset(headCenter.dx - headW * 0.08, eyeY - 3 + browLift * 0.5),
       browPaint,
     );
     canvas.drawLine(
-      Offset(headCenter.dx + headW * 0.34, eyeY - 6),
-      Offset(headCenter.dx + headW * 0.08, eyeY - 3),
+      Offset(headCenter.dx + headW * 0.34, eyeY - 6 - browLift),
+      Offset(headCenter.dx + headW * 0.08, eyeY - 3 + browLift * 0.5),
       browPaint,
     );
 
-    // Glowing cel-shaded shades / eyes with diagonal white slash highlight
+    final lensHeight = isBlinking ? 2.2 : headH * 0.16;
     final leftLens = Rect.fromCenter(
       center: Offset(headCenter.dx - headW * 0.20, eyeY + 1),
       width: headW * 0.28,
-      height: headH * 0.16,
+      height: lensHeight,
     );
     final rightLens = Rect.fromCenter(
       center: Offset(headCenter.dx + headW * 0.20, eyeY + 1),
       width: headW * 0.28,
-      height: headH * 0.16,
+      height: lensHeight,
     );
 
     final lensFill = Paint()
-      ..color = archetype.silhouetteStyle.isEven
-          ? const Color(0xFF07090E)
-          : Colors.white;
+      ..color = isBlinking
+          ? const Color(0xFF05070B)
+          : (archetype.silhouetteStyle.isEven
+              ? const Color(0xFF07090E)
+              : Colors.white);
     canvas.drawRect(leftLens, lensFill);
     canvas.drawRect(rightLens, lensFill);
 
-    // Diagonal anime lens glint
-    final glintPaint = Paint()
-      ..color = archetype.rimAccentColor
-      ..strokeWidth = 2.0;
-    canvas.drawLine(leftLens.topLeft, leftLens.bottomRight, glintPaint);
-    canvas.drawLine(rightLens.topLeft, rightLens.bottomRight, glintPaint);
+    if (!isBlinking) {
+      final sweepOffset = (lensSweepT - 0.5) * leftLens.width * 0.85;
+      final glintPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.9)
+        ..strokeWidth = 2.0;
+      canvas.drawLine(
+        Offset(leftLens.left + 2 + sweepOffset * 0.4, leftLens.top + 1),
+        Offset(leftLens.right - 2 + sweepOffset * 0.4, leftLens.bottom - 1),
+        glintPaint,
+      );
+      canvas.drawLine(
+        Offset(rightLens.left + 2 + sweepOffset * 0.4, rightLens.top + 1),
+        Offset(rightLens.right - 2 + sweepOffset * 0.4, rightLens.bottom - 1),
+        glintPaint,
+      );
+    }
 
-    // Confident smirk / cigar / grit line
+    // Expressive Animated Talking Mouth / Smirk Line
     final mouthY = headCenter.dy + headH * 0.26;
-    canvas.drawLine(
-      Offset(headCenter.dx - headW * 0.16, mouthY),
-      Offset(headCenter.dx + headW * 0.18, mouthY - 2),
-      browPaint,
+    if (talkPulse > 0.62 && isSelected) {
+      final mouthRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(headCenter.dx + 1, mouthY),
+          width: headW * 0.26,
+          height: 3.5 + talkPulse * 2.5,
+        ),
+        const Radius.circular(2),
+      );
+      canvas.drawRRect(mouthRect, Paint()..color = const Color(0xFF05070B));
+      canvas.drawLine(
+        Offset(mouthRect.left + 1.5, mouthRect.top + 1.5),
+        Offset(mouthRect.right - 1.5, mouthRect.top + 1.5),
+        Paint()
+          ..color = Colors.white
+          ..strokeWidth = 1.4,
+      );
+    } else {
+      canvas.drawLine(
+        Offset(headCenter.dx - headW * 0.16, mouthY),
+        Offset(headCenter.dx + headW * 0.18, mouthY - 2 - talkPulse * 1.5),
+        browPaint,
+      );
+    }
+
+    final inkOutlinePaint = Paint()
+      ..color = const Color(0xFF05070B)
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.miter;
+    canvas.drawPath(jawPath, inkOutlinePaint);
+    canvas.restore(); // End head rotation
+
+    canvas.drawPath(shoulderPath, inkOutlinePaint);
+
+    // =========================================================================
+    // LAYER 5: Active Foreground Prop Hand (Gesture & Prop Animation)
+    // =========================================================================
+    final propBobY = math.sin(t * 3.8 + seed) * (radius * 0.06);
+    final handCenter = Offset(
+      center.dx + radius * 0.46,
+      center.dy + radius * 0.42 + propBobY,
     );
-    if (archetype.id == 'the_mob_boss') {
-      // Cel-shaded cigar with glowing ember tip
+
+    canvas.drawCircle(
+      handCenter,
+      radius * 0.13,
+      Paint()..color = const Color(0xFFC68652),
+    );
+    canvas.drawCircle(
+      handCenter,
+      radius * 0.13,
+      Paint()
+        ..color = const Color(0xFF05070B)
+        ..strokeWidth = 2.2
+        ..style = PaintingStyle.stroke,
+    );
+
+    if (archetype.id == 'the_director') {
+      final cone = Path()
+        ..moveTo(handCenter.dx - 2, handCenter.dy)
+        ..lineTo(handCenter.dx - radius * 0.36, handCenter.dy - radius * 0.24)
+        ..lineTo(handCenter.dx - radius * 0.36, handCenter.dy + radius * 0.06)
+        ..close();
+      canvas.drawPath(cone, Paint()..color = const Color(0xFFE11342));
+      canvas.drawPath(
+        cone,
+        Paint()
+          ..color = const Color(0xFF05070B)
+          ..strokeWidth = 2.0
+          ..style = PaintingStyle.stroke,
+      );
+    } else if (archetype.id == 'the_mob_boss') {
       final cigarRect = Rect.fromLTWH(
         headCenter.dx + headW * 0.06,
-        mouthY - 3,
-        headW * 0.36,
+        headCenter.dy + headH * 0.22,
+        headW * 0.38,
         4.5,
       );
       canvas.drawRect(cigarRect, Paint()..color = const Color(0xFF78350F));
       canvas.drawCircle(
         Offset(cigarRect.right, cigarRect.center.dy),
-        2.6,
+        2.8,
         Paint()..color = const Color(0xFFEF4444),
+      );
+      canvas.drawCircle(
+        Offset(cigarRect.right + 4, cigarRect.top - 5 + propBobY),
+        3.2,
+        Paint()..color = Colors.white.withValues(alpha: 0.45),
+      );
+    } else if (archetype.id == 'the_paparazzo') {
+      final camRect = Rect.fromCenter(
+        center: Offset(handCenter.dx - radius * 0.12, handCenter.dy - 4),
+        width: radius * 0.28,
+        height: radius * 0.20,
+      );
+      canvas.drawRect(camRect, Paint()..color = const Color(0xFF05070B));
+      if ((t * 2.5).floor().isEven) {
+        canvas.drawCircle(
+          camRect.center,
+          radius * 0.18,
+          Paint()..color = const Color(0xFFF5DEB3).withValues(alpha: 0.85),
+        );
+      }
+    } else {
+      canvas.drawCircle(
+        Offset(handCenter.dx - radius * 0.10, handCenter.dy - radius * 0.12),
+        radius * 0.11,
+        Paint()..color = archetype.rimAccentColor,
       );
     }
 
-    // 7. Heavy 3.5px Jet-Black Comic Ink Outlines on Head & Shoulders
-    final inkOutlinePaint = Paint()
-      ..color = const Color(0xFF05070B)
-      ..strokeWidth = 3.2
-      ..style = PaintingStyle.stroke
-      ..strokeJoin = StrokeJoin.miter;
-    canvas.drawPath(shoulderPath, inkOutlinePaint);
-    canvas.drawPath(jawPath, inkOutlinePaint);
-    canvas.restore();
+    canvas.restore(); // End bgRect clip
 
-    // 8. Outer Comic Panel Border (Thick Ink + Neon Rim)
+    // Outer Comic Panel Border (Thick Ink + Neon Rim)
     canvas.drawRRect(
       bgRect,
       Paint()
@@ -544,7 +1024,8 @@ class _BoondocksCellShadedPortraitPainter extends CustomPainter {
     canvas.drawRRect(
       bgRect.deflate(1.6),
       Paint()
-        ..color = isSelected ? archetype.rimAccentColor : archetype.primaryInkColor
+        ..color =
+            isSelected ? archetype.rimAccentColor : archetype.primaryInkColor
         ..strokeWidth = isSelected ? 2.6 : 1.6
         ..style = PaintingStyle.stroke,
     );
@@ -870,6 +1351,7 @@ class _CellShadedIntroCinematicScreenState
   late final AnimationController _walkController;
   late final AnimationController _clapperSmashController;
   Timer? _autoDirectorCutTimer;
+  Timer? _spotlightCycleTimer;
 
   bool _isCuttingToAuth = false;
   int _spotlightArchetypeIndex = 0;
@@ -879,7 +1361,7 @@ class _CellShadedIntroCinematicScreenState
     super.initState();
     _walkController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
+      duration: const Duration(seconds: 12),
     )..repeat();
 
     _clapperSmashController = AnimationController(
@@ -887,34 +1369,31 @@ class _CellShadedIntroCinematicScreenState
       duration: const Duration(milliseconds: 820),
     );
 
-    // Cycle featured foreground archetype callouts during the first-person walk
-    _walkController.addListener(_onWalkTick);
+    // Cycle featured foreground archetype callout every 2.5 seconds (readable pace)
+    _spotlightCycleTimer = Timer.periodic(
+      const Duration(milliseconds: 2500),
+      (_) {
+        if (!mounted || _isCuttingToAuth) return;
+        setState(() {
+          _spotlightArchetypeIndex =
+              (_spotlightArchetypeIndex + 1) % kFourteenAvatarArchetypes.length;
+        });
+      },
+    );
 
-    // Auto-trigger the Director's "CUT!" clapperboard smash after 9.5 seconds
+    // Auto-trigger the Director's "CUT!" clapperboard smash after 18 seconds
     // if the player hasn't tapped Fast-Skip or Roll Camera yet.
-    _autoDirectorCutTimer = Timer(const Duration(milliseconds: 9500), () {
+    _autoDirectorCutTimer = Timer(const Duration(milliseconds: 18000), () {
       if (mounted && !_isCuttingToAuth) {
         _triggerDirectorCutToAuth();
       }
     });
   }
 
-  void _onWalkTick() {
-    if (!mounted) return;
-    final idx =
-        ((_walkController.value * kFourteenAvatarArchetypes.length).floor()) %
-            kFourteenAvatarArchetypes.length;
-    if (idx != _spotlightArchetypeIndex) {
-      setState(() {
-        _spotlightArchetypeIndex = idx;
-      });
-    }
-  }
-
   @override
   void dispose() {
     _autoDirectorCutTimer?.cancel();
-    _walkController.removeListener(_onWalkTick);
+    _spotlightCycleTimer?.cancel();
     _walkController.dispose();
     _clapperSmashController.dispose();
     super.dispose();
@@ -1054,54 +1533,65 @@ class _CellShadedIntroCinematicScreenState
                               ],
                             ),
                           ),
-                          const Spacer(),
-                          // High-contrast "FAST-SKIP TO RED CARPET" Glass Pill
-                          GestureDetector(
-                            onTap: _handleFastSkipToRedCarpet,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(999),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xE607090E),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: const Color(0xFFF5DEB3),
-                                      width: 2.2,
+                          const SizedBox(width: 8),
+                          // High-contrast "FAST-SKIP TO RED CARPET" Glass Pill wrapped in Flexible + FittedBox
+                          Flexible(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: GestureDetector(
+                                onTap: _handleFastSkipToRedCarpet,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(
+                                      sigmaX: 12,
+                                      sigmaY: 12,
                                     ),
-                                    boxShadow: const <BoxShadow>[
-                                      BoxShadow(
-                                        color: Color(0xFF05070B),
-                                        offset: Offset(3, 3),
-                                        blurRadius: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
                                       ),
-                                    ],
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.fast_forward_rounded,
-                                        color: Color(0xFFF5DEB3),
-                                        size: 15,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xE607090E),
+                                        borderRadius: BorderRadius.circular(999),
+                                        border: Border.all(
+                                          color: const Color(0xFFF5DEB3),
+                                          width: 2.2,
+                                        ),
+                                        boxShadow: const <BoxShadow>[
+                                          BoxShadow(
+                                            color: Color(0xFF05070B),
+                                            offset: Offset(3, 3),
+                                            blurRadius: 0,
+                                          ),
+                                        ],
                                       ),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        'FAST-SKIP TO RED CARPET',
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.7,
-                                          color: Color(0xFFF5DEB3),
+                                      child: const FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.fast_forward_rounded,
+                                              color: Color(0xFFF5DEB3),
+                                              size: 15,
+                                            ),
+                                            SizedBox(width: 5),
+                                            Text(
+                                              'FAST-SKIP TO RED CARPET',
+                                              style: TextStyle(
+                                                fontFamily: 'monospace',
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: 0.5,
+                                                color: Color(0xFFF5DEB3),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1408,23 +1898,27 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
           ..strokeWidth = 1.5 + easedT * 3.0,
       );
 
-      // Left & Right 2.5D Archetype Silhouettes leaning over the velvet ropes
+      // Left & Right 5-Layer 2.5D Archetype Puppets leaning over the velvet ropes
       final leftArch = kFourteenAvatarArchetypes[(i * 2) % 14];
       final rightArch = kFourteenAvatarArchetypes[(i * 2 + 1) % 14];
-      final charScale = 16.0 + easedT * 42.0;
+      final charScale = 22.0 + easedT * 48.0;
 
-      _drawCellShadedCrowdFigure(
+      _drawArticulatedRedCarpetPuppet(
         canvas,
         anchor: Offset(centerX - halfW - charScale * 0.45, y),
         scale: charScale,
-        accent: leftArch.primaryInkColor,
+        archetype: leftArch,
+        walkProgress: walkProgress,
+        isLeftSide: true,
         flashActive: (i + (walkProgress * 12).floor()) % 3 == 0,
       );
-      _drawCellShadedCrowdFigure(
+      _drawArticulatedRedCarpetPuppet(
         canvas,
         anchor: Offset(centerX + halfW + charScale * 0.45, y),
         scale: charScale,
-        accent: rightArch.primaryInkColor,
+        archetype: rightArch,
+        walkProgress: walkProgress,
+        isLeftSide: false,
         flashActive: (i + (walkProgress * 12).floor()) % 4 == 0,
       );
     }
@@ -1445,48 +1939,129 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
     }
   }
 
-  void _drawCellShadedCrowdFigure(
+  void _drawArticulatedRedCarpetPuppet(
     Canvas canvas, {
     required Offset anchor,
     required double scale,
-    required Color accent,
+    required BoondocksAvatarArchetype archetype,
+    required double walkProgress,
+    required bool isLeftSide,
     required bool flashActive,
   }) {
-    final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: Offset(anchor.dx, anchor.dy - scale * 0.45),
-        width: scale * 0.72,
-        height: scale * 0.9,
-      ),
-      Radius.circular(scale * 0.16),
-    );
-    final headCenter = Offset(anchor.dx, anchor.dy - scale * 1.05);
+    final t = walkProgress * math.pi * 4 + archetype.silhouetteStyle * 0.7;
+    final breathBob = math.sin(t) * (scale * 0.04);
+    final hairLag = math.sin(t - 0.4) * (scale * 0.05);
+    final headTilt = math.sin(t * 0.8) * 0.08 * (isLeftSide ? 1.0 : -1.0);
+    final dirSign = isLeftSide ? 1.0 : -1.0;
 
-    // Fill + Cel Rim
-    canvas.drawRRect(bodyRect, Paint()..color = const Color(0xFF07090E));
-    canvas.drawCircle(headCenter, scale * 0.28, Paint()..color = const Color(0xFF07090E));
-
-    // Rim highlight
-    canvas.drawRRect(
-      bodyRect,
-      Paint()
-        ..color = accent
-        ..strokeWidth = 2.0
-        ..style = PaintingStyle.stroke,
+    // 1. Secondary Coat/Cape Layer
+    final capePath = Path()
+      ..moveTo(anchor.dx - scale * 0.42 + hairLag, anchor.dy)
+      ..lineTo(anchor.dx - scale * 0.30, anchor.dy - scale * 0.78 + breathBob)
+      ..lineTo(anchor.dx + scale * 0.30, anchor.dy - scale * 0.78 + breathBob)
+      ..lineTo(anchor.dx + scale * 0.42 + hairLag, anchor.dy)
+      ..close();
+    canvas.drawPath(
+      capePath,
+      Paint()..color = archetype.shadowBlockColor,
     );
-    canvas.drawCircle(
-      headCenter,
-      scale * 0.28,
+
+    // 2. Breathing Torso & Cel-Shaded Lapels
+    final torsoTop = anchor.dy - scale * 0.74 + breathBob;
+    final torsoPath = Path()
+      ..moveTo(anchor.dx - scale * 0.36, anchor.dy)
+      ..lineTo(anchor.dx - scale * 0.28, torsoTop)
+      ..lineTo(anchor.dx + scale * 0.28, torsoTop)
+      ..lineTo(anchor.dx + scale * 0.36, anchor.dy)
+      ..close();
+    canvas.drawPath(torsoPath, Paint()..color = const Color(0xFF0E131F));
+
+    final lapelPath = Path()
+      ..moveTo(anchor.dx - scale * 0.24 * dirSign, torsoTop)
+      ..lineTo(anchor.dx, torsoTop + scale * 0.34)
+      ..lineTo(anchor.dx - scale * 0.14 * dirSign, anchor.dy)
+      ..close();
+    canvas.drawPath(
+      lapelPath,
+      Paint()..color = archetype.primaryInkColor.withValues(alpha: 0.85),
+    );
+    canvas.drawPath(
+      torsoPath,
       Paint()
         ..color = const Color(0xFF05070B)
-        ..strokeWidth = 3.0
+        ..strokeWidth = 2.4
+        ..style = PaintingStyle.stroke,
+    );
+
+    // 3. Expressive Tilted Head & Angular Jaw
+    final headCenter = Offset(
+      anchor.dx + hairLag * 0.3,
+      anchor.dy - scale * 1.02 + breathBob,
+    );
+    final headR = scale * 0.25;
+    canvas.save();
+    canvas.translate(headCenter.dx, headCenter.dy);
+    canvas.rotate(headTilt);
+
+    final jawRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: headR * 1.75,
+        height: headR * 1.9,
+      ),
+      Radius.circular(headR * 0.45),
+    );
+    canvas.drawRRect(jawRect, Paint()..color = const Color(0xFFC68652));
+    canvas.drawRRect(
+      jawRect,
+      Paint()
+        ..color = const Color(0xFF05070B)
+        ..strokeWidth = 2.4
+        ..style = PaintingStyle.stroke,
+    );
+
+    // Hair / Fedora Crown
+    final crownRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(0, -headR * 0.85),
+        width: headR * 2.1,
+        height: headR * 0.65,
+      ),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(crownRect, Paint()..color = const Color(0xFF05070B));
+
+    // 4. Visor Shades & Glint
+    final visorRect = Rect.fromCenter(
+      center: Offset(headR * 0.15 * dirSign, -headR * 0.08),
+      width: headR * 1.25,
+      height: headR * 0.42,
+    );
+    canvas.drawRect(visorRect, Paint()..color = archetype.rimAccentColor);
+    canvas.restore();
+
+    // 5. Active Prop Hand Reaching Over the Velvet Rope
+    final handPos = Offset(
+      anchor.dx + dirSign * scale * 0.38,
+      anchor.dy - scale * 0.56 + math.sin(t * 1.6) * (scale * 0.06),
+    );
+    canvas.drawCircle(
+      handPos,
+      scale * 0.09,
+      Paint()..color = archetype.primaryInkColor,
+    );
+    canvas.drawCircle(
+      handPos,
+      scale * 0.09,
+      Paint()
+        ..color = const Color(0xFF05070B)
+        ..strokeWidth = 2.0
         ..style = PaintingStyle.stroke,
     );
 
     if (flashActive) {
-      // 4-point comic flashburst in Limelight Gold
-      final flashCenter = Offset(anchor.dx, anchor.dy - scale * 0.85);
-      final r = scale * 0.65;
+      final flashCenter = Offset(handPos.dx, handPos.dy - scale * 0.18);
+      final r = scale * 0.55;
       final path = Path()
         ..moveTo(flashCenter.dx - r, flashCenter.dy)
         ..lineTo(flashCenter.dx - 3, flashCenter.dy - 3)

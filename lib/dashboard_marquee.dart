@@ -159,7 +159,7 @@ class _LivingMarqueeDashboardScreenState
       'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
 
   static const List<String> _liveMarqueeFeedItems = [
-    'STAGE LIVE · ROOM #482910 PERFORMING "THE DARK KNIGHT (2008)" — FULL ENSEMBLE ON SET',
+    'STAGE LIVE · ROOM #482910 PERFORMING "THE GOTHAM INTERROGATION" — FULL ENSEMBLE ON SET',
     'HIGH SCORE · @NAOMI_V HIT 98.4 COMPOSITE TRI-MODAL SCORE ON "WHIPLASH"',
     'AI TELEMETRICS · GEMINI 2.5 FLASH EVALUATED 1,420 MICRO-EXPRESSION FRAMES THIS HOUR',
     'VIRAL LOOP · @MARCUS_S26 HIT +410 SOCIAL SHARES IN SPECIALTY: CULT CLASSICS',
@@ -200,12 +200,17 @@ class _LivingMarqueeDashboardScreenState
     )..repeat();
 
     _audioPlayer = AudioPlayer();
+    GameSettingsModal.volumeNotifier.addListener(_onMasterVolumeChanged);
     _initGameShowMusicLoop();
 
     OfflineManager.instance.ensureInitialized().then((_) {
       if (mounted) setState(() {});
     });
     _refreshVipHudState();
+  }
+
+  void _onMasterVolumeChanged() {
+    _audioPlayer.setVolume(GameSettingsModal.volumeNotifier.value);
   }
 
   Future<void> _refreshVipHudState() async {
@@ -268,6 +273,7 @@ class _LivingMarqueeDashboardScreenState
   Future<void> _initGameShowMusicLoop() async {
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setVolume(GameSettingsModal.masterAudioVolume);
       await _audioPlayer.play(
         UrlSource(_gameShowSoundtrackUrl),
       );
@@ -330,6 +336,7 @@ class _LivingMarqueeDashboardScreenState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    GameSettingsModal.volumeNotifier.removeListener(_onMasterVolumeChanged);
     _redCarpetScrollController.removeListener(_onRedCarpetScroll);
     _redCarpetScrollController.dispose();
     _ticketPageController.removeListener(_onTicketScroll);
@@ -347,6 +354,25 @@ class _LivingMarqueeDashboardScreenState
     required bool joinMode,
   }) async {
     HapticFeedback.mediumImpact();
+    final selectedTicket = kSceneVaultTickets[_focusedTicketIndex];
+
+    // Door 1 ("JOIN 6-DIGIT ROOM") navigates directly to the 6-digit Airlock Join screen
+    if (joinMode) {
+      await _pauseMusicBeforeNavigation();
+      if (!mounted) return;
+      await BespokeTransitionEngine.navigate(
+        context: context,
+        type: BespokeTransitionType.soundstageDoorSlam,
+        destination: LobbyMatchmakingScreen(
+          initialCategory: selectedTicket.category,
+          startInJoinMode: true,
+        ),
+      );
+      return;
+    }
+
+    // Door 0 ("CREATE LOBBY / QUICK PLAY") opens The Call Sheet once, then
+    // auto-creates the 6-digit lobby and lands directly in the Studio Green Room.
     final settings = await showModalBottomSheet<GameSettingsConfig>(
       context: context,
       isScrollControlled: true,
@@ -358,15 +384,13 @@ class _LivingMarqueeDashboardScreenState
     await _pauseMusicBeforeNavigation();
     if (!mounted) return;
 
-    final selectedTicket = kSceneVaultTickets[_focusedTicketIndex];
     await BespokeTransitionEngine.navigate(
       context: context,
-      type: joinMode
-          ? BespokeTransitionType.soundstageDoorSlam
-          : BespokeTransitionType.clapperboardSnap,
+      type: BespokeTransitionType.clapperboardSnap,
       destination: LobbyMatchmakingScreen(
         initialCategory: selectedTicket.category,
-        startInJoinMode: joinMode,
+        startInJoinMode: false,
+        autoCreateOnInit: true,
       ),
     );
   }
@@ -592,7 +616,7 @@ class _LivingMarqueeDashboardScreenState
                               ),
                             ),
                             SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                              padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
                               sliver: SliverList(
                                 delegate: SliverChildListDelegate(
                                   BespokePremiereDoorsList.buildSixDoors(

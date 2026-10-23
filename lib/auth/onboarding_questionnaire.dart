@@ -132,8 +132,12 @@ class _OnboardingQuestionnaireScreenState
           ? widget.initialUsername
           : (existing?.username ?? 'StageStar'),
     );
-    _selectedBirthYear = existing?.birthYear ?? widget.initialBirthYear;
-    _selectedArchetypeId = existing?.avatarArchetypeId ?? widget.initialArchetypeId;
+    _selectedBirthYear = widget.initialBirthYear != 1998
+        ? widget.initialBirthYear
+        : (existing?.birthYear ?? widget.initialBirthYear);
+    _selectedArchetypeId = widget.initialArchetypeId != 'the_method_actor'
+        ? widget.initialArchetypeId
+        : (existing?.avatarArchetypeId ?? widget.initialArchetypeId);
     if (existing != null) {
       if (existing.favoriteEras.isNotEmpty) {
         _selectedEras
@@ -342,9 +346,9 @@ class _OnboardingQuestionnaireScreenState
 
   Widget _buildStepProgressIndicator() {
     const stepLabels = <String>[
-      '1. FAVORITE ERAS',
-      '2. ACTING STRENGTHS',
-      '3. STAGE CREDENTIALS',
+      '1. ERAS',
+      '2. STRENGTHS',
+      '3. VIP PASS',
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -375,17 +379,20 @@ class _OnboardingQuestionnaireScreenState
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    stepLabels[index],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      color: (isCurrent || isDone)
-                          ? Colors.white
-                          : const Color(0xFF64748B),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      stepLabels[index],
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: (isCurrent || isDone)
+                            ? Colors.white
+                            : const Color(0xFF64748B),
+                      ),
                     ),
                   ),
                 ],
@@ -489,33 +496,35 @@ class _OnboardingQuestionnaireScreenState
                   ),
                   child: GestureDetector(
                     onTap: () => onToggleTicket(ticket.id),
-                    child: ClipPath(
-                      clipper: _RedCarpetTicketClipper(),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        padding: const EdgeInsets.all(22),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0B0E17),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected
-                                ? ticket.neonAccent
-                                : const Color(0xFF1E293B),
-                            width: isSelected ? 2.4 : 1.3,
+                    child: CustomPaint(
+                      foregroundPainter: _RedCarpetPerforatedTicketBorderPainter(
+                        borderColor: isSelected
+                            ? ticket.neonAccent
+                            : const Color(0xFF334155),
+                        strokeWidth: isSelected ? 2.6 : 1.5,
+                        showPerforationLine: true,
+                      ),
+                      child: ClipPath(
+                        clipper: _RedCarpetTicketClipper(),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          padding: const EdgeInsets.all(22),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0B0E17),
+                            boxShadow: isSelected
+                                ? <BoxShadow>[
+                                    BoxShadow(
+                                      color: ticket.neonAccent
+                                          .withValues(alpha: 0.28),
+                                      blurRadius: 24,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : const <BoxShadow>[],
                           ),
-                          boxShadow: isSelected
-                              ? <BoxShadow>[
-                                  BoxShadow(
-                                    color: ticket.neonAccent.withOpacity(0.28),
-                                    blurRadius: 24,
-                                    spreadRadius: 2,
-                                  ),
-                                ]
-                              : const <BoxShadow>[],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                             Row(
                               children: [
                                 Container(
@@ -655,6 +664,7 @@ class _OnboardingQuestionnaireScreenState
                         ),
                       ),
                     ),
+                    ),
                   ),
                 ),
               );
@@ -730,90 +740,96 @@ class _OnboardingQuestionnaireScreenState
             ),
           ),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B0E17),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: chosenArchetype.primaryInkColor,
-                width: 2.2,
-              ),
+          CustomPaint(
+            foregroundPainter: _RedCarpetPerforatedTicketBorderPainter(
+              borderColor: chosenArchetype.primaryInkColor,
+              strokeWidth: 2.2,
+              showPerforationLine: true,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            child: ClipPath(
+              clipper: _RedCarpetTicketClipper(),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0B0E17),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    BoondocksAvatarPortrait(
-                      archetype: chosenArchetype,
-                      size: 64,
-                      isSelected: true,
+                    Row(
+                      children: [
+                        BoondocksAvatarPortrait(
+                          archetype: chosenArchetype,
+                          size: 64,
+                          isSelected: true,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                chosenArchetype.roleBadge,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: chosenArchetype.primaryInkColor,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                chosenArchetype.name,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                chosenArchetype.catchphrase,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontStyle: FontStyle.italic,
+                                  color: Color(0xFFFDE68A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            chosenArchetype.roleBadge,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: chosenArchetype.primaryInkColor,
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 66,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        itemCount: kFourteenAvatarArchetypes.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final arch = kFourteenAvatarArchetypes[index];
+                          final selected = arch.id == _selectedArchetypeId;
+                          return GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _selectedArchetypeId = arch.id;
+                              });
+                            },
+                            child: BoondocksAvatarPortrait(
+                              archetype: arch,
+                              size: selected ? 62 : 52,
+                              isSelected: selected,
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            chosenArchetype.name,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            chosenArchetype.catchphrase,
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontStyle: FontStyle.italic,
-                              color: Color(0xFFFDE68A),
-                            ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 66,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: kFourteenAvatarArchetypes.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final arch = kFourteenAvatarArchetypes[index];
-                      final selected = arch.id == _selectedArchetypeId;
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() {
-                            _selectedArchetypeId = arch.id;
-                          });
-                        },
-                        child: BoondocksAvatarPortrait(
-                          archetype: arch,
-                          size: selected ? 62 : 52,
-                          isSelected: selected,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -903,20 +919,8 @@ class _OnboardingQuestionnaireScreenState
                     ),
                   ],
                 ),
-                Slider(
-                  value: _selectedBirthYear.toDouble(),
-                  min: 1945,
-                  max: (currentYear - 13).toDouble(),
-                  divisions: (currentYear - 13) - 1945,
-                  activeColor: const Color(0xFFF59E0B),
-                  inactiveColor: const Color(0xFF1E293B),
-                  label: '$_selectedBirthYear',
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedBirthYear = value.round();
-                    });
-                  },
-                ),
+                const SizedBox(height: 10),
+                _buildStep3BirthYearPickerRow(currentYear, is18Plus),
                 const Divider(color: Color(0xFF1E293B), height: 24),
                 _buildSummaryRow(
                   label: 'STAMPED ERAS',
@@ -973,6 +977,172 @@ class _OnboardingQuestionnaireScreenState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStep3BirthYearPickerRow(int currentYear, bool is18Plus) {
+    final minYear = 1945;
+    final maxYear = currentYear - 13;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07090E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1E293B)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'SELECT BIRTH YEAR',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: _selectedBirthYear > minYear
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _selectedBirthYear -= 1);
+                      }
+                    : null,
+                icon: const Icon(
+                  Icons.remove_circle_outline_rounded,
+                  color: Color(0xFFF59E0B),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _openStep3YearWheelModal(minYear, maxYear),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B0E17),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFF59E0B),
+                      width: 1.4,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$_selectedBirthYear',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.unfold_more_rounded,
+                        size: 15,
+                        color: Color(0xFFF59E0B),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: _selectedBirthYear < maxYear
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _selectedBirthYear += 1);
+                      }
+                    : null,
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: Color(0xFFF59E0B),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openStep3YearWheelModal(int minYear, int maxYear) async {
+    final years = List<int>.generate(
+      maxYear - minYear + 1,
+      (i) => maxYear - i,
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0B0E17),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: SizedBox(
+            height: 320,
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Text(
+                    'SELECT BIRTH YEAR (18+ VAULT GATE)',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                ),
+                const Divider(color: Color(0xFF1E293B), height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: years.length,
+                    itemBuilder: (context, index) {
+                      final yr = years[index];
+                      final selected = yr == _selectedBirthYear;
+                      return ListTile(
+                        dense: true,
+                        selected: selected,
+                        selectedTileColor:
+                            const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                        title: Text(
+                          '$yr',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 15,
+                            fontWeight:
+                                selected ? FontWeight.w900 : FontWeight.w600,
+                            color: selected
+                                ? const Color(0xFFF59E0B)
+                                : Colors.white,
+                          ),
+                        ),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _selectedBirthYear = yr);
+                          Navigator.of(ctx).pop();
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1070,31 +1240,88 @@ class _OnboardingQuestionnaireScreenState
 class _RedCarpetTicketClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
+    const cornerRadius = 18.0;
     const notchRadius = 14.0;
     final notchCenterY = size.height * 0.68;
     final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
+      ..moveTo(cornerRadius, 0)
+      ..lineTo(size.width - cornerRadius, 0)
+      ..quadraticBezierTo(size.width, 0, size.width, cornerRadius)
       ..lineTo(size.width, notchCenterY - notchRadius)
       ..arcToPoint(
         Offset(size.width, notchCenterY + notchRadius),
         radius: const Radius.circular(notchRadius),
         clockwise: false,
       )
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
+      ..lineTo(size.width, size.height - cornerRadius)
+      ..quadraticBezierTo(
+        size.width,
+        size.height,
+        size.width - cornerRadius,
+        size.height,
+      )
+      ..lineTo(cornerRadius, size.height)
+      ..quadraticBezierTo(0, size.height, 0, size.height - cornerRadius)
       ..lineTo(0, notchCenterY + notchRadius)
       ..arcToPoint(
         Offset(0, notchCenterY - notchRadius),
         radius: const Radius.circular(notchRadius),
         clockwise: false,
       )
+      ..lineTo(0, cornerRadius)
+      ..quadraticBezierTo(0, 0, cornerRadius, 0)
       ..close();
     return path;
   }
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+/// Paints the neon border along the notched [_RedCarpetTicketClipper] path and
+/// draws a horizontal dashed perforation line between the semicircular notches.
+class _RedCarpetPerforatedTicketBorderPainter extends CustomPainter {
+  final Color borderColor;
+  final double strokeWidth;
+  final bool showPerforationLine;
+
+  const _RedCarpetPerforatedTicketBorderPainter({
+    required this.borderColor,
+    required this.strokeWidth,
+    this.showPerforationLine = true,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = _RedCarpetTicketClipper().getClip(size);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = borderColor
+        ..strokeWidth = strokeWidth
+        ..style = PaintingStyle.stroke,
+    );
+
+    if (showPerforationLine) {
+      final notchY = size.height * 0.68;
+      final dashPaint = Paint()
+        ..color = borderColor.withValues(alpha: 0.45)
+        ..strokeWidth = 1.4;
+      double x = 18.0;
+      while (x < size.width - 18.0) {
+        canvas.drawLine(Offset(x, notchY), Offset(x + 6.0, notchY), dashPaint);
+        x += 12.0;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant _RedCarpetPerforatedTicketBorderPainter oldDelegate,
+  ) {
+    return oldDelegate.borderColor != borderColor ||
+        oldDelegate.strokeWidth != strokeWidth;
+  }
 }
 
 /// Renders slow-moving Cyan, Purple, and Amber neon spotlights across the

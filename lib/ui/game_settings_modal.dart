@@ -32,6 +32,9 @@ class GameSettingsConfig {
 /// and runtime Cloud API credentials.
 class GameSettingsModal extends StatefulWidget {
   static GameSettingsConfig latestConfig = const GameSettingsConfig();
+  static double masterAudioVolume = 0.35;
+  static final ValueNotifier<double> volumeNotifier =
+      ValueNotifier<double>(0.35);
 
   final String? modeTitle;
   final VoidCallback? onRollCamera;
@@ -62,10 +65,11 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
   late final TextEditingController _supaUrlCtrl;
   late final TextEditingController _supaKeyCtrl;
   late final TextEditingController _liveKitCtrl;
-  double _audioVolume = 0.85;
+  double _audioVolume = GameSettingsModal.masterAudioVolume;
   bool _hapticsEnabled = true;
   String _cameraResolution = '1080p60 Cinematic';
   bool _hasSavedCredentials = false;
+  bool _showDeveloperDiagnostics = false;
 
   @override
   void initState() {
@@ -153,97 +157,108 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
               ],
             ),
             child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-              24.0,
-              24.0,
-              24.0,
-              24.0 + mediaQuery.viewInsets.bottom,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-              // Drag Handle
-              Center(
-                child: Container(
-                  width: 52,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5DEB3),
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: const Color(0xFF05070B), width: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              if (widget.isGeneralSettings) ...[
-                _buildGeneralSettingsConsole(),
-              ] else ...[
-                // Call Sheet Header
-              Row(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF520002),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: const Color(0xFFF5DEB3),
-                        width: 2.2,
+                  Flexible(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        24.0,
+                        20.0,
+                        24.0,
+                        widget.isGeneralSettings
+                            ? 24.0 + mediaQuery.viewInsets.bottom
+                            : 12.0,
                       ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0xFF05070B),
-                          offset: Offset(4, 4),
-                          blurRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: Color(0xFFF5DEB3),
-                      size: 26,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DIRECTOR\'S CALL SHEET · TOTAL CAST: ${widget.totalCastCount ?? 1} PLAYERS',
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
-                            color: Color(0xFFF5DEB3),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.modeTitle ?? 'STUDIO SOUNDBOARD',
-                          style: GoogleFonts.limelight(
-                            fontSize: 24,
-                            color: Colors.white,
-                            letterSpacing: 1.0,
-                            shadows: const [
-                              Shadow(
-                                color: Color(0xFFE11342),
-                                offset: Offset(2, 2),
-                                blurRadius: 0,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Drag Handle
+                          Center(
+                            child: Container(
+                              width: 52,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF5DEB3),
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(
+                                  color: const Color(0xFF05070B),
+                                  width: 1.5,
+                                ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                          const SizedBox(height: 20),
+                          if (widget.isGeneralSettings) ...[
+                            _buildGeneralSettingsConsole(),
+                          ] else ...[
+                            // Call Sheet Header
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF520002),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: const Color(0xFFF5DEB3),
+                                      width: 2.2,
+                                    ),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0xFF05070B),
+                                        offset: Offset(4, 4),
+                                        blurRadius: 0,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.tune_rounded,
+                                    color: Color(0xFFF5DEB3),
+                                    size: 26,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'DIRECTOR\'S CALL SHEET · TOTAL CAST: ${widget.totalCastCount ?? 1} ${(widget.totalCastCount ?? 1) == 1 ? "PLAYER" : "PLAYERS"}',
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 1.2,
+                                          color: Color(0xFFF5DEB3),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        widget.modeTitle ?? 'STUDIO SOUNDBOARD',
+                                        style: GoogleFonts.limelight(
+                                          fontSize: 24,
+                                          color: Colors.white,
+                                          letterSpacing: 1.0,
+                                          shadows: const [
+                                            Shadow(
+                                              color: Color(0xFFE11342),
+                                              offset: Offset(2, 2),
+                                              blurRadius: 0,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
               const SizedBox(height: 28),
 
               // Section Label: Studio Judging Faders
@@ -335,76 +350,113 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   setState(() => _screenTestDuetMode = val);
                 },
               ),
-              const SizedBox(height: 32),
-
-              // Massive 2.5D Cell-Shaded Neon-Bordered "ROLL CAMERA" Action Button
-              GestureDetector(
-                onTap: _handleRollCamera,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFFE11342),
-                        Color(0xFF520002),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: const Color(0xFFF5DEB3),
-                      width: 2.8,
-                    ),
-                    boxShadow: [
-                      const BoxShadow(
-                        color: Color(0xFF05070B),
-                        offset: Offset(6, 6),
-                        blurRadius: 0,
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFFE11342).withValues(alpha: 0.55),
-                        blurRadius: 24,
-                        spreadRadius: 2,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.videocam_rounded,
-                        color: Color(0xFFF5DEB3),
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'ROLL CAMERA',
-                        style: GoogleFonts.limelight(
-                          fontSize: 22,
-                          color: Colors.white,
-                          letterSpacing: 2.0,
-                          shadows: const [
-                            Shadow(
-                              color: Color(0xFF05070B),
-                              offset: Offset(2.5, 2.5),
-                              blurRadius: 0,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               ],
             ],
             ),
           ),
         ),
-      ),
-      ),
-      ),
+        if (!widget.isGeneralSettings)
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              10.0,
+              24.0,
+              18.0 + mediaQuery.viewInsets.bottom,
+            ),
+            decoration: const BoxDecoration(
+              color: Color(0xFA07090E),
+              border: Border(
+                top: BorderSide(color: Color(0xFF1E293B), width: 1.5),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'SCROLL FOR MORE STUDIO FADERS ↑↓',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _handleRollCamera,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFFE11342),
+                          Color(0xFF520002),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFFF5DEB3),
+                        width: 2.8,
+                      ),
+                      boxShadow: [
+                        const BoxShadow(
+                          color: Color(0xFF05070B),
+                          offset: Offset(6, 6),
+                          blurRadius: 0,
+                        ),
+                        BoxShadow(
+                          color:
+                              const Color(0xFFE11342).withValues(alpha: 0.55),
+                          blurRadius: 24,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.videocam_rounded,
+                          color: Color(0xFFF5DEB3),
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'ROLL CAMERA',
+                          style: GoogleFonts.limelight(
+                            fontSize: 22,
+                            color: Colors.white,
+                            letterSpacing: 2.0,
+                            shadows: const [
+                              Shadow(
+                                color: Color(0xFF05070B),
+                                offset: Offset(2.5, 2.5),
+                                blurRadius: 0,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  ),
+),
+),
+),
     );
   }
 
@@ -512,6 +564,8 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 inactiveColor: const Color(0xFF1E293B),
                 onChanged: (v) {
                   setState(() => _audioVolume = v);
+                  GameSettingsModal.masterAudioVolume = v;
+                  GameSettingsModal.volumeNotifier.value = v;
                 },
               ),
               const Divider(color: Color(0xFF1E293B), height: 20),
@@ -593,83 +647,146 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
         ),
         const SizedBox(height: 24),
 
-        // Section 3: Cloud API Runtime Vault
-        const Text(
-          'CLOUD API RUNTIME VAULT',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.4,
-            color: Color(0xFF94A3B8),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _geminiCtrl,
-          decoration: const InputDecoration(
-            labelText: 'GEMINI_API_KEY (AI Telemetrics)',
-            filled: true,
-            fillColor: Color(0xFF0B0E17),
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _supaUrlCtrl,
-          decoration: const InputDecoration(
-            labelText: 'SUPABASE_URL (https://xxx.supabase.co)',
-            filled: true,
-            fillColor: Color(0xFF0B0E17),
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _supaKeyCtrl,
-          decoration: const InputDecoration(
-            labelText: 'SUPABASE_ANON_KEY',
-            filled: true,
-            fillColor: Color(0xFF0B0E17),
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _liveKitCtrl,
-          decoration: const InputDecoration(
-            labelText: 'LIVEKIT_URL (wss://xxx.livekit.cloud)',
-            filled: true,
-            fillColor: Color(0xFF0B0E17),
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF06B6D4),
-            foregroundColor: const Color(0xFF07090E),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+        // Section 3: Collapsed Developer Diagnostics Accordion (Locked by Default)
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B0E17),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _showDeveloperDiagnostics
+                  ? const Color(0xFF06B6D4)
+                  : const Color(0xFF1E293B),
             ),
           ),
-          onPressed: _saveCloudCredentials,
-          icon: Icon(
-            _hasSavedCredentials
-                ? Icons.check_circle_rounded
-                : Icons.save_rounded,
-            size: 20,
-          ),
-          label: Text(
-            _hasSavedCredentials
-                ? 'CREDENTIALS SAVED TO VAULT'
-                : 'SAVE RUNTIME CLOUD CREDENTIALS',
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.0,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _showDeveloperDiagnostics = !_showDeveloperDiagnostics;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _showDeveloperDiagnostics
+                            ? Icons.lock_open_rounded
+                            : Icons.lock_outline_rounded,
+                        size: 18,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'DEVELOPER DIAGNOSTICS (LOCKED)',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.1,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        _showDeveloperDiagnostics
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_showDeveloperDiagnostics)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _geminiCtrl,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'GEMINI_API_KEY (AI Telemetrics)',
+                          filled: true,
+                          fillColor: Color(0xFF07090E),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _supaUrlCtrl,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'SUPABASE_URL (https://xxx.supabase.co)',
+                          filled: true,
+                          fillColor: Color(0xFF07090E),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _supaKeyCtrl,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'SUPABASE_ANON_KEY',
+                          filled: true,
+                          fillColor: Color(0xFF07090E),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _liveKitCtrl,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'LIVEKIT_URL (wss://xxx.livekit.cloud)',
+                          filled: true,
+                          fillColor: Color(0xFF07090E),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF06B6D4),
+                          foregroundColor: const Color(0xFF07090E),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: _saveCloudCredentials,
+                        icon: Icon(
+                          _hasSavedCredentials
+                              ? Icons.check_circle_rounded
+                              : Icons.save_rounded,
+                          size: 18,
+                        ),
+                        label: Text(
+                          _hasSavedCredentials
+                              ? 'CREDENTIALS SAVED TO VAULT'
+                              : 'SAVE RUNTIME CLOUD CREDENTIALS',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 8),

@@ -1031,8 +1031,9 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                             ),
                           ),
                         ),
-                      // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face)
-                      if (scene != null) _buildTeleprompterOverlay(scene),
+                      // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face — shown once recording starts)
+                      if (scene != null && !_isPreRolling)
+                        _buildTeleprompterOverlay(scene),
                       // 10-Second Pre-Roll Translucent Clapperboard Overlay
                       if (_isPreRolling) _buildPreRollClapperboardOverlay(scene),
                     ],
@@ -1170,11 +1171,14 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                 ),
                 onPressed: _skipPreRollAndRollCamera,
                 icon: const Icon(Icons.fast_forward_rounded, size: 18),
-                label: const Text(
-                  'SNAP CLAPPERBOARD & ROLL CAMERA (30s TAKE)',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w900,
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'SNAP CLAPPERBOARD & ROLL CAMERA (30s TAKE)',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),

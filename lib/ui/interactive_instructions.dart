@@ -308,38 +308,44 @@ class _InteractiveInstructionsScreenState
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: currentSlide.neonAccent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: currentSlide.neonAccent.withValues(alpha: 0.7),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: currentSlide.neonAccent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: currentSlide.neonAccent.withValues(alpha: 0.7),
+                ),
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.movie_creation_outlined,
+                      size: 14,
+                      color: currentSlide.neonAccent,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'DIRECTOR\'S HANDBOOK · ${currentSlide.takeNumber}',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: currentSlide.neonAccent,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.movie_creation_outlined,
-                  size: 14,
-                  color: currentSlide.neonAccent,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'DIRECTOR\'S HANDBOOK · ${currentSlide.takeNumber}',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
-                    color: currentSlide.neonAccent,
-                  ),
-                ),
-              ],
-            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 10),
           IconButton(
             onPressed: _closeInstructionsBackToLobby,
             tooltip: 'Back to Lobby',
@@ -463,17 +469,23 @@ class _InteractiveInstructionsScreenState
             ),
             child: Row(
               children: [
-                Text(
-                  slide.slateCode,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.9,
-                    color: Color(0xFF94A3B8),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      slide.slateCode,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.9,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -484,13 +496,16 @@ class _InteractiveInstructionsScreenState
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: slide.neonAccent, width: 1),
                   ),
-                  child: Text(
-                    slide.weightBadge,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: slide.neonAccent,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      slide.weightBadge,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: slide.neonAccent,
+                      ),
                     ),
                   ),
                 ),
@@ -913,15 +928,18 @@ class _InteractiveInstructionsScreenState
                         : Icons.arrow_forward_rounded,
                     size: 18,
                   ),
-                  label: Text(
-                    isFinalSlide
-                        ? 'BACK TO RED CARPET'
-                        : 'NEXT SLIDE (${_currentIndex + 1}/${kInstructionStorySlides.length})',
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.8,
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      isFinalSlide
+                          ? 'BACK TO RED CARPET'
+                          : 'NEXT SLIDE (${_currentIndex + 1}/${kInstructionStorySlides.length})',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
                 ),
