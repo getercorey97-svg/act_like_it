@@ -485,7 +485,7 @@ ${take.scriptExcerpt}
                             archetype: archetype,
                             size: 136,
                             isSelected: true,
-                            phaseOverride: phase,
+                            externalPhase: phase,
                           ),
                         ),
                         const SizedBox(height: 12),
