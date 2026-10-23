@@ -86,68 +86,72 @@ class BespokeTransitionEngine {
   static Future<T?> navigateToAuthWithLogoGlide<T>({
     required BuildContext context,
     required Widget destination,
+    bool replace = false,
   }) {
     HapticFeedback.heavyImpact();
-    return Navigator.of(context).pushReplacement<T, void>(
-      PageRouteBuilder<T>(
-        transitionDuration: const Duration(milliseconds: 900),
-        reverseTransitionDuration: const Duration(milliseconds: 450),
-        pageBuilder: (context, animation, secondaryAnimation) => destination,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              final t = animation.value.clamp(0.0, 1.0);
-              // 0ms-300ms (t: 0.0 -> 0.33): Golden radial flash bloom & blur
-              final flashOpacity = t < 0.34
-                  ? math.sin((t / 0.34) * math.pi) * 0.68
-                  : 0.0;
-              final blurSigma = (t < 0.5 ? (t / 0.5) * 18.0 : (1.0 - (t - 0.5) / 0.5) * 18.0)
-                  .clamp(0.0, 18.0);
-              final fadeIn = Curves.easeOutCubic.transform(
-                ((t - 0.12) / 0.88).clamp(0.0, 1.0),
-              );
+    final route = PageRouteBuilder<T>(
+      transitionDuration: const Duration(milliseconds: 900),
+      reverseTransitionDuration: const Duration(milliseconds: 450),
+      pageBuilder: (context, animation, secondaryAnimation) => destination,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            final t = animation.value.clamp(0.0, 1.0);
+            // 0ms-300ms (t: 0.0 -> 0.33): Golden radial flash bloom & blur
+            final flashOpacity =
+                t < 0.34 ? math.sin((t / 0.34) * math.pi) * 0.68 : 0.0;
+            final blurSigma = (t < 0.5
+                    ? (t / 0.5) * 18.0
+                    : (1.0 - (t - 0.5) / 0.5) * 18.0)
+                .clamp(0.0, 18.0);
+            final fadeIn = Curves.easeOutCubic.transform(
+              ((t - 0.12) / 0.88).clamp(0.0, 1.0),
+            );
 
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (blurSigma > 0.2)
-                    BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: blurSigma,
-                        sigmaY: blurSigma,
-                      ),
-                      child: const SizedBox.expand(),
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                if (blurSigma > 0.2)
+                  BackdropFilter(
+                    filter: ImageFilter.blur(
+                      sigmaX: blurSigma,
+                      sigmaY: blurSigma,
                     ),
-                  Opacity(
-                    opacity: fadeIn,
-                    child: child,
+                    child: const SizedBox.expand(),
                   ),
-                  if (flashOpacity > 0.01)
-                    IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: RadialGradient(
-                            center: const Alignment(0.0, 0.25),
-                            radius: 0.95,
-                            colors: <Color>[
-                              const Color(0xFFFFE082)
-                                  .withValues(alpha: flashOpacity),
-                              const Color(0xFFFFB300)
-                                  .withValues(alpha: flashOpacity * 0.55),
-                              Colors.transparent,
-                            ],
-                          ),
+                Opacity(
+                  opacity: fadeIn,
+                  child: child,
+                ),
+                if (flashOpacity > 0.01)
+                  IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: const Alignment(0.0, 0.25),
+                          radius: 0.95,
+                          colors: <Color>[
+                            const Color(0xFFFFE082)
+                                .withValues(alpha: flashOpacity),
+                            const Color(0xFFFFB300)
+                                .withValues(alpha: flashOpacity * 0.55),
+                            Colors.transparent,
+                          ],
                         ),
                       ),
                     ),
-                ],
-              );
-            },
-          );
-        },
-      ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
     );
+    if (replace) {
+      return Navigator.of(context).pushReplacement<T, Object?>(route);
+    }
+    return Navigator.of(context).push<T>(route);
   }
 }
 
