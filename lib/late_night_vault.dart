@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
 import 'lobby.dart';
+import 'auth/auth_service.dart';
+import 'monetization/payment_dashboard_screen.dart';
 
 /// Categorizes the intensity tiers inside the hidden Late-Night After-Hours Vault.
 enum LateNightSpiceTier {
@@ -504,6 +506,42 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFF5DEB3),
+                    side: const BorderSide(color: Color(0xFFF5DEB3)),
+                  ),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PaymentDashboardScreen(
+                          highlightProductKey: 'vip_speakeasy_pass',
+                        ),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                  icon: Icon(
+                    AuthService.instance.hasVipSpeakeasyPass
+                        ? Icons.verified_rounded
+                        : Icons.workspace_premium_rounded,
+                    size: 16,
+                  ),
+                  label: Text(
+                    AuthService.instance.hasVipSpeakeasyPass
+                        ? '🍸 VIP SPEAKEASY PASS ACTIVE (ALL TIERS UNLOCKED)'
+                        : '🍸 UNLOCK VIP SPEAKEASY PASS (\$4.99/mo · ALL TIER 3 SCRIPTS)',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -512,9 +550,69 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
   }
 
   Widget _buildUnlockedVaultView() {
+    final hasVipPass = AuthService.instance.hasVipSpeakeasyPass;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF140910),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasVipPass
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFFF5DEB3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                hasVipPass
+                    ? Icons.verified_rounded
+                    : Icons.nightlife_rounded,
+                color: hasVipPass
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFF5DEB3),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  hasVipPass
+                      ? 'VIP Speakeasy Pass Active · All Tier 3 Double-Dare Scripts Unlocked'
+                      : 'VIP Speakeasy Pass (\$4.99/mo) · Unlock All Uncut Tier 3 Scripts & Monthly Drops',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              if (!hasVipPass)
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PaymentDashboardScreen(
+                          highlightProductKey: 'vip_speakeasy_pass',
+                        ),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                  child: const Text(
+                    'UPGRADE',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFF5DEB3),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         DropdownButtonFormField<LateNightSpiceTier>(
           value: _controller.selectedTier,
           decoration: const InputDecoration(

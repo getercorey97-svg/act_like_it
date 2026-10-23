@@ -815,6 +815,21 @@ class BespokePremiereDoorsList {
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
+              Builder(
+                builder: (ctx) => GestureDetector(
+                  onTap: () => showBoondocksCharacterSpotlightModal(
+                    ctx,
+                    kFourteenAvatarArchetypes[5],
+                  ),
+                  child: BoondocksCharacterRig(
+                    archetype: kFourteenAvatarArchetypes[5],
+                    size: 56,
+                    isSelected: true,
+                    externalPhase: phase,
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -1080,23 +1095,49 @@ class BespokePremiereDoorsList {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              'JOIN 6-DIGIT ROOM',
-              style: GoogleFonts.chakraPetch(
-                fontSize: 25,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Punch in your castmate\'s 6-digit backstage pass and step directly under the live studio lights.',
-              style: GoogleFonts.montserrat(
-                fontSize: 12.5,
-                height: 1.35,
-                color: const Color(0xFFCBD5E1),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'JOIN 6-DIGIT ROOM',
+                        style: GoogleFonts.chakraPetch(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Punch in your castmate\'s 6-digit backstage pass and step directly under the live studio lights.',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 12.5,
+                          height: 1.35,
+                          color: const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Builder(
+                  builder: (ctx) => GestureDetector(
+                    onTap: () => showBoondocksCharacterSpotlightModal(
+                      ctx,
+                      kFourteenAvatarArchetypes[1],
+                    ),
+                    child: BoondocksCharacterRig(
+                      archetype: kFourteenAvatarArchetypes[1],
+                      size: 56,
+                      isSelected: true,
+                      externalPhase: phase,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -1321,6 +1362,21 @@ class BespokePremiereDoorsList {
               ],
             ),
           ),
+          const SizedBox(width: 10),
+          Builder(
+            builder: (ctx) => GestureDetector(
+              onTap: () => showBoondocksCharacterSpotlightModal(
+                ctx,
+                kFourteenAvatarArchetypes[4],
+              ),
+              child: BoondocksCharacterRig(
+                archetype: kFourteenAvatarArchetypes[4],
+                size: 56,
+                isSelected: true,
+                externalPhase: phase,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1414,6 +1470,21 @@ class BespokePremiereDoorsList {
                     ],
                   ),
                 ),
+                const SizedBox(width: 10),
+                Builder(
+                  builder: (ctx) => GestureDetector(
+                    onTap: () => showBoondocksCharacterSpotlightModal(
+                      ctx,
+                      kFourteenAvatarArchetypes[13],
+                    ),
+                    child: BoondocksCharacterRig(
+                      archetype: kFourteenAvatarArchetypes[13],
+                      size: 56,
+                      isSelected: true,
+                      externalPhase: phase,
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -1504,6 +1575,21 @@ class BespokePremiereDoorsList {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Builder(
+              builder: (ctx) => GestureDetector(
+                onTap: () => showBoondocksCharacterSpotlightModal(
+                  ctx,
+                  kFourteenAvatarArchetypes[3],
+                ),
+                child: BoondocksCharacterRig(
+                  archetype: kFourteenAvatarArchetypes[3],
+                  size: 56,
+                  isSelected: true,
+                  externalPhase: phase,
+                ),
               ),
             ),
           ],

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../lobby.dart';
+import '../auth/auth_service.dart';
+import '../monetization/payment_dashboard_screen.dart';
 import 'premiere_red_carpet_painters.dart';
 import 'game_app_bar.dart';
 import 'game_settings_modal.dart';
@@ -140,6 +142,20 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
     );
   }
 
+  Future<void> _openHostPaysUnlock(VaultEraTicketSpec ticket) async {
+    HapticFeedback.mediumImpact();
+    final key = (ticket.category == SceneCategory.awardsEmmyVault ||
+            ticket.category == SceneCategory.specialtyCultClassics)
+        ? 'emmy_cult_bundle'
+        : 'all_era_vault';
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PaymentDashboardScreen(highlightProductKey: key),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeTicket = kVaultEraTickets[_activeIndex];
@@ -168,81 +184,85 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'VINTAGE BOX OFFICE WINDOW · SWIPE REELS',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.4,
-                      color: activeTicket.neonAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'THE SCENE VAULT',
-                    style: GoogleFonts.limelight(
-                      fontSize: 30,
-                      color: Colors.white,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _ticketController,
-                physics: const BouncingScrollPhysics(),
-                itemCount: kVaultEraTickets.length,
-                onPageChanged: (idx) {
-                  HapticFeedback.selectionClick();
-                  setState(() => _activeIndex = idx);
-                },
-                itemBuilder: (context, index) {
-                  final ticket = kVaultEraTickets[index];
-                  final delta = (_pagePosition - index).abs().clamp(0.0, 1.0);
-                  final scale = 1.0 - (delta * 0.07);
-
-                  return Transform.scale(
-                    scale: scale,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'VINTAGE BOX OFFICE WINDOW · SWIPE REELS',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
+                        color: activeTicket.neonAccent,
                       ),
-                      child: _buildLargeMovieTicket(ticket),
                     ),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(kVaultEraTickets.length, (i) {
-                  final selected = i == _activeIndex;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    height: 8,
-                    width: selected ? 28 : 8,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? activeTicket.neonAccent
-                          : const Color(0xFF334155),
-                      borderRadius: BorderRadius.circular(99),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'THE SCENE VAULT',
+                        style: GoogleFonts.limelight(
+                          fontSize: 30,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ),
-                  );
-                }),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+              Expanded(
+                child: PageView.builder(
+                  controller: _ticketController,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: kVaultEraTickets.length,
+                  onPageChanged: (idx) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _activeIndex = idx);
+                  },
+                  itemBuilder: (context, index) {
+                    final ticket = kVaultEraTickets[index];
+                    final delta = (_pagePosition - index).abs().clamp(0.0, 1.0);
+                    final scale = 1.0 - (delta * 0.07);
+
+                    return Transform.scale(
+                      scale: scale,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 16,
+                        ),
+                        child: _buildLargeMovieTicket(ticket),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(kVaultEraTickets.length, (i) {
+                    final selected = i == _activeIndex;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      height: 8,
+                      width: selected ? 28 : 8,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? activeTicket.neonAccent
+                            : const Color(0xFF334155),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -250,6 +270,8 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
 
   Widget _buildLargeMovieTicket(VaultEraTicketSpec ticket) {
     final prompts = kBuiltInSceneVault[ticket.category] ?? const [];
+    final isUnlocked = AuthService.instance.hasAllEraBundle ||
+        AuthService.instance.hasEmmyAndCultVault;
 
     return GestureDetector(
       onTap: () => _onSelectTicket(ticket),
@@ -283,175 +305,234 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                 ),
               ),
               padding: const EdgeInsets.fromLTRB(26, 24, 26, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ticket.neonAccent.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: ticket.neonAccent),
-                            ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        ticket.neonAccent.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: ticket.neonAccent),
+                                  ),
+                                  child: Text(
+                                    ticket.admitCode,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      color: ticket.neonAccent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                ticket.icon,
+                                color: ticket.neonAccent,
+                                size: 32,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
                             child: Text(
-                              ticket.admitCode,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: ticket.neonAccent,
+                              ticket.eraTitle,
+                              style: GoogleFonts.limelight(
+                                fontSize: 32,
+                                color: Colors.white,
+                                letterSpacing: 1.2,
+                                height: 1.1,
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          ticket.icon,
-                          color: ticket.neonAccent,
-                          size: 32,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      ticket.eraTitle,
-                      style: GoogleFonts.limelight(
-                        fontSize: 32,
-                        color: Colors.white,
-                        letterSpacing: 1.2,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      ticket.tagline,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFE2E8F0),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    // Perforated tear-line
-                    Row(
-                      children: List.generate(22, (i) {
-                        return Expanded(
-                          child: Container(
-                            height: 1.6,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            color: i.isEven
-                                ? ticket.neonAccent.withValues(alpha: 0.5)
-                                : Colors.transparent,
+                          const SizedBox(height: 8),
+                          Text(
+                            ticket.tagline,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFE2E8F0),
+                            ),
                           ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'FEATURED SOUNDSTAGE REELS',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: Color(0xFF94A3B8),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      ticket.featuredReels,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.45,
-                        color: Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    if (prompts.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF07090E),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF1E293B)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'SPOTLIGHT SCRIPT · ${prompts.first.filmOrSeries} (${prompts.first.releaseYear})',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: ticket.neonAccent,
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: () => _openHostPaysUnlock(ticket),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isUnlocked
+                                    ? const Color(0x2610B981)
+                                    : const Color(0x26F5DEB3),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isUnlocked
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFFF5DEB3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isUnlocked
+                                        ? Icons.verified_rounded
+                                        : Icons.workspace_premium_rounded,
+                                    size: 14,
+                                    color: isUnlocked
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFF5DEB3),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      isUnlocked
+                                          ? 'HOST-PAYS PACK UNLOCKED · ALL GUESTS PLAY FREE'
+                                          : 'HOST-PAYS UNLOCK · GUESTS PLAY FREE (TAP FOR VIP BOX OFFICE)',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: isUnlocked
+                                            ? const Color(0xFF10B981)
+                                            : const Color(0xFFF5DEB3),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '"${prompts.first.promptScript}"',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontStyle: FontStyle.italic,
-                                height: 1.45,
-                                color: Colors.white70,
+                          ),
+                          const SizedBox(height: 16),
+                          // Perforated tear-line
+                          Row(
+                            children: List.generate(22, (i) {
+                              return Expanded(
+                                child: Container(
+                                  height: 1.6,
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 2),
+                                  color: i.isEven
+                                      ? ticket.neonAccent.withValues(alpha: 0.5)
+                                      : Colors.transparent,
+                                ),
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'FEATURED SOUNDSTAGE REELS',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            ticket.featuredReels,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              color: Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          if (prompts.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF07090E),
+                                borderRadius: BorderRadius.circular(14),
+                                border:
+                                    Border.all(color: const Color(0xFF1E293B)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'SPOTLIGHT SCRIPT · ${prompts.first.filmOrSeries} (${prompts.first.releaseYear})',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: ticket.neonAccent,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '"${prompts.first.promptScript}"',
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontStyle: FontStyle.italic,
+                                      height: 1.45,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ticket.neonAccent,
-                  foregroundColor: const Color(0xFF07090E),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () => _onSelectTicket(ticket),
-                icon: const Icon(Icons.confirmation_number_rounded, size: 20),
-                label: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'STAMP TICKET & OPEN CALL SHEET',
-                    style: GoogleFonts.limelight(
-                      fontSize: 14,
-                      letterSpacing: 1.1,
-                      color: const Color(0xFF07090E),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ticket.neonAccent,
+                        foregroundColor: const Color(0xFF07090E),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () => _onSelectTicket(ticket),
+                      icon: const Icon(Icons.confirmation_number_rounded,
+                          size: 20),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'STAMP TICKET & OPEN CALL SHEET',
+                          style: GoogleFonts.limelight(
+                            fontSize: 14,
+                            letterSpacing: 1.1,
+                            color: const Color(0xFF07090E),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
-    ),
-    ),
-    ),
     );
   }
 }

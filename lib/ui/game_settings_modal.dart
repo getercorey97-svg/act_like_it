@@ -13,6 +13,8 @@ class GameSettingsConfig {
   final bool socialJudgingEnabled;
   final bool improvRouletteWildcard;
   final bool screenTestDuetMode;
+  final int roundsCount;
+  final String turnMode; // 'pass_and_play' | 'cross_internet_live'
 
   const GameSettingsConfig({
     this.aiTelemetricsEnabled = true,
@@ -20,6 +22,8 @@ class GameSettingsConfig {
     this.socialJudgingEnabled = true,
     this.improvRouletteWildcard = false,
     this.screenTestDuetMode = false,
+    this.roundsCount = 3,
+    this.turnMode = 'cross_internet_live',
   });
 }
 
@@ -60,6 +64,8 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
   bool _improvRouletteWildcard =
       GameSettingsModal.latestConfig.improvRouletteWildcard;
   bool _screenTestDuetMode = GameSettingsModal.latestConfig.screenTestDuetMode;
+  int _roundsCount = GameSettingsModal.latestConfig.roundsCount;
+  String _turnMode = GameSettingsModal.latestConfig.turnMode;
 
   late final TextEditingController _geminiCtrl;
   late final TextEditingController _supaUrlCtrl;
@@ -112,12 +118,19 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
 
   void _handleRollCamera() {
     HapticFeedback.heavyImpact();
+    if (!_aiTelemetricsEnabled &&
+        !_peerJudgingEnabled &&
+        !_socialJudgingEnabled) {
+      _aiTelemetricsEnabled = true;
+    }
     final config = GameSettingsConfig(
       aiTelemetricsEnabled: _aiTelemetricsEnabled,
       peerJudgingEnabled: _peerJudgingEnabled,
       socialJudgingEnabled: _socialJudgingEnabled,
       improvRouletteWildcard: _improvRouletteWildcard,
       screenTestDuetMode: _screenTestDuetMode,
+      roundsCount: _roundsCount,
+      turnMode: _turnMode,
     );
     GameSettingsModal.latestConfig = config;
     Navigator.of(context).pop(config);
@@ -349,6 +362,188 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   HapticFeedback.mediumImpact();
                   setState(() => _screenTestDuetMode = val);
                 },
+              ),
+              const SizedBox(height: 22),
+
+              // Section Label: Match Structure & Multiplayer Rules
+              const Text(
+                'MATCH LENGTH & ENSEMBLE TURN MODE',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.4,
+                  color: Color(0xFFF5DEB3),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D111C),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFF1E293B),
+                    width: 2.0,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'OFFICIAL ROUNDS PER MATCH',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [1, 3, 5].map((int r) {
+                        final bool selected = _roundsCount == r;
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: r == 5 ? 0 : 8),
+                            child: GestureDetector(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                setState(() => _roundsCount = r);
+                              },
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? const Color(0x28F59E0B)
+                                      : const Color(0xFF07090E),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: selected
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF1E293B),
+                                    width: 1.6,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  r == 1
+                                      ? '1 ROUND (QUICK)'
+                                      : '$r ROUNDS',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: selected
+                                        ? const Color(0xFFF5DEB3)
+                                        : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'MULTIPLAYER TURN SYNCHRONIZATION',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(
+                                () => _turnMode = 'cross_internet_live',
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _turnMode == 'cross_internet_live'
+                                    ? const Color(0x260CB6D4)
+                                    : const Color(0xFF07090E),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _turnMode == 'cross_internet_live'
+                                      ? const Color(0xFF0CB6D4)
+                                      : const Color(0xFF1E293B),
+                                  width: 1.6,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '🌐 CROSS-INTERNET LIVE',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _turnMode = 'pass_and_play');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _turnMode == 'pass_and_play'
+                                    ? const Color(0x26E11342)
+                                    : const Color(0xFF07090E),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _turnMode == 'pass_and_play'
+                                      ? const Color(0xFFE11342)
+                                      : const Color(0xFF1E293B),
+                                  width: 1.6,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '📱 COUCH PASS & PLAY',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               ],

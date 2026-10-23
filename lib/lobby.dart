@@ -823,6 +823,36 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                           : 'Generate 6-Digit Set Pass'),
                 ),
               ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0CB6D4),
+                  side: const BorderSide(color: Color(0xFF0CB6D4), width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: _lobbyManager.isLoading
+                    ? null
+                    : () {
+                        HapticFeedback.heavyImpact();
+                        _lobbyManager.quickJoinPublicLobby(
+                          displayName: _nameController.text,
+                          fallbackCategory: _selectedCategory,
+                        );
+                      },
+                icon: const Icon(Icons.public_rounded, size: 18),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '🌐 QUICK-JOIN PUBLIC ENSEMBLE',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -832,10 +862,13 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
 
   Future<void> _shareVipSetPass(LobbySession session) async {
     HapticFeedback.mediumImpact();
+    final joinUrl =
+        'https://act-like-it.vercel.app/join?room=${session.roomCode}';
     final passMessage = '🎬 VIP SET PASS · ACT LIKE IT\n'
         'Step onto my Hollywood Soundstage!\n'
         '6-Digit Room Code: ${session.roomCode}\n'
-        'Featured Reel: ${session.selectedCategory.label}';
+        'Featured Reel: ${session.selectedCategory.label}\n'
+        'Join online or in-app: $joinUrl';
     await Clipboard.setData(ClipboardData(text: session.roomCode));
     try {
       await SharePlus.instance.share(
@@ -849,7 +882,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'VIP Set Pass #${session.roomCode} copied to clipboard!',
+            'VIP Set Pass #${session.roomCode} & Join URL copied to clipboard!',
           ),
         ),
       );
@@ -1117,16 +1150,43 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                 player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
               ),
-              trailing: Text(
-                player.isReady ? 'ON SET' : 'STANDBY',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: player.isReady
-                      ? const Color(0xFF10B981)
-                      : const Color(0xFFF59E0B),
-                ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    player.isReady ? 'ON SET' : 'STANDBY',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: player.isReady
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFF59E0B),
+                    ),
+                  ),
+                  if (player.userId != _lobbyManager.localUserId) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.flag_outlined,
+                        size: 16,
+                        color: Color(0xFF64748B),
+                      ),
+                      tooltip: 'Report or Block Actor',
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        _lobbyManager.blockAndRemovePlayer(player.userId);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Reported & removed ${player.displayName} from your Green Room.',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
               ),
             ),
           ),

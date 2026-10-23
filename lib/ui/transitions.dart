@@ -75,6 +75,36 @@ class BespokeTransitionEngine {
     );
   }
 
+  static Future<T?> pushWithClapperboard<T>(
+    BuildContext context,
+    Widget destination,
+  ) =>
+      navigate<T>(
+        context: context,
+        type: BespokeTransitionType.clapperboardSnap,
+        destination: destination,
+      );
+
+  static Future<T?> pushWithFlashbulb<T>(
+    BuildContext context,
+    Widget destination,
+  ) =>
+      navigate<T>(
+        context: context,
+        type: BespokeTransitionType.vintageFlashbulbPop,
+        destination: destination,
+      );
+
+  static Future<T?> pushWithSilverElevator<T>(
+    BuildContext context,
+    Widget destination,
+  ) =>
+      navigate<T>(
+        context: context,
+        type: BespokeTransitionType.silverElevatorVelvetRope,
+        destination: destination,
+      );
+
   /// Seamless 900ms choreographed transition from the 8-second Opening Video
   /// directly into `AuthScreen` (`LivingMarqueeLoginScreen`):
   /// 1. Golden Flash & Backdrop Blur (0ms–300ms): Warm-gold radial flash bloom
@@ -684,8 +714,8 @@ class _MobBossCigarSmokeTransitionPainter extends CustomPainter {
       oldDelegate.progress != progress;
 }
 
-/// 3. SCENE VAULT (Doors 3–6): Vintage press flashbulb pops directly in the
-/// camera lens with comic halftone rays, leaving a white-out optical fade.
+/// 3. SCENE VAULT (Doors 3–6) & VERDICT REVEAL: Soft RadialGradient golden
+/// camera flash bloom that leaves outer edges translucent and fades in 450ms.
 class _VintageFlashbulbPopTransitionPainter extends CustomPainter {
   final double progress;
 
@@ -693,40 +723,39 @@ class _VintageFlashbulbPopTransitionPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * 0.5, size.height * 0.5);
+    final center = Offset(size.width * 0.5, size.height * 0.46);
     final popIntensity = math.sin(progress * math.pi).clamp(0.0, 1.0);
-
-    // Radial comic flashburst rays
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..color = Color.lerp(
-          const Color(0xFF07090E),
-          const Color(0xFFFFFBEB),
-          popIntensity,
-        )!,
-    );
+    final radius = (size.longestSide * 0.68).clamp(80.0, 1400.0);
 
     final rayPaint = Paint()
-      ..color = const Color(0xFFFFD700).withValues(alpha: 0.85 * popIntensity)
-      ..strokeWidth = 4.0;
-    for (int i = 0; i < 28; i++) {
-      final angle = (i / 28.0) * math.pi * 2 + progress * 0.5;
+      ..color = const Color(0xFFFFD700).withValues(alpha: 0.52 * popIntensity)
+      ..strokeWidth = 3.0;
+    for (int i = 0; i < 20; i++) {
+      final angle = (i / 20.0) * math.pi * 2 + progress * 0.4;
       canvas.drawLine(
         center,
         Offset(
-          center.dx + math.cos(angle) * size.longestSide,
-          center.dy + math.sin(angle) * size.longestSide,
+          center.dx + math.cos(angle) * radius * 0.85,
+          center.dy + math.sin(angle) * radius * 0.85,
         ),
         rayPaint,
       );
     }
 
-    // Blinding white core expanding across the lens
-    canvas.drawCircle(
-      center,
-      size.longestSide * 0.75 * popIntensity,
-      Paint()..color = Colors.white.withValues(alpha: popIntensity),
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(0.0, -0.08),
+          radius: 0.88,
+          colors: <Color>[
+            const Color(0xFFFFF8E1).withValues(alpha: 0.90 * popIntensity),
+            const Color(0xFFFFD54F).withValues(alpha: 0.62 * popIntensity),
+            const Color(0xFF07090E).withValues(alpha: 0.18 * popIntensity),
+            Colors.transparent,
+          ],
+          stops: const <double>[0.0, 0.36, 0.74, 1.0],
+        ).createShader(Offset.zero & size),
     );
   }
 
@@ -889,12 +918,12 @@ class _SilverElevatorPortalPainter extends CustomPainter {
 
     final signTp = TextPainter(
       text: const TextSpan(
-        text: '★ THE CUTTING ROOM FLOOR ★',
+        text: '★ B1 · THE CUTTING ROOM FLOOR ★',
         style: TextStyle(
           fontFamily: 'monospace',
-          fontSize: 13,
+          fontSize: 12.5,
           fontWeight: FontWeight.w900,
-          letterSpacing: 1.4,
+          letterSpacing: 1.2,
           color: Color(0xFFF9A8D4),
           shadows: <Shadow>[
             Shadow(color: Color(0xFFEC4899), blurRadius: 14),

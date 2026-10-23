@@ -4,17 +4,77 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Synthesizes a real 16-bit PCM WAV Hollywood Premiere Opening Soundtrack in memory
-/// (Brass Fanfare Swell + Cyber-Lens Whir + Clapperboard Snap at 1.45s + Golden Chord Loop)
-/// so the opening sequence plays rich music & SFX immediately with zero external asset dependencies.
+/// Synthesizes a real 16-bit PCM WAV Hollywood Premiere Opening Soundtrack and
+/// 1.5-second Award Verdict Fanfare Sting in memory with zero low-frequency buzzy drone.
 class OpeningPremiereMusicSynthesizer {
   static Uint8List? _cachedWavBytes;
+  static Uint8List? _cachedVerdictStingBytes;
+
+  /// Short, crisp 1.5-second Hollywood Award Fanfare Sting for the Verdict Screen.
+  /// Plays once and decays cleanly to silence (zero continuous loop or bass buzz).
+  static Uint8List buildAwardVerdictFanfareWav() {
+    if (_cachedVerdictStingBytes != null) return _cachedVerdictStingBytes!;
+
+    const int sampleRate = 22050;
+    const int numSamples = 33075; // 1.5 seconds
+    final int dataSize = numSamples * 2;
+    final ByteData buffer = ByteData(44 + dataSize);
+
+    void writeAscii(int offset, String text) {
+      for (int i = 0; i < text.length; i++) {
+        buffer.setUint8(offset + i, text.codeUnitAt(i));
+      }
+    }
+
+    writeAscii(0, 'RIFF');
+    buffer.setUint32(4, 36 + dataSize, Endian.little);
+    writeAscii(8, 'WAVE');
+    writeAscii(12, 'fmt ');
+    buffer.setUint32(16, 16, Endian.little);
+    buffer.setUint16(20, 1, Endian.little);
+    buffer.setUint16(22, 1, Endian.little);
+    buffer.setUint32(24, sampleRate, Endian.little);
+    buffer.setUint32(28, sampleRate * 2, Endian.little);
+    buffer.setUint16(32, 2, Endian.little);
+    buffer.setUint16(34, 16, Endian.little);
+    writeAscii(36, 'data');
+    buffer.setUint32(40, dataSize, Endian.little);
+
+    // Bright C-Major 9th fanfare arpeggio -> warm golden chord chime with exponential decay
+    const List<double> notes = <double>[523.25, 659.25, 783.99, 1046.50];
+    for (int i = 0; i < numSamples; i++) {
+      final double t = i / sampleRate;
+      double sample = 0.0;
+
+      for (int n = 0; n < notes.length; n++) {
+        final double noteStart = n * 0.09;
+        if (t >= noteStart) {
+          final double localT = t - noteStart;
+          final double env =
+              (1.0 - math.exp(-localT * 45.0)) * math.exp(-localT * 2.6);
+          final double freq = notes[n];
+          sample += (math.sin(2.0 * math.pi * freq * localT) * 0.20 +
+                  math.sin(2.0 * math.pi * (freq * 1.5) * localT) * 0.05) *
+              env;
+        }
+      }
+
+      final double tailFade =
+          t > 1.15 ? ((1.5 - t) / 0.35).clamp(0.0, 1.0) : 1.0;
+      final int pcm16 =
+          ((sample * tailFade).clamp(-0.85, 0.85) * 32767.0).round();
+      buffer.setInt16(44 + i * 2, pcm16, Endian.little);
+    }
+
+    _cachedVerdictStingBytes = buffer.buffer.asUint8List();
+    return _cachedVerdictStingBytes!;
+  }
 
   static Uint8List buildOpeningFanfareWav() {
     if (_cachedWavBytes != null) return _cachedWavBytes!;
 
     const int sampleRate = 22050;
-    const int durationSeconds = 8;
+    const int durationSeconds = 6;
     const int numSamples = sampleRate * durationSeconds;
     final int dataSize = numSamples * 2; // 16-bit mono PCM
     final ByteData buffer = ByteData(44 + dataSize);
@@ -45,57 +105,45 @@ class OpeningPremiereMusicSynthesizer {
       final double t = i / sampleRate;
       double sample = 0.0;
 
-      if (t < 1.45) {
-        final double swellProgress = (t / 1.45).clamp(0.0, 1.0);
-        final double freq1 = 110.0 + swellProgress * 36.8;
-        final double freq2 = 220.0 + swellProgress * 73.6;
-        final double cyberWhir =
-            math.sin(2.0 * math.pi * (440.0 + swellProgress * 880.0) * t) *
-                0.08 *
-                swellProgress;
-        sample = (math.sin(2.0 * math.pi * freq1 * t) * 0.35 +
-                math.sin(2.0 * math.pi * freq2 * t) * 0.25 +
-                cyberWhir) *
-            swellProgress;
+      if (t < 1.35) {
+        final double swellProgress = (t / 1.35).clamp(0.0, 1.0);
+        final double freq1 = 261.63 + swellProgress * 68.0;
+        final double freq2 = 392.00 + swellProgress * 131.25;
+        sample = (math.sin(2.0 * math.pi * freq1 * t) * 0.22 +
+                math.sin(2.0 * math.pi * freq2 * t) * 0.16) *
+            swellProgress *
+            math.exp(-t * 0.3);
       } else {
-        if (t >= 1.45 && t < 1.68) {
-          final double snapEnv = math.exp(-(t - 1.45) * 32.0);
-          final double noise = (rng.nextDouble() * 2.0 - 1.0) * 0.65 * snapEnv;
+        if (t >= 1.35 && t < 1.52) {
+          final double snapEnv = math.exp(-(t - 1.35) * 38.0);
+          final double noise = (rng.nextDouble() * 2.0 - 1.0) * 0.38 * snapEnv;
           final double woodClick =
-              math.sin(2.0 * math.pi * 920.0 * t) * 0.45 * snapEnv;
+              math.sin(2.0 * math.pi * 880.0 * t) * 0.30 * snapEnv;
           sample += noise + woodClick;
         }
 
-        if (t >= 1.48 && t < 3.2) {
-          final double dropEnv = math.exp(-(t - 1.48) * 1.9);
-          final double dropFreq = 82.0 - ((t - 1.48) * 18.0).clamp(0.0, 32.0);
-          sample += math.sin(2.0 * math.pi * dropFreq * t) * 0.42 * dropEnv;
-        }
-
-        List<double> chordNotes;
-        if (t < 4.0) {
-          chordNotes = const <double>[146.83, 220.00, 349.23, 440.00, 659.25];
-        } else if (t < 6.0) {
-          chordNotes = const <double>[116.54, 174.61, 293.66, 440.00, 587.33];
-        } else {
-          chordNotes = const <double>[110.00, 164.81, 277.18, 392.00, 523.25];
-        }
-
+        // Clean mid-high orchestral chime chords with natural exponential decay (no low bass drone)
+        const List<double> chordNotes = <double>[
+          261.63,
+          329.63,
+          392.00,
+          523.25,
+          659.25,
+        ];
+        final double chordTime = t - 1.35;
+        final double chordEnv = math.exp(-chordTime * 0.85);
         double chordSum = 0.0;
         for (int n = 0; n < chordNotes.length; n++) {
           final double f = chordNotes[n];
-          chordSum += math.sin(2.0 * math.pi * f * t) * 0.14 +
-              math.sin(2.0 * math.pi * (f * 2.0) * t) * 0.05;
+          chordSum += math.sin(2.0 * math.pi * f * t) * 0.10;
         }
 
-        final double beatPulse = 0.78 + 0.22 * math.sin(2.0 * math.pi * 2.0 * t);
         final double loopFade =
-            t > 7.4 ? ((8.0 - t) / 0.6).clamp(0.0, 1.0) : 1.0;
-
-        sample += chordSum * beatPulse * loopFade;
+            t > 4.8 ? ((6.0 - t) / 1.2).clamp(0.0, 1.0) : 1.0;
+        sample += chordSum * chordEnv * loopFade;
       }
 
-      final int pcm16 = (sample.clamp(-0.95, 0.95) * 32767.0).round();
+      final int pcm16 = (sample.clamp(-0.85, 0.85) * 32767.0).round();
       buffer.setInt16(44 + i * 2, pcm16, Endian.little);
     }
 

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
 import 'lobby.dart';
 import 'judging_engine.dart';
@@ -676,6 +677,18 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   bool _duetModeEnabled = GameSettingsModal.latestConfig.screenTestDuetMode;
   bool _improvTwistTriggered = false;
   String? _activeImprovTwistPrompt;
+  bool _showSpectatorHypeDeck = true;
+
+  // Live Spectator "Heckle, Hype & Curveball" Reaction State
+  RealtimeChannel? _hypeRealtimeChannel;
+  int _goldenRoseCount = 0;
+  int _tomatoSplatCount = 0;
+  int _standingOvationCount = 0;
+  String? _latestReactionBanner;
+  Color _latestReactionColor = const Color(0xFFFFD700);
+  DateTime? _lastTomatoSplatAt;
+  DateTime? _lastStandingOvationAt;
+  Timer? _reactionClearTimer;
 
   // Pre-Roll Countdown State (10s -> 0s)
   bool _isPreRolling = true;
@@ -709,8 +722,91 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           'Dramatic Intensity',
     );
 
+    _bindSpectatorHypeRealtimeChannel();
     _startPreRollCountdown();
     _startVuMeterModulation();
+  }
+
+  void _bindSpectatorHypeRealtimeChannel() {
+    final client = supabaseOrNull;
+    if (client == null) return;
+    try {
+      final channel = client.channel(
+        'act_like_it_hype_${widget.lobbySession.roomCode.toUpperCase()}',
+      );
+      channel
+          .onBroadcast(
+            event: 'stage_hype',
+            callback: (payload) {
+              if (!mounted) return;
+              final kind = payload['kind']?.toString() ?? 'rose';
+              final sender = payload['sender']?.toString() ?? 'Ensemble';
+              _applyStageHypeReaction(
+                kind: kind,
+                senderName: sender,
+                broadcastToRoom: false,
+              );
+            },
+          )
+          .subscribe();
+      _hypeRealtimeChannel = channel;
+    } catch (_) {}
+  }
+
+  void _applyStageHypeReaction({
+    required String kind,
+    required String senderName,
+    bool broadcastToRoom = true,
+  }) {
+    HapticFeedback.mediumImpact();
+    _reactionClearTimer?.cancel();
+
+    setState(() {
+      if (kind == 'rose') {
+        _goldenRoseCount += 1;
+        _latestReactionBanner =
+            '🌹 $senderName threw a Golden Rose! (+1 Hype · Total $_goldenRoseCount)';
+        _latestReactionColor = const Color(0xFFFFD700);
+      } else if (kind == 'tomato') {
+        _tomatoSplatCount += 1;
+        _lastTomatoSplatAt = DateTime.now();
+        _latestReactionBanner =
+            '🍅 SPLAT! $senderName roasted the take! (Keep your composure!)';
+        _latestReactionColor = const Color(0xFFE11D48);
+      } else if (kind == 'ovation') {
+        _standingOvationCount += 1;
+        _lastStandingOvationAt = DateTime.now();
+        _latestReactionBanner =
+            '👏 STANDING OVATION from $senderName! The soundstage is electric!';
+        _latestReactionColor = const Color(0xFF10B981);
+      } else if (kind == 'curveball') {
+        _triggerImprovTwist();
+        _latestReactionBanner =
+            '⚡ $senderName dropped a Director Curveball! (+5.0 Bonus Points)';
+        _latestReactionColor = const Color(0xFF0CB6D4);
+      }
+    });
+
+    _reactionClearTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _latestReactionBanner = null;
+        });
+      }
+    });
+
+    if (broadcastToRoom && _hypeRealtimeChannel != null) {
+      try {
+        _hypeRealtimeChannel!.sendBroadcastMessage(
+          event: 'stage_hype',
+          payload: <String, dynamic>{
+            'kind': kind,
+            'sender': senderName,
+            'ts': DateTime.now().millisecondsSinceEpoch,
+          },
+        );
+      } catch (_) {}
+    }
   }
 
   void _startPreRollCountdown() {
@@ -821,6 +917,13 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     WidgetsBinding.instance.removeObserver(this);
     _preRollTimer?.cancel();
     _vuModulationTimer?.cancel();
+    _reactionClearTimer?.cancel();
+    try {
+      final ch = _hypeRealtimeChannel;
+      if (ch != null) {
+        supabaseOrNull?.removeChannel(ch);
+      }
+    } catch (_) {}
     _stageManager.removeListener(_onStageUpdated);
     _stageManager.dispose();
     super.dispose();
@@ -1031,18 +1134,114 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                             ),
                           ),
                         ),
+                      // Live Floating Spectator Reactions (Golden Roses, Tomato Splatter, Standing Ovation)
+                      if (_latestReactionBanner != null)
+                        Positioned(
+                          top: _improvTwistTriggered ? 92 : 48,
+                          left: 14,
+                          right: 36,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xEB07090E),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _latestReactionColor,
+                                width: 1.8,
+                              ),
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _latestReactionBanner!,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: _latestReactionColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_lastTomatoSplatAt != null &&
+                          DateTime.now().difference(_lastTomatoSplatAt!).inSeconds < 3)
+                        Positioned(
+                          top: 86,
+                          left: 24,
+                          child: IgnorePointer(
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xD9E11D48),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFF05070B),
+                                  width: 3,
+                                ),
+                              ),
+                              child: const Text(
+                                '🍅 SPLAT!',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_lastStandingOvationAt != null &&
+                          DateTime.now()
+                                  .difference(_lastStandingOvationAt!)
+                                  .inSeconds <
+                              3)
+                        Positioned(
+                          bottom: 104,
+                          right: 34,
+                          child: IgnorePointer(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xD910B981),
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(
+                                  color: const Color(0xFFFFD700),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Text(
+                                '👏 OVATION x$_standingOvationCount · 🌹 $_goldenRoseCount',
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face — shown once recording starts)
                       if (scene != null && !_isPreRolling)
                         _buildTeleprompterOverlay(scene),
-                      // 10-Second Pre-Roll Translucent Clapperboard Overlay
+                      // 10-Second Pre-Roll Semi-Transparent Clapperboard Overlay
                       if (_isPreRolling) _buildPreRollClapperboardOverlay(scene),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               _buildSpectatorStrip(),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               _buildStageControlBar(isPerformer),
             ],
           ),
@@ -1060,8 +1259,9 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
             : 'DIRECTOR\'S 10s PRE-ROLL · FRAME YOUR SHOT');
 
     return Container(
-      color: const Color(0xD905070D),
-      padding: const EdgeInsets.all(24),
+      // Semi-transparent 35% backdrop so the live camera feed stays visible
+      color: Colors.black.withValues(alpha: 0.35),
+      padding: const EdgeInsets.all(20),
       child: Center(
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -1247,7 +1447,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   Widget _buildDuetSplitScreenSurface() {
     final remotes = _stageManager.remoteParticipants;
     RemoteVideoTrack? coStarVideoTrack;
-    String coStarName = 'CO-STAR (LOCAL PIP)';
+    String coStarName = 'CO-STAR · THE DIVA (AI RIG)';
     if (remotes.isNotEmpty) {
       coStarName = remotes.first.name.isNotEmpty
           ? remotes.first.name.toUpperCase()
@@ -1259,111 +1459,130 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         }
       }
     }
+    final coStarArchetype = resolveAvatarArchetype('the_diva');
+    final animPhase =
+        (_stageManager.performanceElapsedSeconds * 0.45) + (_vuDancingOffset * 0.05);
 
     return Row(
       children: [
+        // Left 50%: LEAD A (Local Actor) framed in Limelight Gold (#F5DEB3)
         Expanded(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _buildPrimaryVideoSurface(),
-              Positioned(
-                bottom: 96,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xCC050508),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0x99FFD700)),
-                  ),
-                  child: const Text(
-                    'LEAD ACTOR',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFFFD700),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFF5DEB3), width: 2.0),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _buildPrimaryVideoSurface(),
+                Positioned(
+                  top: 46,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xD9050508),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: const Color(0xFFF5DEB3)),
+                    ),
+                    child: const Text(
+                      'LEAD A · GOLD',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFF5DEB3),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        Container(width: 2, color: const Color(0xFFFFD700)),
+        // Right 50%: LEAD B / CO-STAR framed in Soundstage Cyan (#0CB6D4)
         Expanded(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (coStarVideoTrack != null)
-                VideoTrackRenderer(
-                  coStarVideoTrack,
-                  fit: VideoViewFit.cover,
-                )
-              else
-                Container(
-                  color: const Color(0xFF0B0E17),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.people_alt_rounded,
-                          size: 34,
-                          color: Color(0xFF06B6D4),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          coStarName,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF06B6D4),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFF0CB6D4), width: 2.0),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (coStarVideoTrack != null)
+                  VideoTrackRenderer(
+                    coStarVideoTrack,
+                    fit: VideoViewFit.cover,
+                  )
+                else
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [
+                          Color(0xFF132338),
+                          Color(0xFF0B0E17),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          BoondocksCharacterRig(
+                            archetype: coStarArchetype,
+                            size: 108,
+                            isSelected: true,
+                            externalPhase: animPhase,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          '50/50 Cinema Split Active',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF94A3B8),
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                coStarName,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0CB6D4),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  top: 46,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xD9050508),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: const Color(0xFF0CB6D4)),
+                    ),
+                    child: const Text(
+                      'LEAD B · CYAN',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0CB6D4),
+                      ),
                     ),
                   ),
                 ),
-              Positioned(
-                bottom: 96,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xCC050508),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0x9906B6D4)),
-                  ),
-                  child: Text(
-                    coStarName,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF06B6D4),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -1486,34 +1705,98 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
               ],
             ),
             const SizedBox(height: 4),
-            RichText(
-              text: TextSpan(
-                style: TextStyle(
-                  fontSize: _largeTeleprompterFont ? 17 : 14,
-                  fontWeight: FontWeight.w700,
-                  height: 1.35,
-                ),
-                children: [
-                  const TextSpan(
-                    text: '"',
-                    style: TextStyle(color: Color(0xFFFFD700)),
-                  ),
-                  TextSpan(
-                    text: spokenPart,
-                    style: const TextStyle(color: Color(0xFFFFD700)),
-                  ),
-                  if (remainingPart.isNotEmpty)
-                    TextSpan(
-                      text: spokenPart.isEmpty ? remainingPart : ' $remainingPart',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  const TextSpan(
-                    text: '"',
-                    style: TextStyle(color: Color(0xFFFFD700)),
-                  ),
-                ],
+            if (_duetModeEnabled) ...[
+              Builder(
+                builder: (context) {
+                  final halfLen = (words.length / 2).ceil();
+                  final leadALine = words.take(halfLen).join(' ');
+                  final leadBLine = words.skip(halfLen).join(' ');
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RichText(
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: _largeTeleprompterFont ? 15.5 : 13,
+                            fontWeight: FontWeight.w800,
+                            height: 1.3,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: '[LEAD A - GOLD]: ',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                color: Color(0xFFF5DEB3),
+                              ),
+                            ),
+                            TextSpan(
+                              text: '"$leadALine"',
+                              style: const TextStyle(color: Color(0xFFFFE082)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (leadBLine.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: _largeTeleprompterFont ? 15.5 : 13,
+                              fontWeight: FontWeight.w800,
+                              height: 1.3,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: '[LEAD B - CYAN]: ',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  color: Color(0xFF0CB6D4),
+                                ),
+                              ),
+                              TextSpan(
+                                text: '"$leadBLine"',
+                                style:
+                                    const TextStyle(color: Color(0xFF84FFFF)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
-            ),
+            ] else
+              RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: _largeTeleprompterFont ? 17 : 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                  children: [
+                    const TextSpan(
+                      text: '"',
+                      style: TextStyle(color: Color(0xFFFFD700)),
+                    ),
+                    TextSpan(
+                      text: spokenPart,
+                      style: const TextStyle(color: Color(0xFFFFD700)),
+                    ),
+                    if (remainingPart.isNotEmpty)
+                      TextSpan(
+                        text: spokenPart.isEmpty
+                            ? remainingPart
+                            : ' $remainingPart',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    const TextSpan(
+                      text: '"',
+                      style: TextStyle(color: Color(0xFFFFD700)),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 4),
             Text(
               'Cue: ${scene.directorCue} · Target: ${scene.emotionalTarget}',
@@ -1530,29 +1813,139 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     );
   }
 
+  /// Toggleable "🎭 Spectator / Co-Star Hype Deck" soundboard bar synced via
+  /// the Supabase Realtime room channel (`🌹 Rose`, `🍅 Tomato`, `👏 Ovation`, `⚡ Curveball`).
   Widget _buildSpectatorStrip() {
-    final remotes = _stageManager.remoteParticipants;
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF101420),
-        borderRadius: BorderRadius.circular(10),
+        color: const Color(0xFF0D111C),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1E293B)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.sensors, size: 18, color: Color(0xFF10B981)),
-          const SizedBox(width: 10),
-          Expanded(
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _showSpectatorHypeDeck = !_showSpectatorHypeDeck;
+                  });
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '🎭 SPECTATOR / CO-STAR HYPE DECK',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFF5DEB3),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showSpectatorHypeDeck
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      size: 16,
+                      color: const Color(0xFFF5DEB3),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '🌹 $_goldenRoseCount · 👏 $_standingOvationCount',
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFFFD700),
+                ),
+              ),
+            ],
+          ),
+          if (_showSpectatorHypeDeck) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _buildHypeTriggerButton(
+                  label: '🌹 Rose (+1)',
+                  accent: const Color(0xFFFFD700),
+                  onTap: () => _applyStageHypeReaction(
+                    kind: 'rose',
+                    senderName: widget.localDisplayName,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _buildHypeTriggerButton(
+                  label: '🍅 Tomato',
+                  accent: const Color(0xFFE11D48),
+                  onTap: () => _applyStageHypeReaction(
+                    kind: 'tomato',
+                    senderName: widget.localDisplayName,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _buildHypeTriggerButton(
+                  label: '👏 Ovation',
+                  accent: const Color(0xFF10B981),
+                  onTap: () => _applyStageHypeReaction(
+                    kind: 'ovation',
+                    senderName: widget.localDisplayName,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _buildHypeTriggerButton(
+                  label: '⚡ Curveball',
+                  accent: const Color(0xFF0CB6D4),
+                  onTap: () => _applyStageHypeReaction(
+                    kind: 'curveball',
+                    senderName: widget.localDisplayName,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHypeTriggerButton({
+    required String label,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: accent.withValues(alpha: 0.85)),
+          ),
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
             child: Text(
-              remotes.isEmpty
-                  ? 'S26 Ultra Stage Active · Recording MP4 Take for Peer & AI Judging'
-                  : 'Connected Remote Peers (${remotes.length}/7)',
-              style: const TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1)),
+              label,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

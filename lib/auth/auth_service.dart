@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
 /// Immutable snapshot of an actor's persistent profile, Red Carpet
-/// questionnaire answers, 18+ age-gate birth year, and AI Token balance.
+/// questionnaire answers, 18+ age-gate birth year, Acting DNA, and AI Token balance.
 class ActorProfileState {
   final String userId;
   final String email;
@@ -20,6 +20,10 @@ class ActorProfileState {
   final String avatarArchetypeId;
   final String castingTrack;
   final bool telemetryOptIn;
+  final String regionalDialect;
+  final double vocalProjectionDb;
+  final String physicalStyle;
+  final int careerXp;
   final DateTime updatedAt;
 
   const ActorProfileState({
@@ -35,11 +39,22 @@ class ActorProfileState {
     this.avatarArchetypeId = 'the_method_actor',
     this.castingTrack = 'track_a_star',
     this.telemetryOptIn = true,
+    this.regionalDialect = 'Hollywood Standard',
+    this.vocalProjectionDb = -18.5,
+    this.physicalStyle = 'High-Contrast Method',
+    this.careerXp = 1250,
     required this.updatedAt,
   });
 
   /// Computes whether the actor meets the 18+ threshold for the Late-Night vault.
   bool get is18PlusVerified => (DateTime.now().year - birthYear) >= 18;
+
+  String get careerRankBadge {
+    if (careerXp >= 5000) return 'ACADEMY LEGEND';
+    if (careerXp >= 2500) return 'HEADLINER STAR';
+    if (careerXp >= 1000) return 'RISING LEAD';
+    return 'STUDIO NEWCOMER';
+  }
 
   ActorProfileState copyWith({
     String? userId,
@@ -54,6 +69,10 @@ class ActorProfileState {
     String? avatarArchetypeId,
     String? castingTrack,
     bool? telemetryOptIn,
+    String? regionalDialect,
+    double? vocalProjectionDb,
+    String? physicalStyle,
+    int? careerXp,
     DateTime? updatedAt,
   }) {
     return ActorProfileState(
@@ -69,6 +88,10 @@ class ActorProfileState {
       avatarArchetypeId: avatarArchetypeId ?? this.avatarArchetypeId,
       castingTrack: castingTrack ?? this.castingTrack,
       telemetryOptIn: telemetryOptIn ?? this.telemetryOptIn,
+      regionalDialect: regionalDialect ?? this.regionalDialect,
+      vocalProjectionDb: vocalProjectionDb ?? this.vocalProjectionDb,
+      physicalStyle: physicalStyle ?? this.physicalStyle,
+      careerXp: careerXp ?? this.careerXp,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -87,6 +110,10 @@ class ActorProfileState {
       'avatar_archetype': avatarArchetypeId,
       'casting_track': castingTrack,
       'telemetry_opt_in': telemetryOptIn,
+      'regional_dialect': regionalDialect,
+      'vocal_projection_db': vocalProjectionDb,
+      'physical_style': physicalStyle,
+      'career_xp': careerXp,
       'updated_at': updatedAt.toIso8601String(),
     };
   }
@@ -122,7 +149,15 @@ class ActorProfileState {
 
     final parsedTokens = json['ai_token_balance'] is int
         ? json['ai_token_balance'] as int
-        : int.tryParse('${json['ai_token_balance'] ?? ''}') ?? 10;
+        : int.tryParse('${json['ai_token_balance'] ?? ''}') ?? 25;
+
+    final parsedVocalDb = (json['vocal_projection_db'] as num?)?.toDouble() ??
+        double.tryParse('${json['vocal_projection_db'] ?? ''}') ??
+        -18.5;
+
+    final parsedCareerXp = json['career_xp'] is int
+        ? json['career_xp'] as int
+        : int.tryParse('${json['career_xp'] ?? ''}') ?? 1250;
 
     return ActorProfileState(
       userId: (json['id'] ?? json['user_id'] ?? 'local-s26-actor').toString(),
@@ -131,11 +166,11 @@ class ActorProfileState {
       birthYear: parsedBirthYear.clamp(1900, DateTime.now().year),
       favoriteEras: parseStringList(
         json['favorite_eras'],
-        const <String>['1970s', '2000s'],
+        const <String>['1970–1999', '2000–2026'],
       ),
       actingStrengths: parseStringList(
         json['acting_strengths'],
-        const <String>['Drama'],
+        const <String>['Method Drama', 'Improv Comedy'],
       ),
       aiTokenBalance: parsedTokens < 0 ? 0 : parsedTokens,
       unlockedScenePacks: parseStringList(
@@ -143,23 +178,27 @@ class ActorProfileState {
         const <String>[],
       ),
       onboardingCompleted: json['onboarding_completed'] == true,
-      avatarArchetypeId:
-          (json['avatar_archetype'] ?? json['avatarArchetypeId'] ?? 'the_method_actor')
-              .toString(),
+      avatarArchetypeId: (json['avatar_archetype'] ??
+              json['avatarArchetypeId'] ??
+              'the_method_actor')
+          .toString(),
       castingTrack:
           (json['casting_track'] ?? json['castingTrack'] ?? 'track_a_star')
               .toString(),
       telemetryOptIn: json['telemetry_opt_in'] != false,
+      regionalDialect:
+          (json['regional_dialect'] ?? 'Hollywood Standard').toString(),
+      vocalProjectionDb: parsedVocalDb.clamp(-60.0, 0.0),
+      physicalStyle:
+          (json['physical_style'] ?? 'High-Contrast Method').toString(),
+      careerXp: parsedCareerXp < 0 ? 0 : parsedCareerXp,
       updatedAt: DateTime.tryParse('${json['updated_at'] ?? ''}') ??
           DateTime.now().toUtc(),
     );
   }
 }
 
-/// Global authentication and persistent profile state manager.
-/// Synchronizes user profiles, Red Carpet questionnaire preferences, 18+ birth
-/// year verification, Host-Pays scene pack unlocks, and AI Token balances
-/// between Supabase (`public.profiles` + Auth metadata) and local storage.
+/// Global authentication, multi-profile switcher, and persistent profile state manager.
 class AuthService extends ChangeNotifier {
   AuthService._internal();
 
@@ -167,27 +206,50 @@ class AuthService extends ChangeNotifier {
 
   static const String _kLocalProfilePrefix = 'act_like_it_profile_v1_';
   static const String _kLastActiveUserIdKey = 'act_like_it_last_user_id_v1';
-  static const int kDefaultStarterAiTokens = 10;
+  static const String _kSavedProfilesRegistryKey = 'saved_actor_profiles_v1';
+  static const String _kTelemetricsTokensPrefsKey =
+      'act_like_it_telemetrics_tokens_v1';
+  static const int kDefaultStarterAiTokens = 25;
 
   ActorProfileState? _currentProfile;
+  final List<ActorProfileState> _savedProfiles = <ActorProfileState>[];
   bool _isLoading = false;
   String? _lastError;
   StreamSubscription<AuthState>? _authSubscription;
 
   ActorProfileState? get currentProfile => _currentProfile;
+  List<ActorProfileState> get savedProfiles =>
+      List<ActorProfileState>.unmodifiable(_savedProfiles);
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
   bool get isAuthenticated => _currentProfile != null;
-  int get aiTokenBalance => _currentProfile?.aiTokenBalance ?? kDefaultStarterAiTokens;
+  int get aiTokenBalance =>
+      _currentProfile?.aiTokenBalance ?? kDefaultStarterAiTokens;
   bool get is18PlusVerified => _currentProfile?.is18PlusVerified ?? false;
 
-  /// Initializes the service on app boot and automatically restores any active
-  /// Supabase session or cached profile from the `profiles` table.
+  bool get hasVipSpeakeasyPass =>
+      hasUnlockedScenePack('vip_speakeasy_pass') ||
+      hasUnlockedScenePack('late_night');
+
+  bool get hasWatermarkFreePro => hasUnlockedScenePack('watermark_free_pro');
+
+  bool get hasEmmyAndCultVault =>
+      hasUnlockedScenePack('emmy_cult_bundle') ||
+      hasUnlockedScenePack('all_era_bundle') ||
+      hasUnlockedScenePack('emmy_vault') ||
+      hasUnlockedScenePack('cult_classics');
+
+  bool get hasAllEraBundle => hasUnlockedScenePack('all_era_bundle');
+
+  /// Initializes the service on app boot and restores any active Supabase session
+  /// plus the multi-profile registry (`saved_actor_profiles_v1`).
   Future<void> initialize() async {
     _setLoading(true);
     _lastError = null;
 
     try {
+      await _loadSavedProfilesRegistry();
+
       if (AppConfig.hasCloudSupabase) {
         final client = Supabase.instance.client;
         await _authSubscription?.cancel();
@@ -214,15 +276,38 @@ class AuthService extends ChangeNotifier {
         }
       }
 
-      // Restore most recent cached profile when offline or before cloud sign-in
       final prefs = await SharedPreferences.getInstance();
       final lastUserId = prefs.getString(_kLastActiveUserIdKey);
       if (lastUserId != null && lastUserId.isNotEmpty) {
         final cached = await _readLocalProfile(lastUserId);
         if (cached != null) {
           _currentProfile = cached;
+          await _syncRegistryWithProfile(cached);
           notifyListeners();
+          return;
         }
+      }
+
+      if (_savedProfiles.isNotEmpty) {
+        _currentProfile = _savedProfiles.first;
+        notifyListeners();
+      } else {
+        final defaultProfile = ActorProfileState(
+          userId: 'local-s26-actor',
+          email: 'actor@actlikeit.stage',
+          username: 'kkl',
+          birthYear: 1998,
+          favoriteEras: const <String>['1970–1999', '2000–2026'],
+          actingStrengths: const <String>['Method Drama', 'Improv Comedy'],
+          aiTokenBalance: kDefaultStarterAiTokens,
+          unlockedScenePacks: const <String>[],
+          onboardingCompleted: true,
+          avatarArchetypeId: 'the_method_actor',
+          updatedAt: DateTime.now().toUtc(),
+        );
+        _currentProfile = defaultProfile;
+        await _writeLocalProfile(defaultProfile);
+        notifyListeners();
       }
     } catch (e) {
       _lastError = e.toString();
@@ -231,9 +316,112 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Signs in an existing actor via Supabase Auth (with offline/local fallback)
-  /// and immediately queries `public.profiles` to load historical questionnaire
-  /// answers, birth year, and AI Token balance into global state.
+  /// Switches the active profile across the entire app immediately.
+  Future<ActorProfileState?> switchToProfile(String userId) async {
+    final matchIdx = _savedProfiles.indexWhere((p) => p.userId == userId);
+    ActorProfileState? target =
+        matchIdx >= 0 ? _savedProfiles[matchIdx] : await _readLocalProfile(userId);
+    if (target == null) return _currentProfile;
+
+    _currentProfile = target;
+    await _writeLocalProfile(target);
+    notifyListeners();
+    return target;
+  }
+
+  /// Creates a new local/cloud Actor Profile and switches to it immediately.
+  Future<ActorProfileState> createAndSwitchToNewProfile({
+    required String username,
+    required int birthYear,
+    required String avatarArchetypeId,
+    List<String>? favoriteEras,
+    List<String>? actingStrengths,
+    String regionalDialect = 'Hollywood Standard',
+    String physicalStyle = 'High-Contrast Method',
+  }) async {
+    final cleanHandle =
+        username.trim().replaceAll('@', '').isEmpty ? 'StageStar' : username.trim().replaceAll('@', '');
+    final newUserId =
+        'actor_${cleanHandle.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch % 100000}';
+    final created = ActorProfileState(
+      userId: newUserId,
+      email: '${cleanHandle.toLowerCase()}@actlikeit.stage',
+      username: cleanHandle,
+      birthYear: birthYear.clamp(1920, DateTime.now().year),
+      favoriteEras: favoriteEras == null || favoriteEras.isEmpty
+          ? const <String>['1970–1999', '2000–2026']
+          : favoriteEras,
+      actingStrengths: actingStrengths == null || actingStrengths.isEmpty
+          ? const <String>['Method Drama', 'Improv Comedy']
+          : actingStrengths,
+      aiTokenBalance: kDefaultStarterAiTokens,
+      unlockedScenePacks: const <String>[],
+      onboardingCompleted: true,
+      avatarArchetypeId: avatarArchetypeId,
+      regionalDialect: regionalDialect,
+      physicalStyle: physicalStyle,
+      careerXp: 500,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await persistProfileToSupabaseAndCache(created);
+    return created;
+  }
+
+  /// Awards Career XP after a round/match finalization and persists to cache & Supabase.
+  Future<ActorProfileState?> addCareerXp(int earnedXp) async {
+    if (earnedXp <= 0) return _currentProfile;
+    final current = _currentProfile;
+    if (current == null) return null;
+    final updated = current.copyWith(
+      careerXp: current.careerXp + earnedXp,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await persistProfileToSupabaseAndCache(updated);
+    return updated;
+  }
+
+  /// Play Store Account & Data Deletion Compliance:
+  /// Wipes the active profile (or all local data) from SharedPreferences and
+  /// Supabase `profiles`, signs out, and resets the session cleanly.
+  Future<void> deleteCurrentActorProfileAndData() async {
+    _setLoading(true);
+    try {
+      final targetId = _currentProfile?.userId;
+      final prefs = await SharedPreferences.getInstance();
+
+      if (targetId != null) {
+        await prefs.remove('$_kLocalProfilePrefix$targetId');
+        _savedProfiles.removeWhere((p) => p.userId == targetId);
+        await prefs.setString(
+          _kSavedProfilesRegistryKey,
+          jsonEncode(_savedProfiles.map((e) => e.toJson()).toList()),
+        );
+      }
+
+      if (AppConfig.hasCloudSupabase && targetId != null) {
+        final client = Supabase.instance.client;
+        try {
+          await client.from('profiles').delete().eq('id', targetId);
+        } catch (_) {}
+        try {
+          await client.auth.signOut();
+        } catch (_) {}
+      }
+
+      if (_savedProfiles.isNotEmpty) {
+        _currentProfile = _savedProfiles.first;
+        await prefs.setString(_kLastActiveUserIdKey, _currentProfile!.userId);
+      } else {
+        await prefs.remove(_kLastActiveUserIdKey);
+        await prefs.remove(_kSavedProfilesRegistryKey);
+        _currentProfile = null;
+      }
+      notifyListeners();
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<ActorProfileState> signInWithEmailAndPassword({
     required String email,
     required String password,
@@ -261,7 +449,6 @@ class AuthService extends ChangeNotifier {
         return profile;
       }
 
-      // Offline / Standalone Galaxy S26 Ultra fallback keyed by deterministic ID
       final fallbackUserId = _deterministicUserIdForEmail(normalizedEmail);
       final hydrated = await fetchAndHydrateProfile(
         userId: fallbackUserId,
@@ -276,8 +463,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Registers a new actor account, seeds their initial row in `public.profiles`,
-  /// and prepares them for "The Red Carpet" Onboarding Questionnaire.
   Future<ActorProfileState> signUpWithEmailAndPassword({
     required String email,
     required String password,
@@ -304,8 +489,8 @@ class AuthService extends ChangeNotifier {
           data: <String, dynamic>{
             'username': sanitizedUsername,
             'birth_year': clampedBirthYear,
-            'favorite_eras': const <String>['1970s', '2000s'],
-            'acting_strengths': const <String>['Drama'],
+            'favorite_eras': const <String>['1970–1999', '2000–2026'],
+            'acting_strengths': const <String>['Method Drama'],
             'ai_token_balance': kDefaultStarterAiTokens,
             'unlocked_scene_packs': const <String>[],
             'onboarding_completed': false,
@@ -321,8 +506,8 @@ class AuthService extends ChangeNotifier {
         email: normalizedEmail,
         username: sanitizedUsername,
         birthYear: clampedBirthYear,
-        favoriteEras: const <String>['1970s', '2000s'],
-        actingStrengths: const <String>['Drama'],
+        favoriteEras: const <String>['1970–1999', '2000–2026'],
+        actingStrengths: const <String>['Method Drama'],
         aiTokenBalance: kDefaultStarterAiTokens,
         unlockedScenePacks: const <String>[],
         onboardingCompleted: false,
@@ -339,8 +524,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Queries `public.profiles` (and merges Supabase Auth metadata + local cache)
-  /// to hydrate the actor's complete historical profile on every sign-in.
   Future<ActorProfileState> fetchAndHydrateProfile({
     required String userId,
     String email = '',
@@ -375,8 +558,6 @@ class AuthService extends ChangeNotifier {
 
         if (row != null) {
           mergedData.addAll(Map<String, dynamic>.from(row));
-          // If the user already has a persisted row in `public.profiles` with
-          // favorite_eras or username, mark onboarding completed unless explicitly false.
           if (!mergedData.containsKey('onboarding_completed')) {
             mergedData['onboarding_completed'] = true;
           }
@@ -393,9 +574,6 @@ class AuthService extends ChangeNotifier {
     return hydrated;
   }
 
-  /// Saves the "Red Carpet" Questionnaire selections (`favoriteEras`,
-  /// `actingStrengths`, `birthYear`, `username`, and `aiTokenBalance`) to
-  /// `public.profiles` and updates the global state immediately.
   Future<ActorProfileState> saveOnboardingQuestionnaire({
     required String username,
     required int birthYear,
@@ -426,21 +604,25 @@ class AuthService extends ChangeNotifier {
         email: effectiveEmail,
         username: username.trim().isEmpty ? 'StageStar' : username.trim(),
         birthYear: birthYear.clamp(1920, DateTime.now().year),
-        favoriteEras:
-            favoriteEras.isEmpty ? const <String>['1970s', '2000s'] : favoriteEras,
+        favoriteEras: favoriteEras.isEmpty
+            ? const <String>['1970–1999', '2000–2026']
+            : favoriteEras,
         actingStrengths: actingStrengths.isEmpty
-            ? const <String>['Drama']
+            ? const <String>['Method Drama']
             : actingStrengths,
-        aiTokenBalance:
-            initialAiTokens ?? current?.aiTokenBalance ?? kDefaultStarterAiTokens,
+        aiTokenBalance: initialAiTokens ??
+            current?.aiTokenBalance ??
+            kDefaultStarterAiTokens,
         unlockedScenePacks: current?.unlockedScenePacks ?? const <String>[],
         onboardingCompleted: true,
         avatarArchetypeId:
             avatarArchetypeId ?? current?.avatarArchetypeId ?? 'the_method_actor',
-        castingTrack:
-            castingTrack ?? current?.castingTrack ?? 'track_a_star',
-        telemetryOptIn:
-            telemetryOptIn ?? current?.telemetryOptIn ?? true,
+        castingTrack: castingTrack ?? current?.castingTrack ?? 'track_a_star',
+        telemetryOptIn: telemetryOptIn ?? current?.telemetryOptIn ?? true,
+        regionalDialect: current?.regionalDialect ?? 'Hollywood Standard',
+        vocalProjectionDb: current?.vocalProjectionDb ?? -18.5,
+        physicalStyle: current?.physicalStyle ?? 'High-Contrast Method',
+        careerXp: current?.careerXp ?? 1250,
         updatedAt: DateTime.now().toUtc(),
       );
 
@@ -454,8 +636,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Non-destructive additive helper to update the player's chosen 2.5D cell-shaded
-  /// avatar archetype and sync immediately to Supabase `profiles` & local storage.
   Future<ActorProfileState?> updateAvatarArchetype(String archetypeId) async {
     final current = _currentProfile;
     final base = current ??
@@ -464,8 +644,8 @@ class AuthService extends ChangeNotifier {
           email: 'actor@actlikeit.stage',
           username: 'StageStar',
           birthYear: 1998,
-          favoriteEras: const <String>['1970s', '2000s'],
-          actingStrengths: const <String>['Drama'],
+          favoriteEras: const <String>['1970–1999', '2000–2026'],
+          actingStrengths: const <String>['Method Drama'],
           aiTokenBalance: kDefaultStarterAiTokens,
           unlockedScenePacks: const <String>[],
           onboardingCompleted: true,
@@ -480,9 +660,6 @@ class AuthService extends ChangeNotifier {
     return updated;
   }
 
-  /// Non-destructively upserts additive profile fields (such as `telemetryOptIn`,
-  /// `avatarArchetypeId`, and `castingTrack`) into `public.profiles` and local cache
-  /// without overwriting existing user preferences or breaking RLS policies.
   Future<ActorProfileState?> upsertAdditiveProfileFields({
     String? avatarArchetypeId,
     String? castingTrack,
@@ -491,6 +668,10 @@ class AuthService extends ChangeNotifier {
     int? birthYear,
     List<String>? favoriteEras,
     List<String>? actingStrengths,
+    String? regionalDialect,
+    double? vocalProjectionDb,
+    String? physicalStyle,
+    int? careerXp,
   }) async {
     final current = _currentProfile;
     final base = current ??
@@ -499,8 +680,9 @@ class AuthService extends ChangeNotifier {
           email: 'actor@actlikeit.stage',
           username: username ?? 'StageStar',
           birthYear: birthYear ?? 1998,
-          favoriteEras: favoriteEras ?? const <String>['1970s', '2000s'],
-          actingStrengths: actingStrengths ?? const <String>['Drama'],
+          favoriteEras:
+              favoriteEras ?? const <String>['1970–1999', '2000–2026'],
+          actingStrengths: actingStrengths ?? const <String>['Method Drama'],
           aiTokenBalance: kDefaultStarterAiTokens,
           unlockedScenePacks: const <String>[],
           onboardingCompleted: true,
@@ -517,15 +699,16 @@ class AuthService extends ChangeNotifier {
       avatarArchetypeId: avatarArchetypeId ?? base.avatarArchetypeId,
       castingTrack: castingTrack ?? base.castingTrack,
       telemetryOptIn: telemetryOptIn ?? base.telemetryOptIn,
+      regionalDialect: regionalDialect ?? base.regionalDialect,
+      vocalProjectionDb: vocalProjectionDb ?? base.vocalProjectionDb,
+      physicalStyle: physicalStyle ?? base.physicalStyle,
+      careerXp: careerXp ?? base.careerXp,
       updatedAt: DateTime.now().toUtc(),
     );
     await persistProfileToSupabaseAndCache(updated);
     return updated;
   }
 
-  /// Writes the full `ActorProfileState` to `public.profiles` in Supabase
-  /// (falling back gracefully if optional extended columns are not yet present),
-  /// syncs `auth.users` metadata, and persists to local SharedPreferences.
   Future<void> persistProfileToSupabaseAndCache(
     ActorProfileState profile,
   ) async {
@@ -537,9 +720,6 @@ class AuthService extends ChangeNotifier {
 
     final client = Supabase.instance.client;
 
-    // 1. Additive-only Upsert into `public.profiles`. Try full extended payload
-    // with avatar_archetype & casting_track first; if the remote table only has
-    // earlier migration columns, cascade gracefully without breaking RLS or schema.
     try {
       await client.from('profiles').upsert(<String, dynamic>{
         'id': profile.userId,
@@ -566,21 +746,9 @@ class AuthService extends ChangeNotifier {
           'unlocked_scene_packs': profile.unlockedScenePacks,
           'onboarding_completed': profile.onboardingCompleted,
         }).timeout(const Duration(seconds: 5));
-      } catch (_) {
-        try {
-          await client.from('profiles').upsert(<String, dynamic>{
-            'id': profile.userId,
-            'username': profile.username,
-            'birth_year': profile.birthYear,
-          }).timeout(const Duration(seconds: 5));
-        } catch (innerError) {
-          debugPrint('Supabase profiles base upsert notice: $innerError');
-        }
-      }
+      } catch (_) {}
     }
 
-    // 2. Also persist questionnaire answers, 2.5D avatar archetype, and telemetry
-    // in Supabase Auth userMetadata so multi-device sign-ins always recover 100% of fields.
     if (client.auth.currentUser != null) {
       try {
         await client.auth
@@ -601,22 +769,14 @@ class AuthService extends ChangeNotifier {
               ),
             )
             .timeout(const Duration(seconds: 5));
-      } catch (metaError) {
-        debugPrint('Supabase auth metadata sync notice: $metaError');
-      }
+      } catch (_) {}
     }
   }
 
-  /// Deducts 1 AI Token prior to a Gemini AI Telemetrics call and persists the
-  /// updated balance to Supabase `profiles`. Returns false if balance is 0.
   Future<bool> consumeAiToken() async {
     final profile = _currentProfile;
-    if (profile == null) {
-      return false;
-    }
-    if (profile.aiTokenBalance <= 0) {
-      return false;
-    }
+    if (profile == null) return false;
+    if (profile.aiTokenBalance <= 0) return false;
     final updated = profile.copyWith(
       aiTokenBalance: profile.aiTokenBalance - 1,
       updatedAt: DateTime.now().toUtc(),
@@ -625,17 +785,16 @@ class AuthService extends ChangeNotifier {
     return true;
   }
 
-  /// Adds AI Telemetrics tokens to the user's balance and persists to Supabase.
   Future<ActorProfileState?> topUpAiTokens(int amount) async {
     if (amount <= 0) return _currentProfile;
     final base = _currentProfile ??
         ActorProfileState(
           userId: 'local-s26-actor',
           email: 'actor@actlikeit.stage',
-          username: 'Galaxy S26 Actor',
+          username: 'kkl',
           birthYear: 1998,
-          favoriteEras: const <String>['1970s', '2000s'],
-          actingStrengths: const <String>['Drama'],
+          favoriteEras: const <String>['1970–1999', '2000–2026'],
+          actingStrengths: const <String>['Method Drama'],
           aiTokenBalance: kDefaultStarterAiTokens,
           unlockedScenePacks: const <String>[],
           onboardingCompleted: true,
@@ -649,17 +808,15 @@ class AuthService extends ChangeNotifier {
     return updated;
   }
 
-  /// Unlocks a premium Host-Pays Scene Pack (`emmy_vault`, `cult_classics`,
-  /// `late_night`) and persists the unlock flag to Supabase.
   Future<ActorProfileState?> unlockScenePack(String packKey) async {
     final base = _currentProfile ??
         ActorProfileState(
           userId: 'local-s26-actor',
           email: 'actor@actlikeit.stage',
-          username: 'Galaxy S26 Actor',
+          username: 'kkl',
           birthYear: 1998,
-          favoriteEras: const <String>['1970s', '2000s'],
-          actingStrengths: const <String>['Drama'],
+          favoriteEras: const <String>['1970–1999', '2000–2026'],
+          actingStrengths: const <String>['Method Drama'],
           aiTokenBalance: kDefaultStarterAiTokens,
           unlockedScenePacks: const <String>[],
           onboardingCompleted: true,
@@ -678,11 +835,11 @@ class AuthService extends ChangeNotifier {
   }
 
   bool hasUnlockedScenePack(String packKey) {
-    return _currentProfile?.unlockedScenePacks.contains(packKey) ?? false;
+    final packs = _currentProfile?.unlockedScenePacks ?? const <String>[];
+    if (packs.contains('all_era_bundle')) return true;
+    return packs.contains(packKey);
   }
 
-  /// Signs out from Supabase Auth while preserving the local profile record in
-  /// SharedPreferences so historical data is never lost when offline.
   Future<void> signOut() async {
     _setLoading(true);
     try {
@@ -694,6 +851,42 @@ class AuthService extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  Future<void> _loadSavedProfilesRegistry() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kSavedProfilesRegistryKey);
+      _savedProfiles.clear();
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          for (final item in decoded) {
+            if (item is Map) {
+              _savedProfiles.add(
+                ActorProfileState.fromJson(Map<String, dynamic>.from(item)),
+              );
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _syncRegistryWithProfile(ActorProfileState profile) async {
+    final idx = _savedProfiles.indexWhere((p) => p.userId == profile.userId);
+    if (idx >= 0) {
+      _savedProfiles[idx] = profile;
+    } else {
+      _savedProfiles.insert(0, profile);
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _kSavedProfilesRegistryKey,
+        jsonEncode(_savedProfiles.map((e) => e.toJson()).toList()),
+      );
+    } catch (_) {}
   }
 
   Future<void> _writeLocalProfile(ActorProfileState profile) async {
@@ -710,6 +903,8 @@ class AuthService extends ChangeNotifier {
         );
       }
       await prefs.setString(_kLastActiveUserIdKey, profile.userId);
+      await prefs.setInt(_kTelemetricsTokensPrefsKey, profile.aiTokenBalance);
+      await _syncRegistryWithProfile(profile);
     } catch (e) {
       debugPrint('Local profile cache write notice: $e');
     }

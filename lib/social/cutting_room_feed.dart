@@ -27,6 +27,7 @@ class CuttingRoomAuditionTake {
   final int totalRatingsCount;
   final int shareCount;
   final Color neonAccent;
+  final String? videoUrl;
 
   const CuttingRoomAuditionTake({
     required this.id,
@@ -42,7 +43,226 @@ class CuttingRoomAuditionTake {
     required this.totalRatingsCount,
     required this.shareCount,
     required this.neonAccent,
+    this.videoUrl,
   });
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'actorHandle': actorHandle,
+        'avatarArchetypeId': avatarArchetypeId,
+        'sceneTitle': sceneTitle,
+        'filmOrSeries': filmOrSeries,
+        'releaseYear': releaseYear,
+        'scriptExcerpt': scriptExcerpt,
+        'directorCommentStamp': directorCommentStamp,
+        'aiTelemetricsScore': aiTelemetricsScore,
+        'averageStarRating': averageStarRating,
+        'totalRatingsCount': totalRatingsCount,
+        'shareCount': shareCount,
+        'neonAccent': neonAccent.toARGB32(),
+        if (videoUrl != null) 'videoUrl': videoUrl,
+      };
+
+  factory CuttingRoomAuditionTake.fromJson(Map<String, dynamic> json) {
+    final int colorVal =
+        (json['neonAccent'] as num?)?.toInt() ?? 0xFFFFD700;
+    return CuttingRoomAuditionTake(
+      id: json['id']?.toString() ??
+          'crf_${DateTime.now().millisecondsSinceEpoch}',
+      actorHandle: json['actorHandle']?.toString() ?? '@STAGE_STAR',
+      avatarArchetypeId:
+          json['avatarArchetypeId']?.toString() ?? 'the_method_actor',
+      sceneTitle: json['sceneTitle']?.toString() ?? 'SOUNDSTAGE TAKE',
+      filmOrSeries: json['filmOrSeries']?.toString() ?? 'ACT LIKE IT',
+      releaseYear: (json['releaseYear'] as num?)?.toInt() ?? 2025,
+      scriptExcerpt: json['scriptExcerpt']?.toString() ??
+          '"Live soundstage performance recorded in Act Like It!"',
+      directorCommentStamp: json['directorCommentStamp']?.toString() ??
+          'CERTIFIED SCREEN TEST · OFFICIAL VERDICT',
+      aiTelemetricsScore:
+          (json['aiTelemetricsScore'] as num?)?.toDouble() ?? 88.0,
+      averageStarRating:
+          (json['averageStarRating'] as num?)?.toDouble() ?? 4.9,
+      totalRatingsCount:
+          (json['totalRatingsCount'] as num?)?.toInt() ?? 12,
+      shareCount: (json['shareCount'] as num?)?.toInt() ?? 4,
+      neonAccent: Color(colorVal),
+      videoUrl: json['videoUrl']?.toString(),
+    );
+  }
+}
+
+/// Persistent store & UGC Moderation Registry for "The Cutting Room Floor".
+/// Auto-prepends newly completed player takes to position #1 and enforces
+/// Google Play Store UGC Report / Block safety compliance.
+class CuttingRoomFeedStore {
+  static const String _kPublishedTakesKey =
+      'act_like_it_published_cutting_room_takes_v1';
+  static const String _kBlockedHandlesKey =
+      'act_like_it_blocked_ugc_handles_v1';
+
+  static final List<CuttingRoomAuditionTake> _runtimePublishedTakes =
+      <CuttingRoomAuditionTake>[];
+  static final Set<String> _blockedActorHandles = <String>{};
+
+  static List<CuttingRoomAuditionTake> get runtimePublishedTakes =>
+      List<CuttingRoomAuditionTake>.unmodifiable(_runtimePublishedTakes);
+
+  static Set<String> get blockedActorHandles =>
+      Set<String>.unmodifiable(_blockedActorHandles);
+
+  static bool isActorBlocked(String handleOrName) {
+    final normalized = _normalizeHandle(handleOrName);
+    return _blockedActorHandles.contains(normalized);
+  }
+
+  static String _normalizeHandle(String raw) {
+    final trimmed = raw.trim().toUpperCase();
+    return trimmed.startsWith('@') ? trimmed : '@$trimmed';
+  }
+
+  static Future<void> hydrateFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final blockedList = prefs.getStringList(_kBlockedHandlesKey) ?? <String>[];
+      _blockedActorHandles
+        ..clear()
+        ..addAll(blockedList.map(_normalizeHandle));
+
+      final rawTakes = prefs.getString(_kPublishedTakesKey);
+      if (rawTakes != null && rawTakes.isNotEmpty) {
+        final decoded = jsonDecode(rawTakes);
+        if (decoded is List) {
+          _runtimePublishedTakes.clear();
+          for (final item in decoded) {
+            if (item is Map) {
+              _runtimePublishedTakes.add(
+                CuttingRoomAuditionTake.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> reportAndBlockActor({
+    required String actorHandleOrName,
+    required String reason,
+    String? takeId,
+  }) async {
+    final normalized = _normalizeHandle(actorHandleOrName);
+    _blockedActorHandles.add(normalized);
+    if (takeId != null) {
+      _runtimePublishedTakes.removeWhere((t) => t.id == takeId);
+    }
+    _runtimePublishedTakes
+        .removeWhere((t) => _normalizeHandle(t.actorHandle) == normalized);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        _kBlockedHandlesKey,
+        _blockedActorHandles.toList(),
+      );
+      await prefs.setString(
+        _kPublishedTakesKey,
+        jsonEncode(_runtimePublishedTakes.map((t) => t.toJson()).toList()),
+      );
+    } catch (_) {}
+
+    final client = supabaseOrNull;
+    if (client != null && OfflineManager.instance.isOnline) {
+      try {
+        await client.from('ugc_moderation_reports').insert(<String, dynamic>{
+          'reported_handle': normalized,
+          'take_id': takeId ?? 'lobby_report',
+          'reason': reason,
+          'reporter_id':
+              AuthService.instance.currentProfile?.userId ?? 'local-actor',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        }).timeout(const Duration(seconds: 3));
+      } catch (_) {}
+    }
+  }
+
+  /// Called automatically by `TriModalJudgingScreen` when a round completes so
+  /// the player's own performance is immediately prepended to position `#1`
+  /// on "The Cutting Room Floor".
+  static Future<CuttingRoomAuditionTake> publishCompletedPerformance({
+    required String takeId,
+    required String actorHandle,
+    required String avatarArchetypeId,
+    required String sceneTitle,
+    required String filmOrSeries,
+    required int releaseYear,
+    required String scriptExcerpt,
+    required String directorCommentStamp,
+    required double compositeScore,
+    String? videoUrl,
+  }) async {
+    await hydrateFromPrefs();
+    final cleanFilm = filmOrSeries
+        .replaceAll(RegExp(r'\(\d{4}\)'), '')
+        .trim()
+        .toUpperCase();
+    final take = CuttingRoomAuditionTake(
+      id: takeId,
+      actorHandle: _normalizeHandle(actorHandle),
+      avatarArchetypeId: avatarArchetypeId,
+      sceneTitle: sceneTitle.toUpperCase(),
+      filmOrSeries: cleanFilm.isEmpty ? 'ACT LIKE IT' : cleanFilm,
+      releaseYear: releaseYear,
+      scriptExcerpt: scriptExcerpt,
+      directorCommentStamp: directorCommentStamp,
+      aiTelemetricsScore: compositeScore.clamp(0.0, 100.0),
+      averageStarRating:
+          compositeScore >= 85.0 ? 5.0 : (compositeScore >= 75.0 ? 4.8 : 4.4),
+      totalRatingsCount: 1,
+      shareCount: 1,
+      neonAccent: compositeScore >= 85.0
+          ? const Color(0xFFFFD700)
+          : const Color(0xFF06B6D4),
+      videoUrl: videoUrl,
+    );
+
+    _runtimePublishedTakes.removeWhere((t) => t.id == take.id);
+    _runtimePublishedTakes.insert(0, take);
+    if (_runtimePublishedTakes.length > 20) {
+      _runtimePublishedTakes.removeRange(20, _runtimePublishedTakes.length);
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _kPublishedTakesKey,
+        jsonEncode(_runtimePublishedTakes.map((t) => t.toJson()).toList()),
+      );
+    } catch (_) {}
+
+    final client = supabaseOrNull;
+    if (client != null && OfflineManager.instance.isOnline) {
+      try {
+        await client.from('cutting_room_takes').upsert(<String, dynamic>{
+          'id': take.id,
+          'actor_handle': take.actorHandle,
+          'avatar_archetype_id': take.avatarArchetypeId,
+          'scene_title': take.sceneTitle,
+          'film_or_series': take.filmOrSeries,
+          'release_year': take.releaseYear,
+          'script_excerpt': take.scriptExcerpt,
+          'director_comment_stamp': take.directorCommentStamp,
+          'ai_telemetrics_score': take.aiTelemetricsScore,
+          if (take.videoUrl != null) 'video_url': take.videoUrl,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }).timeout(const Duration(seconds: 4));
+      } catch (_) {}
+    }
+
+    return take;
+  }
 }
 
 const List<CuttingRoomAuditionTake> kDefaultCuttingRoomTakes =
@@ -115,11 +335,6 @@ const List<CuttingRoomAuditionTake> kDefaultCuttingRoomTakes =
 
 /// MODULE 2: "The Cutting Room Floor" (`lib/social/cutting_room_feed.dart`).
 /// Reached via the First-Person Silver Elevator transition on the Red Carpet.
-/// Features:
-/// - Vertical full-screen scrolling feed (`PageView.builder`) in 2.5D cell-shaded style
-/// - 5-to-1 Golden Star Rating Box with optimistic local + additive Supabase sync
-/// - Angled Director's Comment Stamp overlay on the performance frame
-/// - Native Viral Share Trigger (`Share.share`)
 class CuttingRoomFeedScreen extends StatefulWidget {
   const CuttingRoomFeedScreen({super.key});
 
@@ -138,6 +353,7 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
       List<CuttingRoomAuditionTake>.from(kDefaultCuttingRoomTakes);
   final Map<String, int> _userStarRatings = <String, int>{};
   final Map<String, String> _customDirectorStamps = <String, String>{};
+  final Map<String, int> _roseHypeCounts = <String, int>{};
   int _activeIndex = 0;
 
   @override
@@ -151,7 +367,15 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
     _hydrateTakesAndSavedRatings();
   }
 
+  String _formatCleanFilmSubtitle(CuttingRoomAuditionTake take) {
+    final cleanedFilm = take.filmOrSeries
+        .replaceAll(RegExp(r'\(\d{4}\)'), '')
+        .trim();
+    return '${take.sceneTitle} · $cleanedFilm (${take.releaseYear})';
+  }
+
   Future<void> _hydrateTakesAndSavedRatings() async {
+    await CuttingRoomFeedStore.hydrateFromPrefs();
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_kRatingsPrefsKey);
@@ -168,38 +392,70 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
       }
     } catch (_) {}
 
-    // Prepend any local Career Trophy Room takes so the player's own rounds
-    // also appear on The Cutting Room Floor!
+    final merged = <CuttingRoomAuditionTake>[];
+
+    // 1. Prepend published takes from CuttingRoomFeedStore
+    for (final pub in CuttingRoomFeedStore.runtimePublishedTakes) {
+      if (!CuttingRoomFeedStore.isActorBlocked(pub.actorHandle) &&
+          !merged.any((t) => t.id == pub.id)) {
+        merged.add(pub);
+      }
+    }
+
+    // 2. Also prepend latest local match history take if not already present
     final localHistory = OfflineManager.instance.matchHistoryLog;
     final profile = AuthService.instance.currentProfile;
     if (localHistory.isNotEmpty) {
       final rec = localHistory.first;
+      final cleanFilm = rec.filmOrSeries
+          .replaceAll(RegExp(r'\(\d{4}\)'), '')
+          .trim()
+          .toUpperCase();
+      final yearMatch = RegExp(r'\((\d{4})\)').firstMatch(rec.filmOrSeries);
+      final parsedYear =
+          int.tryParse(yearMatch?.group(1) ?? '') ?? 2025;
       final playerTake = CuttingRoomAuditionTake(
         id: 'crf_local_${rec.id}',
         actorHandle:
             '@${(profile?.username ?? "GALAXY_S26_ACTOR").toUpperCase()}',
         avatarArchetypeId: profile?.avatarArchetypeId ?? 'the_method_actor',
         sceneTitle: rec.sceneTitle.toUpperCase(),
-        filmOrSeries: rec.filmOrSeries.toUpperCase(),
-        releaseYear: 2025,
+        filmOrSeries: cleanFilm.isEmpty ? 'ACT LIKE IT' : cleanFilm,
+        releaseYear: parsedYear,
         scriptExcerpt:
-            '"Live soundstage take recorded on Galaxy S26 Ultra — Composite Verdict ${rec.finalScore.toStringAsFixed(1)}/100!"',
+            '"Live soundstage take — Composite Verdict ${rec.finalScore.toStringAsFixed(1)}/100!"',
         directorCommentStamp: rec.isWin
             ? 'STANDING OVATION · CERTIFIED TROPHY WIN'
             : 'OFFICIAL STUDIO SCREEN TEST',
-        aiTelemetricsScore: rec.aiScore,
+        aiTelemetricsScore: rec.finalScore,
         averageStarRating: 5.0,
         totalRatingsCount: 24,
         shareCount: 9,
         neonAccent: const Color(0xFFFFD700),
       );
-      if (!_takes.any((t) => t.id == playerTake.id)) {
-        _takes.insert(0, playerTake);
+      if (!CuttingRoomFeedStore.isActorBlocked(playerTake.actorHandle) &&
+          !merged.any((t) => t.id == playerTake.id)) {
+        merged.add(playerTake);
+      }
+    }
+
+    // 3. Append default takes that aren't blocked
+    for (final def in kDefaultCuttingRoomTakes) {
+      if (!CuttingRoomFeedStore.isActorBlocked(def.actorHandle) &&
+          !merged.any((t) => t.id == def.id)) {
+        merged.add(def);
       }
     }
 
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _takes
+          ..clear()
+          ..addAll(merged);
+        if (_activeIndex >= _takes.length) {
+          _activeIndex = 0;
+        }
+      });
     }
   }
 
@@ -222,7 +478,6 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
       await prefs.setString(_kRatingsPrefsKey, jsonEncode(_userStarRatings));
     } catch (_) {}
 
-    // Non-destructive additive upsert to Supabase if online and table exists
     final client = supabaseOrNull;
     if (client != null && OfflineManager.instance.isOnline) {
       try {
@@ -233,9 +488,7 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
           'stars': clampedStars,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         }).timeout(const Duration(seconds: 4));
-      } catch (_) {
-        // Safely ignore if optional additive table is not provisioned yet
-      }
+      } catch (_) {}
     }
 
     if (!mounted) return;
@@ -253,6 +506,118 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _openReportAndBlockSheet(CuttingRoomAuditionTake take) async {
+    HapticFeedback.heavyImpact();
+    const reasons = <String>[
+      'Inappropriate Audio / Language',
+      'Harassment or Unsportsmanlike Conduct',
+      'Spam / Off-Topic Audition Reel',
+      'Block Actor from My Feed & Lobbies',
+    ];
+
+    final chosenReason = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF0B0E17),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.flag_rounded,
+                      color: Color(0xFFE11D48),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'REPORT OR BLOCK ${take.actorHandle}',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFE11D48),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Flagged reels are immediately hidden from your feed and reported to Studio Moderation.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 12),
+                ...reasons.map((r) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFF334155)),
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(r),
+                      icon: const Icon(
+                        Icons.shield_outlined,
+                        color: Color(0xFFE11D48),
+                        size: 18,
+                      ),
+                      label: Text(
+                        r,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (chosenReason != null && mounted) {
+      await CuttingRoomFeedStore.reportAndBlockActor(
+        actorHandleOrName: take.actorHandle,
+        reason: chosenReason,
+        takeId: take.id,
+      );
+      await _hydrateTakesAndSavedRatings();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF14080E),
+          content: Text(
+            'Reported & blocked ${take.actorHandle}. Reel removed from your feed.',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFFFD700),
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _openDirectorStampModal(CuttingRoomAuditionTake take) async {
@@ -289,13 +654,17 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'STAMP DIRECTOR\'S CRITIQUE ON REEL',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFFFD700),
+                const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'STAMP DIRECTOR\'S CRITIQUE ON REEL',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -327,11 +696,16 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
                   controller: ctrl,
                   maxLength: 56,
                   style: const TextStyle(
+                    fontSize: 13.5,
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
                   ),
                   decoration: InputDecoration(
                     hintText: 'e.g., OSCAR-WORTHY BREAKDOWN · 10/10',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
                     filled: true,
                     fillColor: const Color(0xFF07090E),
                     border: OutlineInputBorder(
@@ -384,7 +758,7 @@ class _CuttingRoomFeedScreenState extends State<CuttingRoomFeedScreen>
     final payload = '''
 🎬 THE CUTTING ROOM FLOOR — ACT LIKE IT 🎬
 Actor: ${take.actorHandle}
-Scene: "${take.sceneTitle}" (${take.filmOrSeries}, ${take.releaseYear})
+Scene: "${take.sceneTitle}" (${_formatCleanFilmSubtitle(take)})
 AI Telemetrics: ${take.aiTelemetricsScore.toStringAsFixed(1)}/100 · Rated: ${'★' * stars} ($stars/5)
 Director's Stamp: [$stamp]
 ${take.scriptExcerpt}
@@ -402,24 +776,33 @@ ${take.scriptExcerpt}
       backgroundColor: const Color(0xFF07090E),
       appBar: GameAppBar(
         title: 'THE CUTTING ROOM FLOOR',
-        subtitle: 'REEL ${_activeIndex + 1} OF ${_takes.length} · SWIPE UP',
+        subtitle: _takes.isEmpty
+            ? 'ALL REELS FILTERED'
+            : 'REEL ${_activeIndex + 1} OF ${_takes.length} · SWIPE UP',
       ),
-      body: PageView.builder(
-        controller: _verticalPageController,
-        scrollDirection: Axis.vertical,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _takes.length,
-        onPageChanged: (idx) {
-          HapticFeedback.selectionClick();
-          setState(() {
-            _activeIndex = idx;
-          });
-        },
-        itemBuilder: (context, index) {
-          final take = _takes[index];
-          return _buildFullScreenCellShadedReel(take);
-        },
-      ),
+      body: _takes.isEmpty
+          ? const Center(
+              child: Text(
+                'No audition reels available.',
+                style: TextStyle(color: Colors.white70),
+              ),
+            )
+          : PageView.builder(
+              controller: _verticalPageController,
+              scrollDirection: Axis.vertical,
+              physics: const BouncingScrollPhysics(),
+              itemCount: _takes.length,
+              onPageChanged: (idx) {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  _activeIndex = idx;
+                });
+              },
+              itemBuilder: (context, index) {
+                final take = _takes[index];
+                return _buildFullScreenCellShadedReel(take);
+              },
+            ),
     );
   }
 
@@ -428,11 +811,13 @@ ${take.scriptExcerpt}
     final selectedStars = _userStarRatings[take.id];
     final activeStamp =
         _customDirectorStamps[take.id] ?? take.directorCommentStamp;
+    final rosesCount = _roseHypeCounts[take.id] ?? 18;
 
     return AnimatedBuilder(
       animation: _reelLoopController,
       builder: (context, _) {
-        final phase = _reelLoopController.value * math.pi * 2;
+        final progress = _reelLoopController.value;
+        final phase = progress * math.pi * 2;
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
@@ -468,67 +853,133 @@ ${take.scriptExcerpt}
                   ),
                 ),
 
-                // 2. Center 2.5D Performer Avatar & Live Audio Wave
+                // 2. Live Audition Reel Viewport (Viewfinder HUD + Waveform + Scrubber + Character)
                 Align(
-                  alignment: const Alignment(0.0, -0.18),
+                  alignment: const Alignment(0.0, -0.22),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 76),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        GestureDetector(
-                          onTap: () => showBoondocksCharacterSpotlightModal(
-                            context,
-                            archetype,
-                          ),
-                          child: BoondocksCharacterRig(
-                            archetype: archetype,
-                            size: 136,
-                            isSelected: true,
-                            externalPhase: phase,
-                          ),
+                    padding: const EdgeInsets.fromLTRB(16, 56, 74, 150),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xB307090E),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: take.neonAccent.withValues(alpha: 0.85),
+                          width: 2.0,
                         ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Camera Viewfinder Header HUD
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: (progress * 10).floor().isEven
+                                          ? const Color(0xFFFF1744)
+                                          : const Color(0x55FF1744),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'PLAYBACK 00:0${(progress * 6).floor()} / 00:06',
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                'AI ${take.aiTelemetricsScore.toStringAsFixed(1)}/100',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: take.neonAccent,
+                                ),
+                              ),
+                            ],
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xE607090E),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: take.neonAccent,
-                              width: 1.8,
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () => showBoondocksCharacterSpotlightModal(
+                              context,
+                              archetype,
+                            ),
+                            child: BoondocksCharacterRig(
+                              archetype: archetype,
+                              size: 118,
+                              isSelected: true,
+                              externalPhase: phase,
                             ),
                           ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              'LOOPING AUDITION REEL · AI ${take.aiTelemetricsScore.toStringAsFixed(1)}/100',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w900,
-                                color: take.neonAccent,
+                          const SizedBox(height: 8),
+                          // Live Audio Waveform Bars
+                          SizedBox(
+                            height: 22,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(18, (barIdx) {
+                                final h = 5.0 +
+                                    15.0 *
+                                        (0.5 +
+                                            0.5 *
+                                                math.sin(
+                                                  phase * 2.0 + barIdx * 0.55,
+                                                ));
+                                return Container(
+                                  width: 4,
+                                  height: h,
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 2),
+                                  decoration: BoxDecoration(
+                                    color: barIdx.isEven
+                                        ? take.neonAccent
+                                        : const Color(0xFFFFD700),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Timeline Scrubber Bar
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 5,
+                              backgroundColor: const Color(0xFF1E293B),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                take.neonAccent,
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
 
                 // 3. Angled "DIRECTOR'S COMMENT STAMP" Ink Overlay
                 Positioned(
-                  top: 16,
+                  top: 14,
                   left: 14,
                   right: 14,
                   child: GestureDetector(
                     onTap: () => _openDirectorStampModal(take),
                     child: Transform.rotate(
-                      angle: -0.035,
+                      angle: -0.025,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -539,7 +990,7 @@ ${take.scriptExcerpt}
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: const Color(0xFFFFD700),
-                            width: 2.4,
+                            width: 2.2,
                           ),
                           boxShadow: const <BoxShadow>[
                             BoxShadow(
@@ -581,10 +1032,10 @@ ${take.scriptExcerpt}
                   ),
                 ),
 
-                // 4. Right-Side Vertical Action Column: Placed cleanly in upper-right margin
+                // 4. Right-Side Vertical Action Column (Stamp, Rose Hype, Share, UGC Report/Block)
                 Positioned(
-                  right: 14,
-                  top: 76,
+                  right: 12,
+                  top: 68,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -594,12 +1045,31 @@ ${take.scriptExcerpt}
                         accent: const Color(0xFFFFD700),
                         onTap: () => _openDirectorStampModal(take),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
+                      _buildActionOrb(
+                        icon: Icons.local_florist_rounded,
+                        label: '🌹 $rosesCount',
+                        accent: const Color(0xFF10B981),
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _roseHypeCounts[take.id] = rosesCount + 1;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
                       _buildActionOrb(
                         icon: Icons.ios_share_rounded,
                         label: '${take.shareCount}',
                         accent: const Color(0xFF06B6D4),
                         onTap: () => _triggerViralShare(take),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildActionOrb(
+                        icon: Icons.flag_rounded,
+                        label: 'REPORT',
+                        accent: const Color(0xFFE11D48),
+                        onTap: () => _openReportAndBlockSheet(take),
                       ),
                     ],
                   ),
@@ -615,7 +1085,7 @@ ${take.scriptExcerpt}
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: const Color(0xEB07090E),
                           borderRadius: BorderRadius.circular(16),
@@ -629,12 +1099,17 @@ ${take.scriptExcerpt}
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  take.actorHandle,
-                                  style: GoogleFonts.bebasNeue(
-                                    fontSize: 22,
-                                    letterSpacing: 1.4,
-                                    color: Colors.white,
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      take.actorHandle,
+                                      style: GoogleFonts.bebasNeue(
+                                        fontSize: 22,
+                                        letterSpacing: 1.4,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -660,25 +1135,26 @@ ${take.scriptExcerpt}
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              take.filmOrSeries
-                                      .contains(take.releaseYear.toString())
-                                  ? '${take.sceneTitle} · ${take.filmOrSeries}'
-                                  : '${take.sceneTitle} · ${take.filmOrSeries} (${take.releaseYear})',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                                color: take.neonAccent,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _formatCleanFilmSubtitle(take),
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: take.neonAccent,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 5),
                             Text(
                               take.scriptExcerpt,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 12.5,
+                                fontSize: 12.2,
                                 fontStyle: FontStyle.italic,
                                 color: Color(0xFFE2E8F0),
                                 height: 1.3,
@@ -687,13 +1163,13 @@ ${take.scriptExcerpt}
                           ],
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
 
                       // 5-to-1 GOLDEN STAR RATING BOX
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 10,
+                          vertical: 9,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xF20B0E17),
@@ -751,8 +1227,7 @@ ${take.scriptExcerpt}
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            // Descending 5 -> 4 -> 3 -> 2 -> 1 Golden Star Buttons
+                            const SizedBox(height: 7),
                             Row(
                               children: [5, 4, 3, 2, 1].map((starValue) {
                                 final isChosen = selectedStars == starValue;
@@ -768,7 +1243,7 @@ ${take.scriptExcerpt}
                                         duration:
                                             const Duration(milliseconds: 180),
                                         padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
+                                          vertical: 7,
                                         ),
                                         decoration: BoxDecoration(
                                           color: isChosen
@@ -840,12 +1315,12 @@ ${take.scriptExcerpt}
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: const Color(0xEB07090E),
               shape: BoxShape.circle,
-              border: Border.all(color: accent, width: 2.2),
+              border: Border.all(color: accent, width: 2.0),
               boxShadow: const <BoxShadow>[
                 BoxShadow(
                   color: Color(0xFF05070B),
@@ -854,14 +1329,14 @@ ${take.scriptExcerpt}
                 ),
               ],
             ),
-            child: Icon(icon, color: accent, size: 22),
+            child: Icon(icon, color: accent, size: 20),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             label,
             style: const TextStyle(
               fontFamily: 'monospace',
-              fontSize: 9.5,
+              fontSize: 9,
               fontWeight: FontWeight.w900,
               color: Colors.white,
             ),
@@ -885,7 +1360,6 @@ class _CuttingRoomLoopStagePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.5, size.height * 0.42);
 
-    // 1. Gritty 2.5D Soundstage Backdrop
     canvas.drawRect(
       Offset.zero & size,
       Paint()
@@ -900,7 +1374,6 @@ class _CuttingRoomLoopStagePainter extends CustomPainter {
         ).createShader(Offset.zero & size),
     );
 
-    // 2. Kinetic Comic Action Lines radiating from the performer
     final linePaint = Paint()
       ..color = neonAccent.withValues(alpha: 0.22)
       ..strokeWidth = 2.0;

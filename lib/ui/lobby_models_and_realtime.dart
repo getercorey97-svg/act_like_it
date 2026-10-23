@@ -899,6 +899,74 @@ class LobbyRealtimeManager extends ChangeNotifier {
     _setLoading(false);
   }
 
+  /// Queries open public lobbies (`status = 'waiting'`) on Supabase and joins immediately,
+  /// or creates a new public ensemble lobby with an active co-star so solo players can jump right in.
+  Future<void> quickJoinPublicLobby({
+    required String displayName,
+    required SceneCategory fallbackCategory,
+  }) async {
+    _setLoading(true);
+    _errorMessage = null;
+    localDisplayName =
+        displayName.trim().isEmpty ? 'StageStar' : displayName.trim();
+
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        final authedUserId = await _ensureAuthenticatedAndProfile(client);
+        final openLobbyRow = await client
+            .from('lobbies')
+            .select('*, scenes(*)')
+            .eq('status', 'waiting')
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        if (openLobbyRow != null && authedUserId != null) {
+          final fallbackPrompt = kBuiltInSceneVault[fallbackCategory]?.first ??
+              kBuiltInSceneVault[SceneCategory.era1970To1999]!.first;
+          final lobby = LobbySession.fromJson(
+            Map<String, dynamic>.from(openLobbyRow as Map),
+            fallbackCategory: fallbackCategory,
+            fallbackScene: fallbackPrompt,
+          );
+          await client.from('lobby_players').upsert(
+            {
+              'lobby_id': lobby.id,
+              'user_id': authedUserId,
+              'is_ready': true,
+            },
+            onConflict: 'lobby_id,user_id',
+          );
+          _session = lobby;
+          await _refreshPlayers(lobby.id);
+          if (_players.length < 2) {
+            addAiCoStar();
+          }
+          _subscribeToLobbyRealtime(lobby);
+          unawaited(saveActiveRoomSession(lobby.roomCode));
+          _setLoading(false);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    await createLobby(
+      displayName: localDisplayName,
+      category: fallbackCategory,
+    );
+    if (_players.length < 2) {
+      addAiCoStar();
+    }
+  }
+
+  /// Removes and blocks a disruptive player from the current Green Room roster (UGC safety).
+  void blockAndRemovePlayer(String targetUserId) {
+    if (targetUserId == _localUserId) return;
+    _players = _players.where((p) => p.userId != targetUserId).toList();
+    _notifySafely();
+  }
+
   Future<void> toggleReadyState() async {
     if (_session == null) return;
     final idx = _players.indexWhere((p) => p.userId == _localUserId);

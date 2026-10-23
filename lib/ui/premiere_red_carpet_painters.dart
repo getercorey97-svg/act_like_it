@@ -591,6 +591,8 @@ class VipCredentialHeaderBar extends StatelessWidget {
   final int telemetricsTokens;
   final int careerWins;
   final bool isOnline;
+  final VoidCallback? onProfileTap;
+  final VoidCallback? onTokensTap;
 
   const VipCredentialHeaderBar({
     super.key,
@@ -598,6 +600,8 @@ class VipCredentialHeaderBar extends StatelessWidget {
     required this.telemetricsTokens,
     required this.careerWins,
     required this.isOnline,
+    this.onProfileTap,
+    this.onTokensTap,
   });
 
   String get _rankTitle {
@@ -634,72 +638,95 @@ class VipCredentialHeaderBar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: ledColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: ledColor.withValues(alpha: 0.8),
-                      blurRadius: 8,
-                      spreadRadius: 1.5,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.workspace_premium_rounded,
-                color: Color(0xFFF5DEB3),
-                size: 17,
-              ),
-              const SizedBox(width: 6),
               Expanded(
-                child: Text(
-                  '$actorHandle · $_rankTitle',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.chakraPetch(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                    color: Colors.white,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(99),
+                  onTap: onProfileTap == null
+                      ? null
+                      : () {
+                          HapticFeedback.selectionClick();
+                          onProfileTap!();
+                        },
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: ledColor,
+                          boxShadow: [
+                            BoxShadow(
+                              color: ledColor.withValues(alpha: 0.8),
+                              blurRadius: 8,
+                              spreadRadius: 1.5,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.workspace_premium_rounded,
+                        color: Color(0xFFF5DEB3),
+                        size: 17,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '$actorHandle · $_rankTitle',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.chakraPetch(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0x260CB6D4),
-                  borderRadius: BorderRadius.circular(99),
-                  border:
-                      Border.all(color: const Color(0xFF0CB6D4), width: 1.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.bolt_rounded,
-                      size: 13,
-                      color: Color(0xFF0CB6D4),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      '$telemetricsTokens AI TOKENS',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
+              GestureDetector(
+                onTap: onTokensTap == null
+                    ? null
+                    : () {
+                        HapticFeedback.selectionClick();
+                        onTokensTap!();
+                      },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x260CB6D4),
+                    borderRadius: BorderRadius.circular(99),
+                    border:
+                        Border.all(color: const Color(0xFF0CB6D4), width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.bolt_rounded,
+                        size: 13,
                         color: Color(0xFF0CB6D4),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 3),
+                      Text(
+                        '$telemetricsTokens AI TOKENS',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0CB6D4),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

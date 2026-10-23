@@ -19,6 +19,8 @@ import 'ui/intro_cinematic.dart';
 import 'ui/brand_logo.dart';
 import 'social/cutting_room_feed.dart';
 import 'auth/auth_service.dart';
+import 'profile/actor_profile_screen.dart';
+import 'monetization/payment_dashboard_screen.dart';
 
 export 'ui/brand_logo.dart';
 
@@ -146,6 +148,7 @@ class _LivingMarqueeDashboardScreenState
   double _currentTicketPage = 0.0;
   int _focusedTicketIndex = 0;
   String? _savedActiveRoomCode;
+  String? _detectedClipboardCode;
   int _telemetricsTokens = 25;
 
   late final AnimationController _marqueeTickerController;
@@ -214,9 +217,19 @@ class _LivingMarqueeDashboardScreenState
   Future<void> _refreshVipHudState() async {
     final activeCode = await LobbyRealtimeManager.loadActiveRoomSession();
     final tokens = await LobbyRealtimeManager.loadTelemetricsTokens();
+    String? clipCode;
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = data?.text?.trim() ?? '';
+      final match = RegExp(r'\b([0-9]{6})\b').firstMatch(raw);
+      if (match != null) {
+        clipCode = match.group(1);
+      }
+    } catch (_) {}
     if (mounted) {
       setState(() {
         _savedActiveRoomCode = activeCode;
+        _detectedClipboardCode = clipCode;
         _telemetricsTokens = tokens;
       });
     }
@@ -269,7 +282,7 @@ class _LivingMarqueeDashboardScreenState
 
   Future<void> _initGameShowMusicLoop() async {
     try {
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setReleaseMode(ReleaseMode.stop);
       await _audioPlayer.setVolume(GameSettingsModal.masterAudioVolume);
       final wavBytes = OpeningPremiereMusicSynthesizer.buildOpeningFanfareWav();
       await _audioPlayer.play(BytesSource(wavBytes));
@@ -471,6 +484,30 @@ class _LivingMarqueeDashboardScreenState
     });
   }
 
+  Future<void> _openActorProfileScreen() async {
+    HapticFeedback.mediumImpact();
+    await _pauseMusicBeforeNavigation();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      StageSharedTransitionRoute(
+        page: const ActorProfileScreen(),
+      ),
+    );
+    _refreshVipHudState();
+  }
+
+  Future<void> _openPaymentDashboard({String? highlightProductKey}) async {
+    HapticFeedback.mediumImpact();
+    await _pauseMusicBeforeNavigation();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      StageSharedTransitionRoute(
+        page: PaymentDashboardScreen(highlightProductKey: highlightProductKey),
+      ),
+    );
+    _refreshVipHudState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -558,8 +595,150 @@ class _LivingMarqueeDashboardScreenState
                                           .instance.totalCareerWins,
                                       isOnline:
                                           OfflineManager.instance.isOnline,
+                                      onProfileTap: _openActorProfileScreen,
+                                      onTokensTap: () => _openPaymentDashboard(
+                                        highlightProductKey: 'tokens_100',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor:
+                                                  const Color(0xFFF5DEB3),
+                                              side: const BorderSide(
+                                                color: Color(0xFFF5DEB3),
+                                                width: 1.3,
+                                              ),
+                                              backgroundColor:
+                                                  const Color(0xCC07090E),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                vertical: 9,
+                                                horizontal: 8,
+                                              ),
+                                            ),
+                                            onPressed: _openActorProfileScreen,
+                                            icon: const Icon(
+                                              Icons.person_pin_rounded,
+                                              size: 15,
+                                            ),
+                                            label: const FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Text(
+                                                '🎭 DRESSING ROOM / PROFILE',
+                                                style: TextStyle(
+                                                  fontFamily: 'monospace',
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor:
+                                                  const Color(0xFF0CB6D4),
+                                              side: const BorderSide(
+                                                color: Color(0xFF0CB6D4),
+                                                width: 1.3,
+                                              ),
+                                              backgroundColor:
+                                                  const Color(0xCC07090E),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                vertical: 9,
+                                                horizontal: 8,
+                                              ),
+                                            ),
+                                            onPressed: () =>
+                                                _openPaymentDashboard(),
+                                            icon: const Icon(
+                                              Icons.workspace_premium_rounded,
+                                              size: 15,
+                                            ),
+                                            label: const FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Text(
+                                                '💳 VIP BOX OFFICE',
+                                                style: TextStyle(
+                                                  fontFamily: 'monospace',
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     const SizedBox(height: 10),
+                                    if (_detectedClipboardCode != null &&
+                                        _detectedClipboardCode !=
+                                            _savedActiveRoomCode) ...[
+                                      GestureDetector(
+                                        onTap: () async {
+                                          HapticFeedback.heavyImpact();
+                                          await _pauseMusicBeforeNavigation();
+                                          if (!mounted) return;
+                                          final selectedTicket =
+                                              kSceneVaultTickets[
+                                                  _focusedTicketIndex];
+                                          await Navigator.of(context).push(
+                                            StageSharedTransitionRoute(
+                                              page: LobbyMatchmakingScreen(
+                                                initialCategory:
+                                                    selectedTicket.category,
+                                                startInJoinMode: true,
+                                              ),
+                                            ),
+                                          );
+                                          _refreshVipHudState();
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xE60B1926),
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                            border: Border.all(
+                                              color: const Color(0xFF0CB6D4),
+                                              width: 1.6,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.confirmation_num_rounded,
+                                                color: Color(0xFF0CB6D4),
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  '🎟️ Backstage Pass #$_detectedClipboardCode detected on clipboard — TAP TO JOIN INSTANTLY',
+                                                  style: const TextStyle(
+                                                    fontFamily: 'monospace',
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                    ],
                                     if (_savedActiveRoomCode != null) ...[
                                       ActiveSetRejoinBanner(
                                         roomCode: _savedActiveRoomCode!,

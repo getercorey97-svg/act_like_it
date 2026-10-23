@@ -1063,6 +1063,45 @@ Return strict JSON:
     }
     return List.unmodifiable(_matchHistoryLog);
   }
+
+  double get highestAiScore {
+    if (_matchHistoryLog.isEmpty) return 0.0;
+    return _matchHistoryLog
+        .map((r) => r.aiScore)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  double get highestPeerScore {
+    if (_matchHistoryLog.isEmpty) return 0.0;
+    return _matchHistoryLog
+        .map((r) => r.peerScore)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  double get highestSocialScore {
+    if (_matchHistoryLog.isEmpty) return 0.0;
+    return _matchHistoryLog
+        .map((r) => r.socialScore)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  /// Clears local cached scenes, queued offline performances, and SQLite/SharedPreferences
+  /// queues for Google Play Store privacy & cache management compliance.
+  Future<void> clearLocalCacheAndOfflineQueue() async {
+    _queue.clear();
+    _matchHistoryLog.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kQueuedPerformancesPrefsKey);
+    await prefs.remove(_kMatchHistoryQueuePrefsKey);
+    await prefs.remove(_kCachedScenesPrefsKey);
+    await prefs.remove(_kCachedScenesTimestampKey);
+    if (!kIsWeb && _sqliteDb != null) {
+      try {
+        await _sqliteDb!.delete('offline_kv_store');
+      } catch (_) {}
+    }
+    notifyListeners();
+  }
 }
 
 /// Offline Pass-and-Play Multiplayer Screen:
