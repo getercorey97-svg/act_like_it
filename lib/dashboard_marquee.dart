@@ -15,6 +15,7 @@ import 'ui/interactive_instructions.dart';
 import 'ui/game_settings_modal.dart';
 import 'ui/scene_vault_screen.dart';
 import 'ui/transitions.dart';
+import 'ui/intro_cinematic.dart';
 import 'social/cutting_room_feed.dart';
 import 'auth/auth_service.dart';
 
@@ -267,19 +268,27 @@ class _LivingMarqueeDashboardScreenState
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.setVolume(GameSettingsModal.masterAudioVolume);
-      await _audioPlayer.play(
-        UrlSource(_gameShowSoundtrackUrl),
-      );
+      final wavBytes = OpeningPremiereMusicSynthesizer.buildOpeningFanfareWav();
+      await _audioPlayer.play(BytesSource(wavBytes));
       if (mounted) {
         setState(() {
           _isMusicPlaying = true;
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isMusicPlaying = false;
-        });
+      try {
+        await _audioPlayer.play(UrlSource(_gameShowSoundtrackUrl));
+        if (mounted) {
+          setState(() {
+            _isMusicPlaying = true;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _isMusicPlaying = false;
+          });
+        }
       }
     }
   }
