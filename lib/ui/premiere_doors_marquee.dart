@@ -55,8 +55,6 @@ class _Interactive3DHolographicMarqueeState
 
   @override
   Widget build(BuildContext context) {
-    final sweep = (math.sin(widget.phase) + 1.0) * 0.5;
-
     return GestureDetector(
       onTap: _handleMarqueeTap,
       child: AnimatedBuilder(
@@ -78,7 +76,7 @@ class _Interactive3DHolographicMarqueeState
             alignment: Alignment.center,
             transform: matrix,
             child: SizedBox(
-              height: 132,
+              height: 158,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -94,128 +92,28 @@ class _Interactive3DHolographicMarqueeState
                       foregroundPainter: _MarqueeFilamentBulbsPainter(
                         phase: widget.phase,
                       ),
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 8,
-                        ),
+                      child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 14,
+                          horizontal: 4,
+                          vertical: 4,
                         ),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xF2520002),
-                              Color(0xF807090E),
-                              Color(0xE6191008),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: const Color(0xFFF5DEB3),
-                            width: 2.6,
-                          ),
-                          boxShadow: [
-                            const BoxShadow(
-                              color: Color(0xFF05070B),
-                              offset: Offset(6, 6),
-                              blurRadius: 0,
-                            ),
-                            BoxShadow(
-                              color: const Color(0xFFE11342)
-                                  .withValues(alpha: 0.44),
-                              blurRadius: 32,
-                              spreadRadius: 2,
-                              offset: const Offset(0, 10),
-                            ),
-                            BoxShadow(
-                              color: const Color(0xFFF5DEB3)
-                                  .withValues(alpha: 0.28),
-                              blurRadius: 20,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: Row(
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ShaderMask(
-                                    shaderCallback: (bounds) {
-                                      return LinearGradient(
-                                        begin: Alignment(
-                                            -1.2 + sweep * 2.4, -0.4),
-                                        end: Alignment(-0.2 + sweep * 2.4, 0.6),
-                                        colors: const [
-                                          Color(0xFFF5DEB3),
-                                          Colors.white,
-                                          Color(0xFFF59E0B),
-                                          Color(0xFF0CB6D4),
-                                          Color(0xFFF5DEB3),
-                                        ],
-                                        stops: const [
-                                          0.0,
-                                          0.28,
-                                          0.52,
-                                          0.76,
-                                          1.0
-                                        ],
-                                      ).createShader(bounds);
-                                    },
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        'ACT LIKE IT',
-                                        style: GoogleFonts.limelight(
-                                          fontSize: 42,
-                                          color: Colors.white,
-                                          letterSpacing: 3.0,
-                                          height: 1.05,
-                                          shadows: const [
-                                            Shadow(
-                                              color: Color(0xFF05070B),
-                                              blurRadius: 0,
-                                              offset: Offset(3.5, 3.5),
-                                            ),
-                                            Shadow(
-                                              color: Color(0xFFE11342),
-                                              blurRadius: 24,
-                                              offset: Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      '2.5D Grand Premiere Soundstage · Tap Marquee for Flash Frenzy',
-                                      maxLines: 1,
-                                      style: GoogleFonts.montserrat(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.4,
-                                        color: const Color(0xFFF5DEB3),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            ActLikeItBrandLogo(
+                              heroTag: kActLikeItBrandLogoHeroTag,
+                              height: 150,
+                              compact: true,
+                              subtitle:
+                                  '2.5D GRAND PREMIERE SOUNDSTAGE · TAP FOR FLASH FRENZY',
+                              onTap: _handleMarqueeTap,
                             ),
-                            if (widget.trailingControls != null) ...[
-                              const SizedBox(width: 8),
-                              widget.trailingControls!,
-                            ],
+                            if (widget.trailingControls != null)
+                              Positioned(
+                                top: 8,
+                                right: 10,
+                                child: widget.trailingControls!,
+                              ),
                           ],
                         ),
                       ),

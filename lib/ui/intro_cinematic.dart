@@ -5,21 +5,29 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:video_player/video_player.dart';
+import '../auth/auth_screen.dart';
 import '../auth/auth_service.dart';
-import '../auth/login_screen.dart';
 import '../dashboard_marquee.dart';
 import 'boondocks_character_rig.dart';
+import 'brand_logo.dart';
 import 'opening_maestro_hero.dart';
+import 'transitions.dart';
 
 export 'boondocks_character_rig.dart';
+export 'brand_logo.dart';
 export 'opening_maestro_hero.dart';
 
-/// MODULE 1: Cell-Shaded Cinematic Opening (`lib/ui/intro_cinematic.dart`).
-/// - Plays the uploaded Golden Cyber-Mask Maestro opening sequence + synthesized
-///   Hollywood Premiere Fanfare music automatically on launch.
-/// - Lines the Red Carpet with all 14 animated 2.5D characters scaling toward the camera.
-/// - Includes a "FAST-SKIP TO RED CARPET" glass pill wrapped in `FittedBox` and a
-///   live Music Mute/Unmute toggle.
+/// MODULE 1: Official 8-Second "ACT LIKE IT" Opening Video & Logo Climax
+/// (`lib/ui/intro_cinematic.dart`).
+/// - Plays `assets/videos/intro_opening.mp4` (`12871.mp4`) full-screen (`BoxFit.cover`)
+///   with a 60fps CustomPainter Red Carpet + 14-character fallback.
+/// - At `t = 1.2s`, triggers the clapperboard golden shockwave bloom +
+///   `HapticFeedback.heavyImpact()` and locks `ActLikeItBrandLogo` (`Hero(tag: 'act_like_it_ulogo')`)
+///   across the lower third.
+/// - At 8.0s (or when `"SKIP TO SIGN IN"` is tapped), executes the 900ms
+///   `BespokeTransitionEngine.navigateToAuthWithLogoGlide` transition directly
+///   into `AuthScreen` while zooming the video canvas (`1.0 -> 1.08`).
 class CellShadedIntroCinematicScreen extends StatefulWidget {
   const CellShadedIntroCinematicScreen({super.key});
 
@@ -31,13 +39,20 @@ class CellShadedIntroCinematicScreen extends StatefulWidget {
 class _CellShadedIntroCinematicScreenState
     extends State<CellShadedIntroCinematicScreen>
     with TickerProviderStateMixin {
+  VideoPlayerController? _videoController;
+  bool _isVideoReady = false;
+
   late final AnimationController _walkController;
-  late final AnimationController _clapperSmashController;
+  late final AnimationController _climaxShockwaveController;
+  late final AnimationController _exitZoomController;
   late final AudioPlayer _openingAudioPlayer;
-  Timer? _autoDirectorCutTimer;
+
+  Timer? _climaxTriggerTimer;
+  Timer? _autoAuthTransitionTimer;
   Timer? _spotlightCycleTimer;
 
-  bool _isCuttingToAuth = false;
+  bool _hasTriggeredLogoClimax = false;
+  bool _isTransitioningToAuth = false;
   bool _isMusicMuted = false;
   int _spotlightArchetypeIndex = 0;
 
@@ -46,21 +61,27 @@ class _CellShadedIntroCinematicScreenState
     super.initState();
     _walkController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 8),
     )..repeat();
 
-    _clapperSmashController = AnimationController(
+    _climaxShockwaveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 820),
+      duration: const Duration(milliseconds: 950),
+    );
+
+    _exitZoomController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
     );
 
     _openingAudioPlayer = AudioPlayer();
-    _startOpeningMusic();
+    _initializeOpeningVideoAndScore();
 
+    // Slow character spotlight cycle (2.5s per character)
     _spotlightCycleTimer = Timer.periodic(
       const Duration(milliseconds: 2500),
       (_) {
-        if (!mounted || _isCuttingToAuth) return;
+        if (!mounted || _isTransitioningToAuth) return;
         setState(() {
           _spotlightArchetypeIndex =
               (_spotlightArchetypeIndex + 1) % kFourteenAvatarArchetypes.length;
@@ -68,26 +89,78 @@ class _CellShadedIntroCinematicScreenState
       },
     );
 
-    _autoDirectorCutTimer = Timer(const Duration(milliseconds: 18000), () {
-      if (mounted && !_isCuttingToAuth) {
-        _triggerDirectorCutToAuth();
+    // At t = 1.2s, trigger the clapperboard snap golden shockwave + Brand Logo lock-in
+    _climaxTriggerTimer = Timer(const Duration(milliseconds: 1200), () {
+      _triggerLogoClimaxOverlay();
+    });
+
+    // At t = 8.0s, automatically execute the 900ms Hero glide to AuthScreen
+    _autoAuthTransitionTimer = Timer(const Duration(milliseconds: 8000), () {
+      if (mounted && !_isTransitioningToAuth) {
+        _triggerChoreographedGlideToAuth();
       }
     });
   }
 
-  Future<void> _startOpeningMusic() async {
+  Future<void> _initializeOpeningVideoAndScore() async {
+    try {
+      final controller = VideoPlayerController.asset(
+        'assets/videos/intro_opening.mp4',
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      _videoController = controller;
+      await controller.initialize();
+      await controller.setLooping(false);
+      await controller.setVolume(_isMusicMuted ? 0.0 : 1.0);
+      controller.addListener(_onVideoTick);
+      if (mounted) {
+        setState(() {
+          _isVideoReady = true;
+        });
+        await controller.play();
+      }
+    } catch (_) {
+      // Seamless fallback to synthesized premiere fanfare + 60fps CustomPainter
+      _startFallbackPremiereScore();
+    }
+  }
+
+  void _onVideoTick() {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    final pos = controller.value.position;
+    final dur = controller.value.duration;
+
+    if (!_hasTriggeredLogoClimax &&
+        pos >= const Duration(milliseconds: 1200)) {
+      _triggerLogoClimaxOverlay();
+    }
+
+    if (!_isTransitioningToAuth &&
+        dur > Duration.zero &&
+        pos >= dur - const Duration(milliseconds: 120)) {
+      _triggerChoreographedGlideToAuth();
+    }
+  }
+
+  void _triggerLogoClimaxOverlay() {
+    if (_hasTriggeredLogoClimax || !mounted) return;
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _hasTriggeredLogoClimax = true;
+    });
+    _climaxShockwaveController.forward(from: 0.0);
+  }
+
+  Future<void> _startFallbackPremiereScore() async {
     try {
       await _openingAudioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _openingAudioPlayer.setVolume(0.48);
-      final wavBytes = OpeningPremiereMusicSynthesizer.buildOpeningFanfareWav();
+      await _openingAudioPlayer.setVolume(_isMusicMuted ? 0.0 : 0.48);
+      final wavBytes =
+          OpeningPremiereMusicSynthesizer.buildOpeningFanfareWav();
       await _openingAudioPlayer.play(BytesSource(wavBytes));
-    } catch (_) {
-      try {
-        await _openingAudioPlayer.play(
-          UrlSource('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'),
-        );
-      } catch (_) {}
-    }
+    } catch (_) {}
   }
 
   Future<void> _toggleOpeningMusic() async {
@@ -96,26 +169,33 @@ class _CellShadedIntroCinematicScreenState
       _isMusicMuted = !_isMusicMuted;
     });
     try {
+      await _videoController?.setVolume(_isMusicMuted ? 0.0 : 1.0);
       await _openingAudioPlayer.setVolume(_isMusicMuted ? 0.0 : 0.48);
     } catch (_) {}
   }
 
   @override
   void dispose() {
-    _autoDirectorCutTimer?.cancel();
+    _climaxTriggerTimer?.cancel();
+    _autoAuthTransitionTimer?.cancel();
     _spotlightCycleTimer?.cancel();
+    _videoController?.removeListener(_onVideoTick);
+    _videoController?.dispose();
     _openingAudioPlayer.stop();
     _openingAudioPlayer.dispose();
     _walkController.dispose();
-    _clapperSmashController.dispose();
+    _climaxShockwaveController.dispose();
+    _exitZoomController.dispose();
     super.dispose();
   }
 
   Future<void> _handleFastSkipToRedCarpet() async {
-    if (_isCuttingToAuth) return;
-    _autoDirectorCutTimer?.cancel();
+    if (_isTransitioningToAuth) return;
+    _climaxTriggerTimer?.cancel();
+    _autoAuthTransitionTimer?.cancel();
     HapticFeedback.heavyImpact();
     try {
+      await _videoController?.pause();
       await _openingAudioPlayer.stop();
     } catch (_) {}
 
@@ -124,7 +204,7 @@ class _CellShadedIntroCinematicScreenState
 
     await Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 320),
+        transitionDuration: const Duration(milliseconds: 360),
         pageBuilder: (_, __, ___) => const LivingMarqueeDashboardScreen(),
         transitionsBuilder: (_, anim, __, child) {
           return FadeTransition(opacity: anim, child: child);
@@ -133,29 +213,32 @@ class _CellShadedIntroCinematicScreenState
     );
   }
 
-  Future<void> _triggerDirectorCutToAuth() async {
-    if (_isCuttingToAuth) return;
-    _autoDirectorCutTimer?.cancel();
+  Future<void> _triggerChoreographedGlideToAuth() async {
+    if (_isTransitioningToAuth || !mounted) return;
+    _climaxTriggerTimer?.cancel();
+    _autoAuthTransitionTimer?.cancel();
+    if (!_hasTriggeredLogoClimax) {
+      setState(() {
+        _hasTriggeredLogoClimax = true;
+      });
+    }
     HapticFeedback.heavyImpact();
+
+    setState(() {
+      _isTransitioningToAuth = true;
+    });
+    _exitZoomController.forward(from: 0.0);
+
     try {
+      await _videoController?.pause();
       await _openingAudioPlayer.stop();
     } catch (_) {}
 
-    setState(() {
-      _isCuttingToAuth = true;
-    });
-
-    await _clapperSmashController.forward(from: 0.0);
     if (!mounted) return;
-
-    await Navigator.of(context).pushReplacement(
-      PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 260),
-        pageBuilder: (_, __, ___) => const LivingMarqueeLoginScreen(),
-        transitionsBuilder: (_, anim, __, child) {
-          return FadeTransition(opacity: anim, child: child);
-        },
-      ),
+    await BespokeTransitionEngine.navigateToAuthWithLogoGlide<void>(
+      context: context,
+      destination: const AuthScreen(),
+      replace: true,
     );
   }
 
@@ -169,130 +252,222 @@ class _CellShadedIntroCinematicScreenState
       body: AnimatedBuilder(
         animation: Listenable.merge([
           _walkController,
-          _clapperSmashController,
+          _climaxShockwaveController,
+          _exitZoomController,
         ]),
         builder: (context, _) {
           final walkProgress = _walkController.value;
-          final smashValue = _clapperSmashController.value;
+          final shockwaveT = _climaxShockwaveController.value;
+          final zoomScale = 1.0 +
+              Curves.easeOutCubic.transform(_exitZoomController.value) * 0.08;
 
-          final stepBobY = math.sin(walkProgress * math.pi * 16) * 5.5;
-          final stepSwayX = math.cos(walkProgress * math.pi * 8) * 4.0;
+          final stepBobY = math.sin(walkProgress * math.pi * 16) * 4.5;
+          final stepSwayX = math.cos(walkProgress * math.pi * 8) * 3.5;
 
           return Stack(
             fit: StackFit.expand,
             children: [
-              Transform.translate(
-                offset: Offset(stepSwayX, stepBobY),
-                child: CustomPaint(
-                  painter: _FirstPersonCellShadedCarpetWalkPainter(
-                    walkProgress: walkProgress,
-                  ),
+              // Layer 1: Official 8s Opening Video (BoxFit.cover) + 60fps Fallback
+              Transform.scale(
+                scale: zoomScale,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Transform.translate(
+                      offset: Offset(stepSwayX, stepBobY),
+                      child: CustomPaint(
+                        painter: _FirstPersonCellShadedCarpetWalkPainter(
+                          walkProgress: walkProgress,
+                        ),
+                      ),
+                    ),
+                    ..._buildRedCarpetAdvancingCharacterRigs(
+                      context,
+                      walkProgress,
+                    ),
+                    if (_isVideoReady &&
+                        _videoController != null &&
+                        _videoController!.value.isInitialized)
+                      Positioned.fill(
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          clipBehavior: Clip.hardEdge,
+                          child: SizedBox(
+                            width: _videoController!.value.size.width > 0
+                                ? _videoController!.value.size.width
+                                : 1080,
+                            height: _videoController!.value.size.height > 0
+                                ? _videoController!.value.size.height
+                                : 1920,
+                            child: VideoPlayer(_videoController!),
+                          ),
+                        ),
+                      ),
+                    // Subtle cinema vignette for legible HUD & Lower-Third Logo
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: <Color>[
+                              const Color(0xFF05070B).withValues(alpha: 0.58),
+                              Colors.transparent,
+                              const Color(0xFF05070B).withValues(alpha: 0.86),
+                            ],
+                            stops: const <double>[0.0, 0.42, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              ..._buildRedCarpetAdvancingCharacterRigs(context, walkProgress),
+
+              // Layer 2: Golden Clapperboard Shockwave Bloom at t = 1.2s
+              if (shockwaveT > 0.0 && shockwaveT < 1.0)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _ClapperGoldenShockwavePainter(
+                        progress: shockwaveT,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Layer 3: Foreground HUD, Cast Spotlight & Lower-Third Unique Brand Logo
               SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Top Bar: Audio Toggle + Fast-Skip to Red Carpet + SKIP TO SIGN IN
                       Row(
                         children: [
                           GestureDetector(
                             onTap: _toggleOpeningMusic,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
+                                horizontal: 9,
+                                vertical: 7,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xF207090E),
-                                borderRadius: BorderRadius.circular(8),
+                                color: const Color(0xE607090E),
+                                borderRadius: BorderRadius.circular(999),
                                 border: Border.all(
                                   color: _isMusicMuted
                                       ? const Color(0xFF64748B)
                                       : const Color(0xFFFFD600),
-                                  width: 2.2,
+                                  width: 2.0,
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    _isMusicMuted
-                                        ? Icons.volume_off_rounded
-                                        : Icons.music_note_rounded,
-                                    color: _isMusicMuted
-                                        ? const Color(0xFF94A3B8)
-                                        : const Color(0xFFFFD600),
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    _isMusicMuted
-                                        ? 'MUSIC MUTED'
-                                        : 'OPENING SCORE ON',
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFFF5DEB3),
-                                    ),
-                                  ),
-                                ],
+                              child: Icon(
+                                _isMusicMuted
+                                    ? Icons.volume_off_rounded
+                                    : Icons.volume_up_rounded,
+                                color: _isMusicMuted
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFFFFD600),
+                                size: 15,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: GestureDetector(
-                                onTap: _handleFastSkipToRedCarpet,
-                                child: ClipRRect(
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _handleFastSkipToRedCarpet,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xCC07090E),
                                   borderRadius: BorderRadius.circular(999),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(
-                                      sigmaX: 12,
-                                      sigmaY: 12,
+                                  border: Border.all(
+                                    color: const Color(0x99F5DEB3),
+                                    width: 1.6,
+                                  ),
+                                ),
+                                child: const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.bolt_rounded,
+                                        color: Color(0xFFF5DEB3),
+                                        size: 14,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'FAST-SKIP TO RED CARPET',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFFF5DEB3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // Top-Right "SKIP TO SIGN IN" Glassmorphic Pill
+                          GestureDetector(
+                            onTap: _triggerChoreographedGlideToAuth,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 12,
+                                  sigmaY: 12,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: <Color>[
+                                        Color(0xEE520002),
+                                        Color(0xEE07090E),
+                                      ],
                                     ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xE607090E),
-                                        borderRadius: BorderRadius.circular(999),
-                                        border: Border.all(
-                                          color: const Color(0xFFF5DEB3),
-                                          width: 2.2,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: const Color(0xFFFFD600),
+                                      width: 2.2,
+                                    ),
+                                  ),
+                                  child: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.skip_next_rounded,
+                                          color: Color(0xFFFFD600),
+                                          size: 15,
                                         ),
-                                      ),
-                                      child: const FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.fast_forward_rounded,
-                                              color: Color(0xFFF5DEB3),
-                                              size: 15,
-                                            ),
-                                            SizedBox(width: 5),
-                                            Text(
-                                              'FAST-SKIP TO RED CARPET',
-                                              style: TextStyle(
-                                                fontFamily: 'monospace',
-                                                fontSize: 10.5,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 0.5,
-                                                color: Color(0xFFF5DEB3),
-                                              ),
-                                            ),
-                                          ],
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'SKIP TO SIGN IN',
+                                          style: TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.6,
+                                            color: Color(0xFFF5DEB3),
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -301,36 +476,52 @@ class _CellShadedIntroCinematicScreenState
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      ActLikeItBrandCenterpiece(
-                        height: 198,
-                        onTap: _triggerDirectorCutToAuth,
-                      ),
+
                       const Spacer(),
+
+                      // Lower-Third Signature Brand Logo Climax (t >= 1.2s)
+                      AnimatedScale(
+                        scale: _hasTriggeredLogoClimax ? 1.0 : 0.76,
+                        duration: const Duration(milliseconds: 620),
+                        curve: Curves.elasticOut,
+                        child: AnimatedOpacity(
+                          opacity: _hasTriggeredLogoClimax ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 340),
+                          child: ActLikeItBrandLogo(
+                            heroTag: kActLikeItBrandLogoHeroTag,
+                            height: 158,
+                            subtitle:
+                                'OFFICIAL PREMIERE SOUNDSTAGE · TAP LOGO OR SIGN IN',
+                            onTap: _triggerChoreographedGlideToAuth,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Compact 14-Character Red Carpet Spotlight Bar
                       GestureDetector(
                         onTap: () => showBoondocksCharacterSpotlightModal(
                           context,
                           activeArchetype,
                         ),
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 9,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xF207090E),
-                            borderRadius: BorderRadius.circular(18),
+                            color: const Color(0xEB07090E),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: activeArchetype.primaryInkColor,
-                              width: 2.8,
+                              width: 2.4,
                             ),
-                            boxShadow: <BoxShadow>[
-                              const BoxShadow(
-                                color: Color(0xFF05070B),
-                                offset: Offset(5, 5),
-                                blurRadius: 0,
-                              ),
+                            boxShadow: const <BoxShadow>[
                               BoxShadow(
-                                color: activeArchetype.primaryInkColor
-                                    .withValues(alpha: 0.34),
-                                blurRadius: 18,
+                                color: Color(0xFF05070B),
+                                offset: Offset(4, 4),
+                                blurRadius: 0,
                               ),
                             ],
                           ),
@@ -338,41 +529,25 @@ class _CellShadedIntroCinematicScreenState
                             children: [
                               BoondocksCharacterRig(
                                 archetype: activeArchetype,
-                                size: 68,
+                                size: 54,
                                 isSelected: true,
                                 externalPhase: walkProgress * math.pi * 4,
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 7,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: activeArchetype.primaryInkColor,
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
                                       child: Text(
-                                        'CAST ${_spotlightArchetypeIndex + 1}/14 · ${activeArchetype.roleBadge}',
-                                        style: const TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFF05070B),
+                                        'CAST ${_spotlightArchetypeIndex + 1}/14 · ${activeArchetype.name.toUpperCase()}',
+                                        style: GoogleFonts.bebasNeue(
+                                          fontSize: 18,
+                                          letterSpacing: 1.3,
+                                          color: const Color(0xFFF5DEB3),
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      activeArchetype.name,
-                                      style: GoogleFonts.bebasNeue(
-                                        fontSize: 22,
-                                        letterSpacing: 1.4,
-                                        color: const Color(0xFFF5DEB3),
                                       ),
                                     ),
                                     Text(
@@ -380,83 +555,46 @@ class _CellShadedIntroCinematicScreenState
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: 11,
                                         fontStyle: FontStyle.italic,
                                         fontWeight: FontWeight.w700,
                                         color: Color(0xFFF5DEB3),
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      activeArchetype.redCarpetActivity,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 9.5,
-                                        color: activeArchetype.rimAccentColor,
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 60,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: kFourteenAvatarArchetypes.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final arch = kFourteenAvatarArchetypes[index];
-                            final selected = index == _spotlightArchetypeIndex;
-                            return GestureDetector(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                setState(() {
-                                  _spotlightArchetypeIndex = index;
-                                });
-                              },
-                              child: BoondocksCharacterRig(
-                                archetype: arch,
-                                size: selected ? 58 : 50,
-                                isSelected: selected,
-                                externalPhase:
-                                    walkProgress * math.pi * 4 + index * 0.4,
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFE11342),
+                                  foregroundColor: const Color(0xFFF5DEB3),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: const BorderSide(
+                                      color: Color(0xFFFFD600),
+                                      width: 2.0,
+                                    ),
+                                  ),
+                                ),
+                                onPressed: _triggerChoreographedGlideToAuth,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'SIGN IN',
+                                    style: GoogleFonts.bebasNeue(
+                                      fontSize: 17,
+                                      letterSpacing: 1.4,
+                                      color: const Color(0xFFF5DEB3),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE11342),
-                          foregroundColor: const Color(0xFFF5DEB3),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: const BorderSide(
-                              color: Color(0xFF05070B),
-                              width: 3.2,
-                            ),
-                          ),
-                        ),
-                        onPressed: _triggerDirectorCutToAuth,
-                        icon: const Icon(Icons.movie_creation_rounded, size: 20),
-                        label: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            'STEP TO THE MIC · DIRECTOR\'S "CUT!" TO CASTING',
-                            style: GoogleFonts.bebasNeue(
-                              fontSize: 20,
-                              letterSpacing: 1.6,
-                              color: const Color(0xFFF5DEB3),
-                            ),
+                            ],
                           ),
                         ),
                       ),
@@ -464,14 +602,6 @@ class _CellShadedIntroCinematicScreenState
                   ),
                 ),
               ),
-              if (_isCuttingToAuth || smashValue > 0.0)
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _DirectorCutClapperSmashPainter(
-                      progress: smashValue,
-                    ),
-                  ),
-                ),
             ],
           );
         },
@@ -484,7 +614,9 @@ class _CellShadedIntroCinematicScreenState
     double walkProgress,
   ) {
     final screenSize = MediaQuery.of(context).size;
-    if (screenSize.width <= 0 || screenSize.height <= 0) return const <Widget>[];
+    if (screenSize.width <= 0 || screenSize.height <= 0) {
+      return const <Widget>[];
+    }
 
     final centerX = screenSize.width * 0.5;
     final horizonY = screenSize.height * 0.34;
@@ -517,7 +649,8 @@ class _CellShadedIntroCinematicScreenState
               archetype: leftArch,
               size: rigSize,
               externalPhase: walkProgress * math.pi * 4 + i,
-              onTap: () => showBoondocksCharacterSpotlightModal(context, leftArch),
+              onTap: () =>
+                  showBoondocksCharacterSpotlightModal(context, leftArch),
             ),
           ),
         ),
@@ -534,7 +667,8 @@ class _CellShadedIntroCinematicScreenState
               archetype: rightArch,
               size: rigSize,
               externalPhase: walkProgress * math.pi * 4 + i + 0.5,
-              onTap: () => showBoondocksCharacterSpotlightModal(context, rightArch),
+              onTap: () =>
+                  showBoondocksCharacterSpotlightModal(context, rightArch),
             ),
           ),
         ),
@@ -542,6 +676,49 @@ class _CellShadedIntroCinematicScreenState
     }
     return rigs;
   }
+}
+
+class _ClapperGoldenShockwavePainter extends CustomPainter {
+  final double progress;
+
+  const _ClapperGoldenShockwavePainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = progress.clamp(0.0, 1.0);
+    final center = Offset(size.width * 0.5, size.height * 0.62);
+    final maxRadius = size.longestSide * 0.75;
+    final radius = Curves.easeOutCubic.transform(p) * maxRadius;
+    final alpha = (1.0 - p).clamp(0.0, 1.0);
+
+    // Expanding golden ring shockwave
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = const Color(0xFFFFD600).withValues(alpha: alpha * 0.65)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6.0 * (1.0 - p * 0.6),
+    );
+
+    // Soft radial golden flash bloom
+    canvas.drawCircle(
+      center,
+      radius * 0.85,
+      Paint()
+        ..shader = RadialGradient(
+          colors: <Color>[
+            const Color(0xFFFFF59D).withValues(alpha: alpha * 0.42),
+            const Color(0xFFE11342).withValues(alpha: alpha * 0.18),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: radius * 0.85)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ClapperGoldenShockwavePainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
@@ -578,7 +755,8 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
       canvas.drawPath(
         beamPath,
         Paint()
-          ..color = (i == 1 ? const Color(0x33F5DEB3) : const Color(0x280CB6D4)),
+          ..color =
+              (i == 1 ? const Color(0x33F5DEB3) : const Color(0x280CB6D4)),
       );
     }
 
@@ -629,83 +807,11 @@ class _FirstPersonCellShadedCarpetWalkPainter extends CustomPainter {
       Offset(centerX + botHalfW - 18, size.height),
       goldTrim,
     );
-
-    const int depthSlices = 6;
-    final shift = (walkProgress * 4.0) % 1.0;
-
-    for (int i = 0; i < depthSlices; i++) {
-      final rawT = ((i + shift) / depthSlices) % 1.0;
-      final easedT = rawT * rawT;
-      final y = horizonY + (size.height - horizonY) * easedT;
-      final halfW = topHalfW + (botHalfW - topHalfW) * easedT;
-
-      canvas.drawLine(
-        Offset(centerX - halfW, y),
-        Offset(centerX + halfW, y),
-        Paint()
-          ..color = const Color(0xFF05070B).withValues(alpha: 0.65 * easedT)
-          ..strokeWidth = 1.5 + easedT * 3.0,
-      );
-    }
   }
 
   @override
-  bool shouldRepaint(covariant _FirstPersonCellShadedCarpetWalkPainter oldDelegate) =>
+  bool shouldRepaint(
+    covariant _FirstPersonCellShadedCarpetWalkPainter oldDelegate,
+  ) =>
       oldDelegate.walkProgress != walkProgress;
-}
-
-class _DirectorCutClapperSmashPainter extends CustomPainter {
-  final double progress;
-
-  const _DirectorCutClapperSmashPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = progress.clamp(0.0, 1.0);
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..color = const Color(0xFF05070B)
-            .withValues(alpha: (p * 1.25).clamp(0.0, 1.0)),
-    );
-
-    final center = Offset(size.width * 0.5, size.height * 0.5);
-    final scale = 0.55 + Curves.easeOutBack.transform(p) * 0.65;
-    final slateW = size.width * 0.72 * scale;
-    final slateH = slateW * 0.62;
-    final slateRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: center, width: slateW, height: slateH),
-      const Radius.circular(16),
-    );
-
-    canvas.drawRRect(slateRect, Paint()..color = const Color(0xFF0B0E17));
-    canvas.drawRRect(
-      slateRect,
-      Paint()
-        ..color = const Color(0xFFFFD600)
-        ..strokeWidth = 4.0
-        ..style = PaintingStyle.stroke,
-    );
-
-    final tp = TextPainter(
-      text: const TextSpan(
-        text: 'CUT! TO CASTING',
-        style: TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 24,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFFFFE082),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(
-      canvas,
-      Offset(center.dx - tp.width * 0.5, center.dy - tp.height * 0.5),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _DirectorCutClapperSmashPainter oldDelegate) =>
-      oldDelegate.progress != progress;
 }

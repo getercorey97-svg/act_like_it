@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../auth/auth_service.dart';
@@ -68,6 +69,81 @@ class BespokeTransitionEngine {
             type: type,
             playerArchetype: chosenArchetype,
             child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  /// Seamless 900ms choreographed transition from the 8-second Opening Video
+  /// directly into `AuthScreen` (`LivingMarqueeLoginScreen`):
+  /// 1. Golden Flash & Backdrop Blur (0ms–300ms): Warm-gold radial flash bloom
+  ///    while the background softly zooms (`1.0 -> 1.08`) and blurs (`sigma 0 -> 18`).
+  /// 2. Hero Unique Logo Glide (150ms–750ms): `Hero(tag: 'act_like_it_ulogo')`
+  ///    glides upward from the lower third into the top header of `AuthScreen`.
+  /// 3. Staggered Sign In / Sign Up Card Rise (350ms–900ms): Smoothly reveals
+  ///    the destination screen underneath the gliding Hero brand emblem.
+  static Future<T?> navigateToAuthWithLogoGlide<T>({
+    required BuildContext context,
+    required Widget destination,
+  }) {
+    HapticFeedback.heavyImpact();
+    return Navigator.of(context).pushReplacement<T, void>(
+      PageRouteBuilder<T>(
+        transitionDuration: const Duration(milliseconds: 900),
+        reverseTransitionDuration: const Duration(milliseconds: 450),
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) {
+              final t = animation.value.clamp(0.0, 1.0);
+              // 0ms-300ms (t: 0.0 -> 0.33): Golden radial flash bloom & blur
+              final flashOpacity = t < 0.34
+                  ? math.sin((t / 0.34) * math.pi) * 0.68
+                  : 0.0;
+              final blurSigma = (t < 0.5 ? (t / 0.5) * 18.0 : (1.0 - (t - 0.5) / 0.5) * 18.0)
+                  .clamp(0.0, 18.0);
+              final fadeIn = Curves.easeOutCubic.transform(
+                ((t - 0.12) / 0.88).clamp(0.0, 1.0),
+              );
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (blurSigma > 0.2)
+                    BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: blurSigma,
+                        sigmaY: blurSigma,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  Opacity(
+                    opacity: fadeIn,
+                    child: child,
+                  ),
+                  if (flashOpacity > 0.01)
+                    IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: const Alignment(0.0, 0.25),
+                            radius: 0.95,
+                            colors: <Color>[
+                              const Color(0xFFFFE082)
+                                  .withValues(alpha: flashOpacity),
+                              const Color(0xFFFFB300)
+                                  .withValues(alpha: flashOpacity * 0.55),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           );
         },
       ),

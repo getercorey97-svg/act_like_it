@@ -2,14 +2,17 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../dashboard_marquee.dart';
+import '../ui/brand_logo.dart';
 import '../ui/intro_cinematic.dart';
 import 'auth_service.dart';
 import 'onboarding_questionnaire.dart';
 
-/// "The Living Marquee" Login & Persistent Onboarding Entry Screen.
+typedef AuthScreen = LivingMarqueeLoginScreen;
+
+/// "The Living Marquee" Login & Persistent Onboarding Entry Screen (`AuthScreen`).
 /// Features a dark obsidian canvas (`#07090E`) with slow-moving Cyan, Purple,
-/// and Amber neon spotlights, the central `assets/app_logo.png` interactive
-/// centerpiece, and Dual-Track Auth:
+/// and Amber neon spotlights, the signature `ActLikeItBrandLogo` (`Hero(tag: 'act_like_it_ulogo')`),
+/// and Dual-Track Auth:
 /// - Track A ("Claim Your Star"): Full Cloud Auth + 2.5D Casting Questionnaire
 /// - Track B ("Sneak Backstage"): Instant Express Pass with 2.5D Avatar Selector
 class LivingMarqueeLoginScreen extends StatefulWidget {
@@ -21,8 +24,11 @@ class LivingMarqueeLoginScreen extends StatefulWidget {
 }
 
 class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _spotlightController;
+  late final AnimationController _cardEntranceController;
+  late final Animation<double> _cardFadeAnimation;
+  late final Animation<Offset> _cardSlideAnimation;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
@@ -41,6 +47,23 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
       vsync: this,
       duration: const Duration(seconds: 14),
     )..repeat(reverse: true);
+
+    // Staggered Sign In / Sign Up Card Rise (350ms–900ms) underneath Hero Logo
+    _cardEntranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+
+    final cardCurve = CurvedAnimation(
+      parent: _cardEntranceController,
+      curve: const Interval(0.32, 1.0, curve: Curves.easeOutCubic),
+    );
+    _cardFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(cardCurve);
+    _cardSlideAnimation = Tween<Offset>(
+      begin: const Offset(0.0, 0.12),
+      end: Offset.zero,
+    ).animate(cardCurve);
+
     _restoreExistingSessionIfAvailable();
   }
 
@@ -60,6 +83,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
   @override
   void dispose() {
     _spotlightController.dispose();
+    _cardEntranceController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _usernameController.dispose();
@@ -213,12 +237,23 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildMarqueeCrest(),
-                      const SizedBox(height: 20),
-                      if (existingProfile != null) ...[
-                        _buildInstantResumeBanner(existingProfile),
-                        const SizedBox(height: 16),
-                      ],
-                      _buildAuthCard(),
+                      const SizedBox(height: 16),
+                      FadeTransition(
+                        opacity: _cardFadeAnimation,
+                        child: SlideTransition(
+                          position: _cardSlideAnimation,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (existingProfile != null) ...[
+                                _buildInstantResumeBanner(existingProfile),
+                                const SizedBox(height: 16),
+                              ],
+                              _buildAuthCard(),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -275,44 +310,21 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
   }
 
   Widget _buildMarqueeCrest() {
-    return Column(
+    return const Column(
       children: [
-        const ActLikeItBrandCenterpiece(
-          height: 122,
-          compact: true,
+        ActLikeItBrandLogo(
+          height: 142,
+          compact: false,
+          enableHero: true,
+          heroTag: kActLikeItBrandLogoHeroTag,
+          subtitle: '2.5D PREMIERE CASTING · DUAL-TRACK AUTH',
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xF207090E),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFF5DEB3), width: 2.0),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0xFF05070B),
-                offset: Offset(3, 3),
-                blurRadius: 0,
-              ),
-            ],
-          ),
-          child: const Text(
-            '2.5D PREMIERE CASTING · DUAL-TRACK AUTH',
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 10.5,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-              color: Color(0xFFF5DEB3),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
+        SizedBox(height: 8),
+        Text(
           'Choose Track A to Claim Your Star with full cloud sync, or Track B to Sneak Backstage with an instant 2.5D Archetype Pass.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 12.5,
+            fontSize: 12.0,
             color: Color(0xFFF5DEB3),
             height: 1.35,
           ),

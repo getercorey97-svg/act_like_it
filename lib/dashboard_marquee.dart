@@ -16,8 +16,11 @@ import 'ui/game_settings_modal.dart';
 import 'ui/scene_vault_screen.dart';
 import 'ui/transitions.dart';
 import 'ui/intro_cinematic.dart';
+import 'ui/brand_logo.dart';
 import 'social/cutting_room_feed.dart';
 import 'auth/auth_service.dart';
+
+export 'ui/brand_logo.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
