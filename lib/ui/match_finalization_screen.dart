@@ -20,25 +20,43 @@ class MatchFinalizationScreen extends StatefulWidget {
   final LobbySession lobbySession;
   final String performerUserId;
   final String performerDisplayName;
-  final ScenePrompt scene;
+  final String leadPerformerName;
+  final ScenePrompt? scene;
   final double compositeScore;
   final double aiScore;
   final double peerScore;
   final double socialScore;
+  final double improvBonus;
+  final String showstopperTitle;
   final String criticQuote;
 
   const MatchFinalizationScreen({
     super.key,
     required this.lobbySession,
-    required this.performerUserId,
-    required this.performerDisplayName,
-    required this.scene,
+    this.performerUserId = 'local-s26-actor',
+    this.performerDisplayName = '',
+    this.leadPerformerName = 'StageStar',
+    this.scene,
     required this.compositeScore,
     required this.aiScore,
     required this.peerScore,
     required this.socialScore,
-    required this.criticQuote,
+    this.improvBonus = 0.0,
+    this.showstopperTitle = 'THE METHOD MASTER',
+    this.criticQuote =
+        'Standing Ovation — Academy-caliber screen command and emotional conviction!',
   });
+
+  String get resolvedPerformerName => performerDisplayName.trim().isNotEmpty
+      ? performerDisplayName.trim()
+      : (leadPerformerName.trim().isNotEmpty
+          ? leadPerformerName.trim()
+          : 'StageStar');
+
+  ScenePrompt get resolvedScene =>
+      scene ??
+      lobbySession.activeScene ??
+      kBuiltInSceneVault[SceneCategory.era1970To1999]!.first;
 
   @override
   State<MatchFinalizationScreen> createState() =>
@@ -94,10 +112,12 @@ class _MatchFinalizationScreenState extends State<MatchFinalizationScreen>
     HapticFeedback.mediumImpact();
     final stars = (widget.compositeScore / 20.0).round().clamp(1, 5);
     final starIcons = '⭐' * stars;
+    final activeScene = widget.resolvedScene;
+    final actorName = widget.resolvedPerformerName;
     final payload = '''
 🏆 ACT LIKE IT — OFFICIAL SOUNDSTAGE WRAP 🏆
-Actor: ${widget.performerDisplayName}
-Scene: "${widget.scene.title}" — ${widget.scene.filmOrSeries} (${widget.scene.releaseYear})
+Actor: $actorName (${widget.showstopperTitle})
+Scene: "${activeScene.title}" — ${activeScene.filmOrSeries} (${activeScene.releaseYear})
 Final Composite Score: ${widget.compositeScore.toStringAsFixed(1)} / 100 $starIcons
 • AI Telemetrics: ${widget.aiScore.toStringAsFixed(1)}
 • Peer Vote: ${widget.peerScore.toStringAsFixed(1)}
@@ -282,7 +302,7 @@ Play Live: https://act-like-it.vercel.app
                             ),
                           ),
                           Text(
-                            '${widget.performerDisplayName} · "${widget.scene.title}"',
+                            '${widget.resolvedPerformerName} · "${widget.resolvedScene.title}"',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 15,
@@ -372,7 +392,7 @@ Play Live: https://act-like-it.vercel.app
                       _buildSpecialAwardRow(
                         icon: Icons.face_retouching_natural_rounded,
                         award: 'Best Facial Micro-Expressions',
-                        winner: widget.performerDisplayName,
+                        winner: widget.resolvedPerformerName,
                         metric: 'AI ${widget.aiScore.toStringAsFixed(1)}/100',
                         accent: const Color(0xFFE11D48),
                       ),
@@ -380,7 +400,7 @@ Play Live: https://act-like-it.vercel.app
                       _buildSpecialAwardRow(
                         icon: Icons.groups_rounded,
                         award: 'Crowd Favorite Peer Vote',
-                        winner: widget.performerDisplayName,
+                        winner: widget.resolvedPerformerName,
                         metric: 'PEER ${widget.peerScore.toStringAsFixed(1)}/100',
                         accent: const Color(0xFF10B981),
                       ),
@@ -388,7 +408,7 @@ Play Live: https://act-like-it.vercel.app
                       _buildSpecialAwardRow(
                         icon: Icons.bolt_rounded,
                         award: 'Scene Stealer Award',
-                        winner: widget.performerDisplayName,
+                        winner: widget.resolvedPerformerName,
                         metric:
                             'COMPOSITE ${widget.compositeScore.toStringAsFixed(1)}',
                         accent: const Color(0xFFFFD700),

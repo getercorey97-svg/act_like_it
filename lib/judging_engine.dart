@@ -1418,7 +1418,10 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                   MaterialPageRoute(
                     builder: (_) => MatchFinalizationScreen(
                       lobbySession: widget.lobbySession,
+                      performerUserId: widget.performerUserId,
+                      performerDisplayName: widget.performerDisplayName,
                       leadPerformerName: widget.performerDisplayName,
+                      scene: _scene,
                       compositeScore: _engine.compositeTriModalScore,
                       aiScore: _engine.aiScore,
                       peerScore: _engine.peerScore,

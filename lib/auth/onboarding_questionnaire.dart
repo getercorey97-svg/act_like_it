@@ -89,6 +89,8 @@ const List<RedCarpetTicketOption> kRedCarpetStrengthTickets =
 /// favorite eras (`1970s`, `2000s`), acting strengths (`Comedy`, `Drama`, `Villain`),
 /// and 2.5D Cell-Shaded Avatar Archetype, verify their birth year for the 18+ gate,
 /// and persist everything additively to Supabase.
+typedef RedCarpetOnboardingScreen = OnboardingQuestionnaireScreen;
+
 class OnboardingQuestionnaireScreen extends StatefulWidget {
   final String initialUsername;
   final int initialBirthYear;

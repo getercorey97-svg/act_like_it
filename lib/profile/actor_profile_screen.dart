@@ -314,7 +314,7 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
                               Navigator.of(context).push(
                                 MaterialPageRoute<void>(
                                   builder: (_) =>
-                                      const RedCarpetOnboardingScreen(),
+                                      const OnboardingQuestionnaireScreen(),
                                 ),
                               );
                             },

@@ -394,6 +394,9 @@ class LobbyPlayer {
     this.socialScore = 0,
   });
 
+  double get compositeScore =>
+      (aiTelemetricsScore * 0.4) + (peerScore * 0.4) + (socialScore * 0.2);
+
   LobbyPlayer copyWith({
     bool? isReady,
     double? aiTelemetricsScore,
@@ -454,6 +457,7 @@ class LobbySession {
   final ScenePrompt? activeScene;
   final int roundNumber;
   final String livekitRoomName;
+  final List<LobbyPlayer> players;
 
   const LobbySession({
     required this.id,
@@ -467,6 +471,7 @@ class LobbySession {
     this.activeScene,
     this.roundNumber = 1,
     required this.livekitRoomName,
+    this.players = const <LobbyPlayer>[],
   });
 
   LobbySession copyWith({
@@ -476,6 +481,7 @@ class LobbySession {
     ScenePrompt? activeScene,
     int? roundNumber,
     String? livekitRoomName,
+    List<LobbyPlayer>? players,
   }) {
     return LobbySession(
       id: id,
@@ -489,6 +495,7 @@ class LobbySession {
       activeScene: activeScene ?? this.activeScene,
       roundNumber: roundNumber ?? this.roundNumber,
       livekitRoomName: livekitRoomName ?? this.livekitRoomName,
+      players: players ?? this.players,
     );
   }
 
@@ -497,6 +504,7 @@ class LobbySession {
     SceneCategory? fallbackCategory,
     ScenePrompt? fallbackScene,
     String? fallbackActorId,
+    List<LobbyPlayer> players = const <LobbyPlayer>[],
   }) {
     final roomCode = json['room_code']?.toString() ?? '000000';
     final rawLiveKitRoom = json['livekit_room_name']?.toString() ?? '';
@@ -528,6 +536,7 @@ class LobbySession {
       livekitRoomName: rawLiveKitRoom.isNotEmpty
           ? rawLiveKitRoom
           : 'act_like_it_$roomCode',
+      players: players,
     );
   }
 }
