@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../lobby.dart';
+import 'premiere_red_carpet_painters.dart';
 import 'game_app_bar.dart';
 import 'game_settings_modal.dart';
 
