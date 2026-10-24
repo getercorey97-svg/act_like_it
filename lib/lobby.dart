@@ -1041,24 +1041,102 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'FEATURED SCRIPT · ${activeScene.filmOrSeries} (${activeScene.releaseYear})',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFF59E0B),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'FEATURED SCRIPT · ${activeScene.title} (${activeScene.releaseYear})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFF5DEB3),
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                          ),
+                          onPressed: () => _openGreenRoomSceneDrawer(session),
+                          icon: const Icon(Icons.menu_book_rounded, size: 15),
+                          label: const Text(
+                            'SCENE DRAWER (90)',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       '${activeScene.characterName} — "${activeScene.promptScript}"',
                       style: const TextStyle(
                         fontSize: 15,
+                        height: 1.4,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    if (activeScene.duetLeadA.isNotEmpty ||
+                        activeScene.duetLeadB.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A0D16),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'SCREEN TEST DUET · 2-PLAYER CO-STAR MODE',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                            if (activeScene.duetLeadA.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'LEAD A (GOLD): "${activeScene.duetLeadA}"',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  height: 1.38,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFF5DEB3),
+                                ),
+                              ),
+                            ],
+                            if (activeScene.duetLeadB.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'LEAD B (CYAN): "${activeScene.duetLeadB}"',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  height: 1.38,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0CB6D4),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
                     Text(
                       'Director\'s Note: ${activeScene.directorCue} · Emotion: ${activeScene.emotionalTarget}',
                       style: const TextStyle(
@@ -1066,6 +1144,17 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                         color: Color(0xFFCBD5E1),
                       ),
                     ),
+                    if (activeScene.improvTwist.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Improv Curveball: ${activeScene.improvTwist}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          color: Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
@@ -1224,6 +1313,180 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
           ],
         ),
       ],
+    );
+  }
+
+  Future<void> _openGreenRoomSceneDrawer(LobbySession session) async {
+    HapticFeedback.selectionClick();
+    SceneCategory activeCat = session.selectedCategory;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF07090E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final scripts = kBuiltInSceneVault[activeCat] ?? const [];
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.82,
+              minChildSize: 0.55,
+              maxChildSize: 0.94,
+              builder: (_, scrollCtrl) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'GREEN ROOM SCENE DRAWER · 90 GENERAL SCRIPTS',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFF5DEB3),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(sheetCtx).pop(),
+                            icon: const Icon(Icons.close, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<SceneCategory>(
+                        value: activeCat,
+                        decoration: const InputDecoration(
+                          labelText: 'Scene Category (9 Categories × 10 Scripts)',
+                          filled: true,
+                          fillColor: Color(0xFF121722),
+                          border: OutlineInputBorder(),
+                        ),
+                        items: SceneCategory.values
+                            .map(
+                              (cat) => DropdownMenuItem(
+                                value: cat,
+                                child: Text(cat.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (nextCat) {
+                          if (nextCat != null) {
+                            setSheetState(() => activeCat = nextCat);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollCtrl,
+                          itemCount: scripts.length,
+                          itemBuilder: (_, idx) {
+                            final item = scripts[idx];
+                            final isCurrent =
+                                session.activeScene?.id == item.id;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF121722),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isCurrent
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF1E293B),
+                                  width: isCurrent ? 1.8 : 1.0,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${idx + 1}. ${item.title} (${item.releaseYear}) — ${item.characterName}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '"${item.promptScript}"',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      height: 1.4,
+                                      color: Color(0xFFF8FAFC),
+                                    ),
+                                  ),
+                                  if (item.duetLeadA.isNotEmpty ||
+                                      item.duetLeadB.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'LEAD A (GOLD): "${item.duetLeadA}"',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        height: 1.35,
+                                        color: Color(0xFFF5DEB3),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'LEAD B (CYAN): "${item.duetLeadB}"',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        height: 1.35,
+                                        color: Color(0xFF0CB6D4),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Director\'s Note: ${item.directorCue} · Emotion: ${item.emotionalTarget}',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        _lobbyManager.selectSceneFromDrawer(
+                                          category: activeCat,
+                                          scene: item,
+                                        );
+                                        Navigator.of(sheetCtx).pop();
+                                      },
+                                      icon: const Icon(
+                                        Icons.check_circle_outline_rounded,
+                                        size: 16,
+                                      ),
+                                      label: const Text('Load Onto Teleprompter'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 }

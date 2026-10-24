@@ -233,9 +233,11 @@ class MatchHistoryRecord {
 class OfflineManager extends ChangeNotifier {
   static final OfflineManager instance = OfflineManager._internal();
 
-  static const String _kCachedScenesPrefsKey = 'offline_cached_scene_packs_v1';
+  static const String _kCachedScenesPrefsKey = 'offline_cached_scene_packs_v2';
+  static const String _kCachedLateNightPrefsKey =
+      'offline_cached_late_night_v2';
   static const String _kCachedScenesTimestampKey =
-      'offline_cached_scene_packs_ts_v1';
+      'offline_cached_scene_packs_ts_v2';
   static const String _kQueuedPerformancesPrefsKey =
       'offline_gemini_ai_queue_v1';
   static const String _kMatchHistoryQueuePrefsKey =
@@ -253,6 +255,7 @@ class OfflineManager extends ChangeNotifier {
   int _cachedSceneCount = 0;
   DateTime? _lastCacheSyncAt;
   final Map<String, List<ScenePrompt>> _cachedPacksByCategory = {};
+  final List<ScenePrompt> _cachedLateNightScenes = [];
   final List<QueuedOfflinePerformance> _queue = [];
   final List<MatchHistoryRecord> _matchHistoryLog = [];
 
@@ -427,12 +430,14 @@ class OfflineManager extends ChangeNotifier {
   }
 
   // --------------------------------------------------------------------------
-  // 1. LOCAL SCENE CACHING (Supabase -> SharedPreferences)
+  // 1. LOCAL SCENE CACHING (Supabase -> SQLite & SharedPreferences)
   // --------------------------------------------------------------------------
 
   Future<void> _loadCachedScenePacksFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final rawJson = await _readSqliteOrPrefs(prefs, _kCachedScenesPrefsKey);
+    final rawLateNightJson =
+        await _readSqliteOrPrefs(prefs, _kCachedLateNightPrefsKey);
     final rawTs = await _readSqliteOrPrefs(prefs, _kCachedScenesTimestampKey);
 
     if (rawTs != null) {
@@ -440,6 +445,7 @@ class OfflineManager extends ChangeNotifier {
     }
 
     _cachedPacksByCategory.clear();
+    _cachedLateNightScenes.clear();
     int count = 0;
 
     if (rawJson != null && rawJson.isNotEmpty) {
@@ -458,20 +464,40 @@ class OfflineManager extends ChangeNotifier {
       } catch (_) {}
     }
 
-    // Seed local cache from built-in vault if no pack has been cached yet
-    if (count == 0) {
+    // Seed local cache from built-in 90-scene vault if no pack has been cached yet
+    if (count < 90) {
+      _cachedPacksByCategory.clear();
+      count = 0;
       for (final entry in kBuiltInSceneVault.entries) {
         _cachedPacksByCategory[entry.key.key] = List.of(entry.value);
         count += entry.value.length;
       }
     }
 
-    _cachedSceneCount = count;
+    if (rawLateNightJson != null && rawLateNightJson.isNotEmpty) {
+      try {
+        final list = (jsonDecode(rawLateNightJson) as List)
+            .map(
+              (item) =>
+                  ScenePrompt.fromJson(Map<String, dynamic>.from(item as Map)),
+            )
+            .toList();
+        _cachedLateNightScenes.addAll(list);
+      } catch (_) {}
+    }
+
+    if (_cachedLateNightScenes.length < kLateNightAfterHoursScenes.length) {
+      _cachedLateNightScenes
+        ..clear()
+        ..addAll(kLateNightAfterHoursScenes);
+    }
+
+    _cachedSceneCount = count + _cachedLateNightScenes.length;
   }
 
-  /// Downloads Scene Packs (`title`, `script_excerpt`, `target_emotion`, etc.)
-  /// from Supabase `public.scenes` while online and caches them into
-  /// `SharedPreferences` for offline play.
+  /// Downloads Scene Packs (`title`, `script_excerpt`, `duet_lead_a`, `duet_lead_b`, `target_emotion`, etc.)
+  /// from Supabase `public.scenes` and `public.scenes_late_night_after_hours` while online
+  /// and caches all 100 scenes into SQLite + `SharedPreferences` for offline play.
   Future<int> downloadAndCacheScenePacks() async {
     await ensureInitialized();
     _isCachingScenes = true;
@@ -485,6 +511,7 @@ class OfflineManager extends ChangeNotifier {
               kBuiltInSceneVault[SceneCategory.era1970To1999]!,
         );
       }
+      List<ScenePrompt> lateNightScenes = List.of(kLateNightAfterHoursScenes);
 
       final client = supabaseOrNull;
       if (client != null && _isOnline) {
@@ -510,13 +537,26 @@ class OfflineManager extends ChangeNotifier {
             }
           }
         } catch (_) {
-          // Keep built-in fallback packs if Supabase table is unreachable
+          // Keep built-in 90-scene fallback packs if Supabase table is unreachable
         }
+
+        try {
+          final lnRows =
+              await client.from('scenes_late_night_after_hours').select();
+          if (lnRows.isNotEmpty) {
+            lateNightScenes = lnRows
+                .map((r) => ScenePrompt.fromJson(Map<String, dynamic>.from(r)))
+                .toList();
+          }
+        } catch (_) {}
       }
 
       _cachedPacksByCategory
         ..clear()
         ..addAll(packs);
+      _cachedLateNightScenes
+        ..clear()
+        ..addAll(lateNightScenes);
 
       int totalCached = 0;
       final serializedMap = <String, dynamic>{};
@@ -525,6 +565,7 @@ class OfflineManager extends ChangeNotifier {
         serializedMap[entry.key] =
             entry.value.map((scene) => scene.toJson()).toList();
       }
+      totalCached += _cachedLateNightScenes.length;
 
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now().toUtc();
@@ -532,6 +573,11 @@ class OfflineManager extends ChangeNotifier {
         prefs,
         _kCachedScenesPrefsKey,
         jsonEncode(serializedMap),
+      );
+      await _writeSqliteOrPrefs(
+        prefs,
+        _kCachedLateNightPrefsKey,
+        jsonEncode(_cachedLateNightScenes.map((s) => s.toJson()).toList()),
       );
       await _writeSqliteOrPrefs(
         prefs,
@@ -556,6 +602,14 @@ class OfflineManager extends ChangeNotifier {
     }
     return kBuiltInSceneVault[category] ??
         kBuiltInSceneVault[SceneCategory.era1970To1999]!;
+  }
+
+  /// Returns the 10 age-gated 18+ After-Hours scenes (`scenes_late_night_after_hours`).
+  List<ScenePrompt> getLateNightAfterHoursScenes() {
+    if (_cachedLateNightScenes.isNotEmpty) {
+      return List.unmodifiable(_cachedLateNightScenes);
+    }
+    return kLateNightAfterHoursScenes;
   }
 
   ScenePrompt drawRandomCachedScene(SceneCategory category) {

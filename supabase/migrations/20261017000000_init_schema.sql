@@ -16,18 +16,46 @@ create table if not exists public.profiles (
 );
 
 -- ----------------------------------------------------------------------------
--- 2. SCENES TABLE (id, title, actor_name, character_name, script_excerpt,
---                  target_emotion, category, is_late_night)
+-- 2. SCENES TABLE (90 General Scenes + 10 Late-Night Mirror Rows)
 -- ----------------------------------------------------------------------------
 create table if not exists public.scenes (
   id uuid primary key default gen_random_uuid(),
+  scene_code text unique,
   title text not null,
   actor_name text not null,
   character_name text not null,
+  release_year integer not null default 2000,
   script_excerpt text not null,
+  duet_lead_a text not null default '',
+  duet_lead_b text not null default '',
+  director_note text not null default '',
   target_emotion text not null,
+  improv_twist text not null default '',
   category text not null,
+  is_18_plus boolean not null default false,
   is_late_night boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- 2B. SCENES_LATE_NIGHT_AFTER_HOURS TABLE (10 Age-Gated 18+ Parody Scenes)
+-- ----------------------------------------------------------------------------
+create table if not exists public.scenes_late_night_after_hours (
+  id uuid primary key default gen_random_uuid(),
+  scene_code text unique not null,
+  title text not null,
+  actor_name text not null,
+  character_name text not null,
+  release_year integer not null default 2004,
+  script_excerpt text not null,
+  duet_lead_a text not null default '',
+  duet_lead_b text not null default '',
+  director_note text not null default '',
+  target_emotion text not null,
+  improv_twist text not null default '',
+  spice_tier integer not null default 3,
+  content_advisory text not null default '18+ High-Tension Romantic & Dramatic Dialogue',
+  is_18_plus boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -62,6 +90,7 @@ create index if not exists idx_profiles_username on public.profiles(username);
 create index if not exists idx_profiles_birth_year on public.profiles(birth_year);
 create index if not exists idx_scenes_category on public.scenes(category);
 create index if not exists idx_scenes_is_late_night on public.scenes(is_late_night);
+create index if not exists idx_scenes_late_night_spice_tier on public.scenes_late_night_after_hours(spice_tier);
 create index if not exists idx_lobbies_room_code on public.lobbies(room_code);
 create index if not exists idx_lobbies_host_id on public.lobbies(host_id);
 create index if not exists idx_lobbies_active_scene_id on public.lobbies(active_scene_id);
@@ -73,6 +102,7 @@ create index if not exists idx_lobby_players_user_id on public.lobby_players(use
 -- ----------------------------------------------------------------------------
 alter table public.profiles enable row level security;
 alter table public.scenes enable row level security;
+alter table public.scenes_late_night_after_hours enable row level security;
 alter table public.lobbies enable row level security;
 alter table public.lobby_players enable row level security;
 
@@ -104,7 +134,7 @@ drop policy if exists "Standard scenes are viewable by everyone" on public.scene
 create policy "Standard scenes are viewable by everyone"
   on public.scenes
   for select
-  using (is_late_night = false);
+  using (is_late_night = false and is_18_plus = false);
 
 drop policy if exists "Late-Night scenes require 18+ birth_year" on public.scenes;
 create policy "Late-Night scenes require 18+ birth_year"
@@ -112,8 +142,23 @@ create policy "Late-Night scenes require 18+ birth_year"
   for select
   to authenticated
   using (
-    is_late_night = true
+    (is_late_night = true or is_18_plus = true)
     and exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.birth_year is not null
+        and (extract(year from current_date)::integer - p.birth_year) >= 18
+    )
+  );
+
+drop policy if exists "After-Hours table requires 18+ birth_year" on public.scenes_late_night_after_hours;
+create policy "After-Hours table requires 18+ birth_year"
+  on public.scenes_late_night_after_hours
+  for select
+  to authenticated
+  using (
+    exists (
       select 1
       from public.profiles p
       where p.id = auth.uid()

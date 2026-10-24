@@ -7,6 +7,8 @@ import '../main.dart';
 import '../offline_manager.dart';
 import '../auth/auth_service.dart';
 import 'intro_cinematic.dart';
+import 'parody_scenes_catalog.dart';
+export 'parody_scenes_catalog.dart';
 
 enum SceneCategory {
   era1970To1999(
@@ -56,6 +58,12 @@ enum SceneCategory {
     label: 'Specialty: Cult Classics',
     table: 'scenes',
     awardFilter: null,
+  ),
+  specialtyBlockbusterSciFi(
+    key: 'specialty_blockbuster_scifi',
+    label: 'Specialty: Sci-Fi & Blockbusters',
+    table: 'scenes',
+    awardFilter: null,
   );
 
   final String key;
@@ -71,8 +79,12 @@ enum SceneCategory {
   });
 
   static SceneCategory fromKey(String key) {
+    final normalized = key.trim();
     return SceneCategory.values.firstWhere(
-      (c) => c.key == key || c.label == key,
+      (c) =>
+          c.key == normalized ||
+          c.label == normalized ||
+          c.awardFilter == normalized,
       orElse: () => SceneCategory.era1970To1999,
     );
   }
@@ -155,8 +167,12 @@ class ScenePrompt {
   final int releaseYear;
   final String characterName;
   final String promptScript;
+  final String duetLeadA;
+  final String duetLeadB;
   final String directorCue;
   final String emotionalTarget;
+  final String improvTwist;
+  final bool is18Plus;
   final int durationSeconds;
   final int difficultyTier;
 
@@ -167,16 +183,31 @@ class ScenePrompt {
     required this.releaseYear,
     required this.characterName,
     required this.promptScript,
+    this.duetLeadA = '',
+    this.duetLeadB = '',
     required this.directorCue,
     required this.emotionalTarget,
+    this.improvTwist = '',
+    this.is18Plus = false,
     required this.durationSeconds,
     required this.difficultyTier,
   });
+
+  String get script => promptScript;
+  String get character => characterName;
+  String get directorNote => directorCue;
+  String get targetEmotion => emotionalTarget;
+  int get year => releaseYear;
 
   factory ScenePrompt.fromJson(Map<String, dynamic> json) {
     final targetEmotion = (json['target_emotion'] ??
             json['emotional_target'] ??
             'Dramatic Intensity')
+        .toString();
+    final rawScript = (json['script_excerpt'] ??
+            json['prompt_script'] ??
+            json['script'] ??
+            '')
         .toString();
     return ScenePrompt(
       id: json['id']?.toString() ?? '',
@@ -184,14 +215,22 @@ class ScenePrompt {
       filmOrSeries:
           (json['actor_name'] ?? json['film_or_series'] ?? 'Featured Actor')
               .toString(),
-      releaseYear: (json['release_year'] as num?)?.toInt() ?? 2000,
-      characterName: json['character_name']?.toString() ?? 'Lead Role',
-      promptScript:
-          (json['script_excerpt'] ?? json['prompt_script'] ?? '').toString(),
+      releaseYear:
+          ((json['release_year'] ?? json['year']) as num?)?.toInt() ?? 2000,
+      characterName:
+          (json['character_name'] ?? json['character'] ?? 'Lead Role')
+              .toString(),
+      promptScript: rawScript,
+      duetLeadA: (json['duet_lead_a'] ?? '').toString(),
+      duetLeadB: (json['duet_lead_b'] ?? '').toString(),
       directorCue: (json['director_cue'] ??
-              'Deliver all 3–4 lines with full conviction toward $targetEmotion.')
+              json['director_note'] ??
+              'Deliver all lines with full conviction toward $targetEmotion.')
           .toString(),
       emotionalTarget: targetEmotion,
+      improvTwist:
+          (json['improv_twist'] ?? json['improvisation_twist'] ?? '').toString(),
+      is18Plus: json['is_18_plus'] == true || json['is_late_night'] == true,
       durationSeconds: (json['duration_seconds'] as num?)?.toInt() ?? 35,
       difficultyTier: (json['difficulty_tier'] as num?)?.toInt() ?? 4,
     );
@@ -202,174 +241,29 @@ class ScenePrompt {
         'title': title,
         'film_or_series': filmOrSeries,
         'release_year': releaseYear,
+        'year': releaseYear,
         'character_name': characterName,
+        'character': characterName,
         'prompt_script': promptScript,
+        'script': promptScript,
+        'duet_lead_a': duetLeadA,
+        'duet_lead_b': duetLeadB,
         'director_cue': directorCue,
+        'director_note': directorCue,
         'emotional_target': emotionalTarget,
+        'target_emotion': emotionalTarget,
+        'improv_twist': improvTwist,
+        'is_18_plus': is18Plus,
         'duration_seconds': durationSeconds,
         'difficulty_tier': difficultyTier,
       };
 }
 
-/// Built-in Scene Vaults with original Copyright-Safe Parody Scripts so the APK works 100% offline or online on the S26 Ultra.
-const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault = {
-  SceneCategory.era1970To1999: [
-    ScenePrompt(
-      id: 'era-70-neon-rain',
-      title: 'Sparks in the Downpour',
-      filmOrSeries: 'Neon Rain 1982 (Original Parody)',
-      releaseYear: 1982,
-      characterName: 'Commander Vance',
-      promptScript:
-          "I've watched neon starships burn above the rings of Saturn, flickering like fireflies in the dark. Every memory we built will vanish into the static, like sparks in a midnight downpour.",
-      directorCue:
-          'Begin with quiet awe, maintain steady eye contact with the camera lens, and release a gentle breath on the final phrase.',
-      emotionalTarget: 'Melancholic Transcendence',
-      durationSeconds: 30,
-      difficultyTier: 4,
-    ),
-    ScenePrompt(
-      id: 'era-90-courtroom-honor',
-      title: 'The Verdict You Requested',
-      filmOrSeries: 'Courtroom Honor (Original Parody)',
-      releaseYear: 1992,
-      characterName: 'General Sterling',
-      promptScript:
-          'You sit in the gallery and question the watchtower, because you enjoy the comfort of never holding the line. You demand the classified truth, yet your hands would tremble the moment I laid the ledger on that bench!',
-      directorCue:
-          'Start with icy courtroom restraint before escalating vocal projection on the second sentence.',
-      emotionalTarget: 'Commanding Indignation',
-      durationSeconds: 30,
-      difficultyTier: 3,
-    ),
-  ],
-  SceneCategory.era2000To2026: [
-    ScenePrompt(
-      id: 'era-00-tempo-obsession',
-      title: 'Off My Metronome',
-      filmOrSeries: 'Tempo Obsession (Original Parody)',
-      releaseYear: 2014,
-      characterName: 'Maestro Vance',
-      promptScript:
-          'Were you rushing the downbeat or dragging the brass? If you sabotage the rhythm of this conservatory stage on my watch, I will lock the rehearsal doors until sunrise.',
-      directorCue:
-          'Whisper the opening question with razor-sharp stillness, then snap into sudden percussive intensity.',
-      emotionalTarget: 'Controlled Menace',
-      durationSeconds: 25,
-      difficultyTier: 4,
-    ),
-    ScenePrompt(
-      id: 'era-20-parallel-laundromat',
-      title: 'Quiet Universe',
-      filmOrSeries: 'Parallel Laundromat (Original Parody)',
-      releaseYear: 2022,
-      characterName: 'Desmond',
-      promptScript:
-          'In another timeline, without the flashing cameras or the chaos, I think I would have loved just folding warm laundry and balancing receipts beside you.',
-      directorCue:
-          'Soften your shoulders, let a bittersweet half-smile form, and deliver with vulnerable sincerity.',
-      emotionalTarget: 'Tender Vulnerability',
-      durationSeconds: 25,
-      difficultyTier: 3,
-    ),
-  ],
-  SceneCategory.awardsBestActor: [
-    ScenePrompt(
-      id: 'award-actor-black-gold',
-      title: 'The Pipeline Reaches',
-      filmOrSeries: 'Black Gold Tycoon (Original Parody)',
-      releaseYear: 2007,
-      characterName: 'Harlan Vance',
-      promptScript:
-          'If your derrick sits on the ridge and my pipeline runs three miles deep, my siphon reaches clear across the valley floor. I drain the entire reservoir before your crew even turns the valve!',
-      directorCue:
-          'Lean forward into the frame, build rhythmic cadence on the metaphor, and erupt on the final declaration.',
-      emotionalTarget: 'Ruthless Triumph',
-      durationSeconds: 35,
-      difficultyTier: 5,
-    ),
-  ],
-  SceneCategory.awardsBestActress: [
-    ScenePrompt(
-      id: 'award-actress-midnight-ranch',
-      title: 'The Open Pasture Gate',
-      filmOrSeries: 'Midnight Ranch (Original Parody)',
-      releaseYear: 1991,
-      characterName: 'Agent Clara',
-      promptScript:
-          'I woke before dawn when the frost was still heavy on the fence, and I unlatched the wooden gate so the colts could run free. None of them moved—so I gathered the smallest one in my coat and walked into the fog.',
-      directorCue:
-          'Hold trembling composure for two beats before letting quiet resolve overtake the line.',
-      emotionalTarget: 'Trembling Resolve',
-      durationSeconds: 35,
-      difficultyTier: 5,
-    ),
-  ],
-  SceneCategory.awardsBestSupportingActor: [
-    ScenePrompt(
-      id: 'award-supp-river-bench',
-      title: 'Beyond the Textbook',
-      filmOrSeries: 'Charles River Bench (Original Parody)',
-      releaseYear: 1997,
-      characterName: 'Professor Callahan',
-      promptScript:
-          "You can recite every chapter ever printed on Renaissance brushwork, yet you have never stood beneath a cathedral dome and breathed in the turpentine and dust. Real life isn't footnotes—it's risking your heart in the open.",
-      directorCue:
-          'Speak with quiet, grounded warmth and steady, unhurried eye contact.',
-      emotionalTarget: 'Grounded Empathy & Quiet Wisdom',
-      durationSeconds: 35,
-      difficultyTier: 4,
-    ),
-  ],
-  SceneCategory.awardsBestVillain: [
-    ScenePrompt(
-      id: 'award-villain-coin-toss',
-      title: 'Call It in the Dust',
-      filmOrSeries: 'Desert Coin Toss (Original Parody)',
-      releaseYear: 2007,
-      characterName: 'The Collector',
-      promptScript:
-          "Tell me the highest stake you ever put on a single flip of silver. Don't slide that coin back into your register—it stopped being ordinary change the moment it left my palm.",
-      directorCue:
-          'Zero blinking, flat deadpan cadence, tilt chin slightly downward while staring directly into the lens.',
-      emotionalTarget: 'Unblinking Dread',
-      durationSeconds: 30,
-      difficultyTier: 4,
-    ),
-  ],
-  SceneCategory.awardsEmmyVault: [
-    ScenePrompt(
-      id: 'award-emmy-desert-chemistry',
-      title: 'The Storm at the Gate',
-      filmOrSeries: 'Desert Chemistry (Original Parody)',
-      releaseYear: 2011,
-      characterName: 'Professor Sterling',
-      promptScript:
-          'You still think we are waiting for someone to rescue this operation from the storm. Listen closely: I am not the one hiding behind the bolted door—I am the storm at the gate.',
-      directorCue:
-          'Drop vocal pitch half an octave and step closer to the microphone on the final five words.',
-      emotionalTarget: 'Ego & Cold Authority',
-      durationSeconds: 30,
-      difficultyTier: 4,
-    ),
-  ],
-  SceneCategory.specialtyCultClassics: [
-    ScenePrompt(
-      id: 'cult-espresso-closers',
-      title: 'Espresso Is for Closers',
-      filmOrSeries: 'Midnight Boardroom (Original Parody)',
-      releaseYear: 1992,
-      characterName: 'Vance Blake',
-      promptScript:
-          'Set that porcelain cup back on the saucer! Double-shot espresso is reserved for top producers who sign the gold leads before midnight. Always be closing the deal.',
-      directorCue:
-          'Snap fingers once, pace the frame slightly, and deliver with rapid-fire boardroom swagger.',
-      emotionalTarget: 'Aggressive Salesmanship',
-      durationSeconds: 30,
-      difficultyTier: 3,
-    ),
-  ],
-};
+/// Built-in Scene Vaults with all 90 Original Copyright-Safe Parody Scripts (9 categories × 10 scenes)
+/// so the APK and Web app work 100% offline or online on the S26 Ultra.
+/// The 10 adult scenes (`is_18_plus: true`) live in `kLateNightAfterHoursScenes`.
+const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault =
+    kParodyGeneralScenesByCategory;
 
 class LobbyPlayer {
   final String id;
@@ -974,6 +868,38 @@ class LobbyRealtimeManager extends ChangeNotifier {
     if (targetUserId == _localUserId) return;
     _players = _players.where((p) => p.userId != targetUserId).toList();
     _notifySafely();
+  }
+
+  /// Updates the active scene & category in the Green Room from the 90-scene drawer
+  /// and broadcasts the chosen scene to all connected cast members in real time.
+  Future<void> selectSceneFromDrawer({
+    required SceneCategory category,
+    required ScenePrompt scene,
+  }) async {
+    if (_session == null || _isDisposed) return;
+    _session = _session!.copyWith(
+      selectedCategory: category,
+      activeScene: scene,
+    );
+    _notifySafely();
+
+    final channel = _realtimeChannel;
+    if (channel != null) {
+      try {
+        await channel.sendBroadcastMessage(
+          event: 'lobby_state_sync',
+          payload: {
+            'lobby_id': _session!.id,
+            'room_code': _session!.roomCode,
+            'selected_category': category.key,
+            'status': _session!.status,
+            'active_actor_id': _session!.activeActorId ?? _localUserId,
+            'active_scene_payload': scene.toJson(),
+            'livekit_room_name': _session!.livekitRoomName,
+          },
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> toggleReadyState() async {

@@ -116,9 +116,14 @@ export default function App() {
       <header className="flex items-center justify-between gap-8 px-6 py-4 border-b border-slate-800 bg-slate-950">
         <a
           href="#top"
-          className="text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0"
+          className="flex items-center gap-3 text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0"
         >
-          Act Like It
+          <img
+            src="/app_logo.png"
+            alt="ACT LIKE IT Official Logo"
+            className="w-10 h-10 rounded-full border-2 border-amber-400/80 object-cover shadow-md"
+          />
+          <span>ACT LIKE IT</span>
         </a>
 
         <nav
@@ -132,7 +137,7 @@ export default function App() {
               activeTab === 'files' ? 'text-white underline underline-offset-8' : ''
             }`}
           >
-            All 5 Batches (8 Files)
+            All 5 Batches &amp; 100 Scenes
           </button>
           <button
             type="button"
@@ -141,7 +146,7 @@ export default function App() {
               activeTab === 'late-night' ? 'text-white underline underline-offset-8' : ''
             }`}
           >
-            Late-Night 18+ Vault
+            Late-Night 18+ Vault (10 Scenes)
           </button>
           <button
             type="button"
@@ -160,7 +165,7 @@ export default function App() {
             onClick={() => setActiveTab('sync-guide')}
             className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition-colors whitespace-nowrap shrink-0"
           >
-            Push Part 5 to GitHub
+            Push 100 Scenes &amp; Logo to GitHub
           </button>
         </div>
       </header>
@@ -170,20 +175,27 @@ export default function App() {
         {/* Batch Status Banner */}
         <section className="p-6 rounded-xl bg-slate-900 border border-slate-800">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-2 max-w-2xl">
-              <div className="text-xs text-slate-400">
-                <span>Samsung Galaxy S26 Ultra Cloud Workflow</span>
-                <span aria-hidden="true"> · </span>
-                <span>Zero Local Storage</span>
-                <span aria-hidden="true"> · </span>
-                <span>All 5 Batches Complete</span>
+            <div className="flex items-start gap-4 max-w-3xl">
+              <img
+                src="/app_logo.png"
+                alt="ACT LIKE IT Medallion"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-amber-400 object-cover shadow-lg shrink-0"
+              />
+              <div className="space-y-2">
+                <div className="text-xs text-slate-400">
+                  <span>100 Original Parody Scenes</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>90 General + 10 Adult (18+)</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Official Brand Logo Integrated</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                  100 Copyright-Safe Parody Scenes &amp; Official App Logo Ready
+                </h1>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Populated <code className="font-mono text-amber-400">lib/ui/parody_scenes_catalog.dart</code>, <code className="font-mono text-amber-400">OfflineManager</code> SQLite cache, <code className="font-mono text-amber-400">SceneVaultScreen</code>, <code className="font-mono text-amber-400">LateNightAfterHoursScreen</code>, Green Room Scene Drawer (<code className="font-mono text-amber-400">lib/lobby.dart</code>), and <code className="font-mono text-amber-400">supabase/seed.sql</code> with all 100 original scripts (Solo + Duet Lead A in <code className="font-mono text-amber-200">#F5DEB3</code> &amp; Lead B in <code className="font-mono text-cyan-400">#0CB6D4</code>, zero text truncation) and wired the official logo into <code className="font-mono text-amber-400">assets/app_logo.png</code>, <code className="font-mono text-amber-400">mipmap-*/ic_launcher.png</code>, and <code className="font-mono text-amber-400">ActLikeItBrandLogo</code>.
+                </p>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Game Show Audio Engine Ready: pubspec.yaml &amp; dashboard_marquee.dart
-              </h1>
-              <p className="text-sm text-slate-300 leading-relaxed">
-                Added <code className="font-mono text-amber-400">audioplayers: ^6.1.0</code> to <code className="font-mono text-amber-400">pubspec.yaml</code> (preserving the Android SDK 36 <code className="font-mono text-amber-400">shared_preferences_android: ^2.4.7</code> override) and injected the auto-playing <code className="font-mono text-amber-400">ReleaseMode.loop</code> Game Show soundtrack, header mute/unmute toggle (<code className="font-mono text-amber-400">Icons.volume_up</code> / <code className="font-mono text-amber-400">Icons.volume_off</code>), and navigation/dispose lifecycle cleanup into <code className="font-mono text-amber-400">lib/dashboard_marquee.dart</code>.
-              </p>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">

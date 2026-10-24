@@ -1692,8 +1692,6 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                 Expanded(
                   child: Text(
                     '${widget.lobbySession.selectedCategory.label.toUpperCase()} · ${scene.characterName} (${scene.releaseYear})',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,
@@ -1709,8 +1707,12 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
               Builder(
                 builder: (context) {
                   final halfLen = (words.length / 2).ceil();
-                  final leadALine = words.take(halfLen).join(' ');
-                  final leadBLine = words.skip(halfLen).join(' ');
+                  final leadALine = scene.duetLeadA.trim().isNotEmpty
+                      ? scene.duetLeadA.trim()
+                      : words.take(halfLen).join(' ');
+                  final leadBLine = scene.duetLeadB.trim().isNotEmpty
+                      ? scene.duetLeadB.trim()
+                      : words.skip(halfLen).join(' ');
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1731,7 +1733,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                             ),
                             TextSpan(
                               text: '"$leadALine"',
-                              style: const TextStyle(color: Color(0xFFFFE082)),
+                              style: const TextStyle(color: Color(0xFFF5DEB3)),
                             ),
                           ],
                         ),
@@ -1756,7 +1758,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                               TextSpan(
                                 text: '"$leadBLine"',
                                 style:
-                                    const TextStyle(color: Color(0xFF84FFFF)),
+                                    const TextStyle(color: Color(0xFF0CB6D4)),
                               ),
                             ],
                           ),
@@ -1800,8 +1802,6 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
             const SizedBox(height: 4),
             Text(
               'Cue: ${scene.directorCue} · Target: ${scene.emotionalTarget}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(0xFFCBD5E1),

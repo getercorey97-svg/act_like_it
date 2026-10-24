@@ -35,8 +35,9 @@ const List<VaultEraTicketSpec> kVaultEraTickets = [
     category: SceneCategory.era1970To1999,
     admitCode: 'BOX OFFICE · REEL 70–99',
     eraTitle: '1970–1999',
-    tagline: 'New Hollywood & Silver Screen Classics',
-    featuredReels: 'Neon Rain 1982 · Courtroom Honor · Diner Pulp · Midnight Cab',
+    tagline: 'New Hollywood & Silver Screen Classics (10 Reels)',
+    featuredReels:
+        'Neon Rain 1982 · Courtroom Honor · Midnight Diner · Galaxy Father · Shark Mayor · Mafia Offer',
     neonAccent: Color(0xFFF59E0B),
     icon: Icons.movie_filter_rounded,
   ),
@@ -44,35 +45,49 @@ const List<VaultEraTicketSpec> kVaultEraTickets = [
     category: SceneCategory.era2000To2026,
     admitCode: 'BOX OFFICE · REEL 00–26',
     eraTitle: '2000–2026',
-    tagline: 'Modern Prestige & High-Voltage Cinema',
-    featuredReels: 'Tempo Obsession · Gotham Shadow · Atomic Horizon · Boardroom Dynasty',
+    tagline: 'Modern Prestige & High-Voltage Cinema (10 Reels)',
+    featuredReels:
+        'Tempo Obsession · Parallel Laundromat · Social Billionaire · Wall Street Wolf · Pirate Captain',
     neonAccent: Color(0xFF06B6D4),
     icon: Icons.auto_awesome_motion_rounded,
   ),
   VaultEraTicketSpec(
-    category: SceneCategory.specialtyCultClassics,
-    admitCode: 'MIDNIGHT VAULT · CULT',
-    eraTitle: 'Cult Classics',
-    tagline: 'Underground Legends & Midnight Quotables',
-    featuredReels: 'Bowling Alley Zen · Basement Rules · Midnight Time Warp · Velvet Tangent',
-    neonAccent: Color(0xFFA855F7),
-    icon: Icons.bolt_rounded,
-  ),
-  VaultEraTicketSpec(
     category: SceneCategory.awardsBestActor,
-    admitCode: 'ACADEMY VAULT · LEAD',
+    admitCode: 'ACADEMY VAULT · LEAD ACTOR',
     eraTitle: 'Best Actor',
-    tagline: 'Tour-de-Force Award-Winning Monologues',
-    featuredReels: 'Black Gold Tycoon · Rookie Precinct · Prime Time Broadcast',
+    tagline: 'Tour-de-Force Award-Winning Monologues (10 Reels)',
+    featuredReels:
+        'The Pipeline Reaches · Corrupt Cop · King Speech · Atomic Physicist · Method Actor Breakdown',
     neonAccent: Color(0xFFE11D48),
     icon: Icons.emoji_events_rounded,
+  ),
+  VaultEraTicketSpec(
+    category: SceneCategory.awardsBestActress,
+    admitCode: 'ACADEMY VAULT · LEAD ACTRESS',
+    eraTitle: 'Best Actress',
+    tagline: 'Commanding Leading Lady Showstoppers (10 Reels)',
+    featuredReels:
+        'Open Pasture Gate · Fashion Magazine Devil · Black Swan Ballerina · Southern Belle · Pop Star',
+    neonAccent: Color(0xFFF43F5E),
+    icon: Icons.stars_rounded,
+  ),
+  VaultEraTicketSpec(
+    category: SceneCategory.awardsBestSupportingActor,
+    admitCode: 'ACADEMY VAULT · SUPPORTING',
+    eraTitle: 'Best Supporting',
+    tagline: 'Scene-Stealing Mentors, Detectives & Wildcards (10 Reels)',
+    featuredReels:
+        'Beyond the Textbook · Grumpy Mentor · Loyal Sidekick · Eccentric Detective · Fast-Talking Agent',
+    neonAccent: Color(0xFF38BDF8),
+    icon: Icons.theater_comedy_rounded,
   ),
   VaultEraTicketSpec(
     category: SceneCategory.awardsBestVillain,
     admitCode: 'ACADEMY VAULT · NEMESIS',
     eraTitle: 'Best Villain',
-    tagline: 'Cold Fatalism & Commanding Menace',
-    featuredReels: 'Desert Coin Toss · Tavern Interrogation · Greed Street',
+    tagline: 'Cold Fatalism & Commanding Menace (10 Reels)',
+    featuredReels:
+        'Call It in the Dust · Chaos Clown ·Polyglot Hunter · Cyber Overlord · Vampire Aristocrat',
     neonAccent: Color(0xFF10B981),
     icon: Icons.whatshot_rounded,
   ),
@@ -80,15 +95,36 @@ const List<VaultEraTicketSpec> kVaultEraTickets = [
     category: SceneCategory.awardsEmmyVault,
     admitCode: 'ACADEMY VAULT · EMMY',
     eraTitle: 'Emmy Vault',
-    tagline: 'Prestige Television Showstoppers',
-    featuredReels: 'Desert Chemistry · Waystar Boardroom · The Bear Kitchen',
+    tagline: 'Prestige Television Showstoppers (10 Reels)',
+    featuredReels:
+        'The Storm at the Gate · Media Patriarch · Chaotic Chef · Dragon Queen · Zombie Survivor',
     neonAccent: Color(0xFFEC4899),
     icon: Icons.live_tv_rounded,
+  ),
+  VaultEraTicketSpec(
+    category: SceneCategory.specialtyCultClassics,
+    admitCode: 'MIDNIGHT VAULT · CULT',
+    eraTitle: 'Cult Classics',
+    tagline: 'Underground Legends & Midnight Quotables (10 Reels)',
+    featuredReels:
+        'Espresso Is for Closers · Bowling Zen · Basement Fight Club · Worst Room Ever · High School Queen',
+    neonAccent: Color(0xFFA855F7),
+    icon: Icons.bolt_rounded,
+  ),
+  VaultEraTicketSpec(
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    admitCode: 'IMAX VAULT · SCI-FI & ACTION',
+    eraTitle: 'Sci-Fi & Action',
+    tagline: 'Blockbuster Spectacles & Multiverse Epics (10 Reels)',
+    featuredReels:
+        'Time Loop Soldier · Giant Robot Pilot · Asteroid Drillers · Dinosaur Park · Superhero Landing',
+    neonAccent: Color(0xFF22D3EE),
+    icon: Icons.rocket_launch_rounded,
   ),
 ];
 
 /// Dedicated Vintage Box Office Scene Vault screen where players swipe through
-/// oversized perforated movie tickets (1970–1999, 2000–2026, Cult Classics, etc.)
+/// oversized perforated movie tickets (all 9 categories × 10 scenes = 90 general scenes)
 /// and trigger the Director's Call Sheet (`GameSettingsModal`) before entering
 /// the matchmaking soundstage.
 class SceneVaultScreen extends StatefulWidget {
@@ -102,6 +138,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
   late final PageController _ticketController;
   int _activeIndex = 0;
   double _pagePosition = 0.0;
+  final Map<SceneCategory, int> _selectedPromptIndexByCategory = {};
 
   @override
   void initState() {
@@ -121,8 +158,30 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
     super.dispose();
   }
 
+  ScenePrompt? _activePromptForCategory(SceneCategory category) {
+    final prompts = kBuiltInSceneVault[category] ?? const [];
+    if (prompts.isEmpty) return null;
+    final idx = (_selectedPromptIndexByCategory[category] ?? 0)
+        .clamp(0, prompts.length - 1);
+    return prompts[idx];
+  }
+
+  void _cyclePrompt(SceneCategory category, int delta) {
+    final prompts = kBuiltInSceneVault[category] ?? const [];
+    if (prompts.isEmpty) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      final current = _selectedPromptIndexByCategory[category] ?? 0;
+      _selectedPromptIndexByCategory[category] =
+          (current + delta) % prompts.length < 0
+              ? prompts.length - 1
+              : (current + delta) % prompts.length;
+    });
+  }
+
   Future<void> _onSelectTicket(VaultEraTicketSpec ticket) async {
     HapticFeedback.heavyImpact();
+    final selectedPrompt = _activePromptForCategory(ticket.category);
     final settings = await showModalBottomSheet<GameSettingsConfig>(
       context: context,
       isScrollControlled: true,
@@ -135,6 +194,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
       StageSharedTransitionRoute(
         page: LobbyMatchmakingScreen(
           initialCategory: ticket.category,
+          initialPromptOverride: selectedPrompt,
           startInJoinMode: false,
           autoCreateOnInit: true,
         ),
@@ -188,7 +248,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'VINTAGE BOX OFFICE WINDOW · SWIPE REELS',
+                      'VINTAGE BOX OFFICE WINDOW · 9 CATEGORIES · 90 GENERAL SCRIPTS',
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
@@ -270,6 +330,9 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
 
   Widget _buildLargeMovieTicket(VaultEraTicketSpec ticket) {
     final prompts = kBuiltInSceneVault[ticket.category] ?? const [];
+    final promptIndex = (_selectedPromptIndexByCategory[ticket.category] ?? 0)
+        .clamp(0, prompts.isEmpty ? 0 : prompts.length - 1);
+    final activePrompt = prompts.isNotEmpty ? prompts[promptIndex] : null;
     final isUnlocked = AuthService.instance.hasAllEraBundle ||
         AuthService.instance.hasEmmyAndCultVault;
 
@@ -331,7 +394,6 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                                   ),
                                   child: Text(
                                     ticket.admitCode,
-                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontFamily: 'monospace',
                                       fontSize: 11,
@@ -459,7 +521,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                               color: Color(0xFFCBD5E1),
                             ),
                           ),
-                          if (prompts.isNotEmpty) ...[
+                          if (activePrompt != null) ...[
                             const SizedBox(height: 16),
                             Container(
                               padding: const EdgeInsets.all(14),
@@ -472,23 +534,111 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'SCRIPT ${promptIndex + 1}/${prompts.length} · ${activePrompt.title} (${activePrompt.releaseYear})',
+                                          style: TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: ticket.neonAccent,
+                                          ),
+                                        ),
+                                      ),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(
+                                              minWidth: 28,
+                                              minHeight: 28,
+                                            ),
+                                            tooltip: 'Previous Script',
+                                            onPressed: () =>
+                                                _cyclePrompt(ticket.category, -1),
+                                            icon: Icon(
+                                              Icons.chevron_left_rounded,
+                                              color: ticket.neonAccent,
+                                              size: 20,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(
+                                              minWidth: 28,
+                                              minHeight: 28,
+                                            ),
+                                            tooltip: 'Next Script',
+                                            onPressed: () =>
+                                                _cyclePrompt(ticket.category, 1),
+                                            icon: Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: ticket.neonAccent,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    'SPOTLIGHT SCRIPT · ${prompts.first.filmOrSeries} (${prompts.first.releaseYear})',
-                                    style: TextStyle(
+                                    'ROLE: ${activePrompt.characterName} · EMOTION: ${activePrompt.emotionalTarget}',
+                                    style: const TextStyle(
                                       fontFamily: 'monospace',
                                       fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: ticket.neonAccent,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF94A3B8),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    '"${prompts.first.promptScript}"',
+                                    '"${activePrompt.promptScript}"',
                                     style: const TextStyle(
                                       fontSize: 12.5,
                                       fontStyle: FontStyle.italic,
                                       height: 1.45,
-                                      color: Colors.white70,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  if (activePrompt.duetLeadA.isNotEmpty ||
+                                      activePrompt.duetLeadB.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'LEAD A (GOLD): "${activePrompt.duetLeadA}"',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        height: 1.4,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFF5DEB3),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'LEAD B (CYAN): "${activePrompt.duetLeadB}"',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        height: 1.4,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF0CB6D4),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Director\'s Note: ${activePrompt.directorCue}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFFCBD5E1),
                                     ),
                                   ),
                                 ],

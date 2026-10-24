@@ -151,16 +151,42 @@ class _ActLikeItBrandLogoState extends State<ActLikeItBrandLogo>
                         ),
                       ),
 
-                      // 2. Optional `assets/app_logo.png` overlay (gracefully hidden
-                      //    via errorBuilder if not bundled so vector emblem shines)
+                      // 2. Official "ACT LIKE IT" Brand Emblem Image (`assets/app_logo.png`)
+                      //    framed in a 24K Gold & Obsidian cinema medallion above the 3D title
                       Positioned(
-                        top: widget.compact ? 4 : 6,
-                        child: SizedBox(
-                          height: widget.height * 0.36,
-                          child: Image.asset(
-                            'assets/app_logo.png',
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        top: widget.compact ? 2 : 4,
+                        child: Container(
+                          height: widget.height * (widget.compact ? 0.44 : 0.46),
+                          width: widget.height * (widget.compact ? 0.44 : 0.46),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFFFFD600),
+                              width: 2.2,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0xAA000000),
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                              BoxShadow(
+                                color: Color(0x55FFB300),
+                                blurRadius: 16,
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/app_logo.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Image.asset(
+                                'assets/app_logo.jpg',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const SizedBox.shrink(),
+                              ),
+                            ),
                           ),
                         ),
                       ),

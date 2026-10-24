@@ -37,7 +37,7 @@ enum LateNightSpiceTier {
 }
 
 /// Represents a specialized 18+ scene prompt from `public.scenes_late_night_after_hours`
-/// including the mid-take improvisation twist mechanic.
+/// including the mid-take improvisation twist mechanic and 2-player Duet scripts.
 class LateNightPrompt extends ScenePrompt {
   final int spiceTier;
   final String contentAdvisory;
@@ -50,8 +50,12 @@ class LateNightPrompt extends ScenePrompt {
     required super.releaseYear,
     required super.characterName,
     required super.promptScript,
+    super.duetLeadA = '',
+    super.duetLeadB = '',
     required super.directorCue,
     required super.emotionalTarget,
+    super.improvTwist = '',
+    super.is18Plus = true,
     required super.durationSeconds,
     required super.difficultyTier,
     required this.spiceTier,
@@ -59,10 +63,42 @@ class LateNightPrompt extends ScenePrompt {
     required this.improvisationTwist,
   });
 
+  factory LateNightPrompt.fromScenePrompt(
+    ScenePrompt base, {
+    required int spiceTier,
+    required String contentAdvisory,
+  }) {
+    return LateNightPrompt(
+      id: base.id,
+      title: base.title,
+      filmOrSeries: base.filmOrSeries,
+      releaseYear: base.releaseYear,
+      characterName: base.characterName,
+      promptScript: base.promptScript,
+      duetLeadA: base.duetLeadA,
+      duetLeadB: base.duetLeadB,
+      directorCue: base.directorCue,
+      emotionalTarget: base.emotionalTarget,
+      improvTwist: base.improvTwist,
+      is18Plus: true,
+      durationSeconds: base.durationSeconds,
+      difficultyTier: base.difficultyTier,
+      spiceTier: spiceTier,
+      contentAdvisory: contentAdvisory,
+      improvisationTwist: base.improvTwist.isNotEmpty
+          ? base.improvTwist
+          : 'TWIST AT 15s: Drop your voice to an intimate whisper on the final line.',
+    );
+  }
+
   factory LateNightPrompt.fromJson(Map<String, dynamic> json) {
     final targetEmotion = (json['target_emotion'] ??
             json['emotional_target'] ??
             'High-Tension Romantic Drama')
+        .toString();
+    final twist = (json['improv_twist'] ??
+            json['improvisation_twist'] ??
+            'TWIST AT 15s: Drop your voice to an intimate whisper on the final two lines.')
         .toString();
     return LateNightPrompt(
       id: json['id']?.toString() ?? '',
@@ -70,23 +106,31 @@ class LateNightPrompt extends ScenePrompt {
       filmOrSeries:
           (json['actor_name'] ?? json['film_or_series'] ?? 'Featured Lead')
               .toString(),
-      releaseYear: (json['release_year'] as num?)?.toInt() ?? 2004,
-      characterName: json['character_name']?.toString() ?? 'Lead',
-      promptScript:
-          (json['script_excerpt'] ?? json['prompt_script'] ?? '').toString(),
+      releaseYear:
+          ((json['release_year'] ?? json['year']) as num?)?.toInt() ?? 2004,
+      characterName:
+          (json['character_name'] ?? json['character'] ?? 'Lead').toString(),
+      promptScript: (json['script_excerpt'] ??
+              json['prompt_script'] ??
+              json['script'] ??
+              '')
+          .toString(),
+      duetLeadA: (json['duet_lead_a'] ?? '').toString(),
+      duetLeadB: (json['duet_lead_b'] ?? '').toString(),
       directorCue: (json['director_cue'] ??
+              json['director_note'] ??
               'Hold intense eye contact with the lens and channel $targetEmotion.')
           .toString(),
       emotionalTarget: targetEmotion,
+      improvTwist: twist,
+      is18Plus: true,
       durationSeconds: (json['duration_seconds'] as num?)?.toInt() ?? 35,
       difficultyTier: (json['difficulty_tier'] as num?)?.toInt() ?? 4,
       spiceTier: (json['spice_tier'] as num?)?.toInt() ?? 3,
       contentAdvisory: (json['content_advisory'] ??
               '18+ High-Tension Romantic & Dramatic Dialogue')
           .toString(),
-      improvisationTwist: (json['improvisation_twist'] ??
-              'TWIST AT 15s: Drop your voice to an intimate whisper on the final two lines.')
-          .toString(),
+      improvisationTwist: twist,
     );
   }
 }
@@ -111,102 +155,22 @@ class LateNightVaultGateController extends ChangeNotifier {
   List<LateNightPrompt> get prompts => List.unmodifiable(_prompts);
   bool get midTakeTwistTriggered => _midTakeTwistTriggered;
 
-  static const List<LateNightPrompt> _builtInFallbackPrompts = [
-    LateNightPrompt(
-      id: 'ln-eyes-wide-shut',
-      title: 'Eyes Wide Shut (1999)',
-      filmOrSeries: 'Nicole Kidman',
-      releaseYear: 1999,
-      characterName: 'Alice Harford',
-      spiceTier: 3,
-      contentAdvisory: '18+ Erotic Candor & Psychological Intimacy',
-      promptScript:
-          "Do you really think you know everything that goes through my head when we're lying in the dark, Bill?\nLast summer at Cape Cod, there was a naval officer at the next table. He glanced at me for three seconds, and I couldn't breathe.\nIf he had wanted me—even for one single night—I was ready to give up everything. You, Helena, my whole life.\nAnd yet at the very same moment, you were dearer to me than ever. If you men only knew...",
-      directorCue:
-          'Slow cadence to half-speed, hold an unblinking gaze three inches from the front camera.',
-      emotionalTarget: 'Hypnotic Erotic Candor & Jealousy',
-      improvisationTwist:
-          'TWIST AT 15s: Break into a sudden, unsettling laugh before snapping back to deadpan seriousness.',
-      durationSeconds: 40,
-      difficultyTier: 5,
-    ),
-    LateNightPrompt(
-      id: 'ln-closer',
-      title: 'Closer (2004)',
-      filmOrSeries: 'Clive Owen & Natalie Portman',
-      releaseYear: 2004,
-      characterName: 'Larry Gray',
-      spiceTier: 3,
-      contentAdvisory: '18+ Scorching Romantic Obsession & Betrayal',
-      promptScript:
-          "Don't give me that innocent stare—tell me the truth! You think honesty is just a weapon you pull out when you want to break someone?\nDid you enjoy it? Look me in the eyes and tell me what you whispered to him when the hotel door closed.\nYou want raw, unfiltered passion, Anna, yet the second somebody touches your actual pulse, you bolt for the exit.\nGive it to me—because everyone else falls in love with your fantasy, and I'm the only man in this room who knows what you really are.",
-      directorCue:
-          'Begin with quiet, wounded disbelief, then step toward the microphone with scorching intensity.',
-      emotionalTarget: 'Scorching Romantic Obsession & Betrayal',
-      improvisationTwist:
-          'TWIST AT 15s: Deliver the final line with an eerie, heartbroken smile.',
-      durationSeconds: 40,
-      difficultyTier: 5,
-    ),
-    LateNightPrompt(
-      id: 'ln-basic-instinct',
-      title: 'Basic Instinct (1992)',
-      filmOrSeries: 'Sharon Stone',
-      releaseYear: 1992,
-      characterName: 'Catherine Tramell',
-      spiceTier: 2,
-      contentAdvisory: '18+ Seductive Interrogation Tension',
-      promptScript:
-          "What are you going to do, Nick? Charge me with smoking in an interrogation room?\nYou read every page of my novel before you walked in here, and now you're terrified that I know exactly how your mind works.\nMaybe I loved him, or maybe I just liked watching a dangerous man lose his nerve between the sheets.\nKeep staring at me like that, Detective, and we both know you won't make it to the end of this investigation alive.",
-      directorCue:
-          'Tilt your chin slightly up, never break eye contact, and speak with velvet composure.',
-      emotionalTarget: 'Seductive Cat-and-Mouse Dominance',
-      improvisationTwist:
-          'TWIST AT 15s: Pause for two full seconds of dead silence before whispering the final threat.',
-      durationSeconds: 35,
-      difficultyTier: 4,
-    ),
-    LateNightPrompt(
-      id: 'ln-challengers',
-      title: 'Challengers (2024)',
-      filmOrSeries: 'Zendaya',
-      releaseYear: 2024,
-      characterName: 'Tashi Duncan',
-      spiceTier: 2,
-      contentAdvisory: '18+ High-Tension Hotel Room Power Play',
-      promptScript:
-          "Don't act like you came up to my hotel room tonight just to talk about your backhand.\nYou two have been orbiting each other for thirteen years, using me as the net so you don't have to admit what you actually want.\nLook at me—if you step onto that court tomorrow and play like a coward, don't bother coming back to my bed.\nI don't want a polite husband or a nostalgic ex-lover. I want to watch two people tear each other apart for one point.",
-      directorCue:
-          'Command the frame with razor-sharp poise and unapologetic magnetism.',
-      emotionalTarget: 'Intoxicating Power Play & Desire',
-      improvisationTwist:
-          'TWIST AT 15s: Switch from icy detachment to breathless urgency on the final sentence.',
-      durationSeconds: 35,
-      difficultyTier: 4,
-    ),
-    LateNightPrompt(
-      id: 'ln-fatal-attraction',
-      title: 'Fatal Attraction (1987)',
-      filmOrSeries: 'Glenn Close',
-      releaseYear: 1987,
-      characterName: 'Alex Forrest',
-      spiceTier: 1,
-      contentAdvisory: '18+ Obsessive Romantic Confrontation',
-      promptScript:
-          "You think you can spend an entire weekend tangled in my sheets and then erase me on Monday morning like a business expense?\nI am not going to be ignored, Dan! Do you hear me?\nYou walked into my apartment, you held my face in your hands, and now you're hiding behind a picket fence like nothing happened.\nI'm part of your life now, whether you lock your front door or not—and we are far from finished.",
-      directorCue:
-          'Start with trembling vulnerability, then erupt on the second line before dropping to a chilling promise.',
-      emotionalTarget: 'Feverish Obsessive Passion & Threat',
-      improvisationTwist:
-          'TWIST AT 15s: Deliver the final line as if you are calmly leaving a voicemail.',
-      durationSeconds: 35,
-      difficultyTier: 4,
-    ),
+  static final List<LateNightPrompt> _builtInFallbackPrompts = [
+    for (int i = 0; i < kLateNightAfterHoursScenes.length; i++)
+      LateNightPrompt.fromScenePrompt(
+        kLateNightAfterHoursScenes[i],
+        spiceTier: i < 3 ? 1 : (i < 7 ? 2 : 3),
+        contentAdvisory: i < 3
+            ? '18+ Midnight Noir & Seductive Tension'
+            : (i < 7
+                ? '18+ Uncensored R-Rated Prestige Drama'
+                : '18+ After-Hours Double-Dare & Twist'),
+      ),
   ];
 
   /// Validates that the player's birth year is >= 18 years ago and that a 4-digit
   /// session PIN is provided, then updates `public.profiles.birth_year` so the
-  /// PostgreSQL RLS policy on `public.scenes (is_late_night = true)` grants access.
+  /// PostgreSQL RLS policy on `public.scenes_late_night_after_hours` grants access.
   Future<bool> verifyAgeAndUnlockVault({
     required int birthYear,
     required String fourDigitPin,
@@ -255,7 +219,7 @@ class LateNightVaultGateController extends ChangeNotifier {
     }
   }
 
-  /// Queries `public.scenes` where `is_late_night = true` (gated by PostgreSQL 18+ RLS).
+  /// Queries `public.scenes_late_night_after_hours` (with fallback to `public.scenes` where `is_late_night = true`).
   Future<void> fetchLateNightPrompts({LateNightSpiceTier? tier}) async {
     if (tier != null) {
       _selectedTier = tier;
@@ -264,6 +228,21 @@ class LateNightVaultGateController extends ChangeNotifier {
 
     final client = supabaseOrNull;
     if (client != null) {
+      try {
+        final lnRows =
+            await client.from('scenes_late_night_after_hours').select();
+        if (lnRows.isNotEmpty) {
+          _prompts = lnRows
+              .map((r) => LateNightPrompt.fromJson(Map<String, dynamic>.from(r)))
+              .where((p) => p.spiceTier <= _selectedTier.tier)
+              .toList();
+          if (_prompts.isNotEmpty) {
+            notifyListeners();
+            return;
+          }
+        }
+      } catch (_) {}
+
       try {
         final rows = await client
             .from('scenes')
@@ -667,15 +646,65 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${prompt.characterName}: "${prompt.promptScript}"',
+                  'SOLO MONOLOGUE (${prompt.characterName}): "${prompt.promptScript}"',
                   style: const TextStyle(
                     fontSize: 14,
+                    height: 1.45,
                     color: Color(0xFFF8FAFC),
                   ),
                 ),
+                if (prompt.duetLeadA.isNotEmpty || prompt.duetLeadB.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A0D14),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'SCREEN TEST DUET · 2-PLAYER CO-STAR SCRIPT',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                        if (prompt.duetLeadA.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'LEAD A (GOLD): "${prompt.duetLeadA}"',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFF5DEB3),
+                            ),
+                          ),
+                        ],
+                        if (prompt.duetLeadB.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'LEAD B (CYAN): "${prompt.duetLeadB}"',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0CB6D4),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
-                  'Director Cue: ${prompt.directorCue}',
+                  'Director Cue: ${prompt.directorCue} · Target Emotion: ${prompt.emotionalTarget}',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF94A3B8),
@@ -737,3 +766,5 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
     );
   }
 }
+
+typedef LateNightPremiumScreen = LateNightAfterHoursScreen;
