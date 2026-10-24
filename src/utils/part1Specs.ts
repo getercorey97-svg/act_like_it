@@ -64,6 +64,46 @@ export const BATCH_STAGES: BatchStage[] = [
 
 export const WORKSPACE_FILES: GeneratedFileRecord[] = [
   {
+    path: 'supabase/migrations/20261024000002_qa_feedback.sql',
+    language: 'sql',
+    part: 4,
+    description:
+      'S.O.A. Alpha QA Telemetry migration creating public.qa_feedback (id, tester_handle, app_version, bug_type, screenshot_url, device_info, local_state_dump, created_at), RLS INSERT/SELECT policies, and the qa-screenshots Storage bucket.',
+    lineCount: 84,
+    content: `-- ACT LIKE IT — S.O.A. Alpha QA Telemetry & Bug Reporting Schema
+create table if not exists public.qa_feedback (
+  id uuid primary key default gen_random_uuid(),
+  tester_handle text not null,
+  app_version text not null default '1.0.0+1',
+  bug_type text not null check (bug_type in ('UI', 'Audio', 'AI Score', 'Crash')),
+  screenshot_url text,
+  device_info jsonb not null default '{}'::jsonb,
+  local_state_dump jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+alter table public.qa_feedback enable row level security;`,
+  },
+  {
+    path: 'lib/qa/qa_overlay.dart',
+    language: 'dart',
+    part: 4,
+    description:
+      'Shake-to-Report & In-App Bug Tool using sensors_plus accelerometer shake detection, RepaintBoundary PNG capture, SharedPreferences + PageRoute state dump, and 2.5D bottom sheet uploading to qa-screenshots and public.qa_feedback.',
+    lineCount: 560,
+    content: `// Shake-to-Report & Floating Bug Overlay (lib/qa/qa_overlay.dart)
+// Wrapped inside MaterialApp.builder so existing screen layouts remain untouched.`,
+  },
+  {
+    path: 'lib/qa/qa_web_portal.dart',
+    language: 'dart',
+    part: 4,
+    description:
+      'Companion Web Portal Dashboard (/qa-dashboard) streaming public.qa_feedback in real-time with filterable bug table, clickable screenshot gallery, and local_state_dump JSON inspector.',
+    lineCount: 470,
+    content: `// Companion Web Portal Dashboard (lib/qa/qa_web_portal.dart)
+// Mounted at /qa-dashboard for real-time S.O.A. alpha telemetry inspection.`,
+  },
+  {
     path: 'supabase/migrations/20261017000001_match_history.sql',
     language: 'sql',
     part: 2,
@@ -609,3 +649,12 @@ export function getBatchCompletionRatio(stages: BatchStage[]): {
   const percentage = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
   return { completedCount, totalCount, percentage };
 }
+
+export function evaluateCalibratedAiScoreTier(score: number): string {
+  const clamped = Math.max(0, Math.min(100, score));
+  if (clamped >= 90) return '90-100_OSCAR_LEVEL';
+  if (clamped >= 70) return '70-89_AVERAGE_ATTEMPT';
+  if (clamped >= 50) return '50-69_FLAT_DELIVERY';
+  return '0-49_LOW_ENERGY_OR_MISSED_CUE';
+}
+

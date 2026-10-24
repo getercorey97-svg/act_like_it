@@ -10,6 +10,8 @@ import 'late_night_vault.dart';
 import 'dashboard_marquee.dart';
 import 'ui/intro_cinematic.dart';
 import 'offline_manager.dart';
+import 'qa/qa_overlay.dart';
+import 'qa/qa_web_portal.dart';
 
 /// Captures startup, plugin, and widget build exceptions in Release APKs so the
 /// app never fails silently with a blank white screen on Android devices.
@@ -724,11 +726,25 @@ class SafeBootEmergencyApp extends StatelessWidget {
 class ActLikeItApp extends StatelessWidget {
   const ActLikeItApp({super.key});
 
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Act Like It',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
+      navigatorObservers: <NavigatorObserver>[QaRouteObserver.instance],
+      routes: <String, WidgetBuilder>{
+        '/qa-dashboard': (_) => const QaWebPortalDashboardScreen(),
+      },
+      builder: (BuildContext context, Widget? child) {
+        return QaBugReporterOverlay(
+          navigatorKey: navigatorKey,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,

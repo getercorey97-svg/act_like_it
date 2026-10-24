@@ -163,3 +163,46 @@ test('Batch progress accurately reports all 5 of 5 batches completed (100%)', ()
   assert.equal(progress.totalCount, 5);
   assert.equal(progress.percentage, 100);
 });
+
+test('S.O.A. Alpha QA Systems (Gemini AI Calibration, qa_feedback SQL, Shake-to-Report Overlay, and QA Web Portal) pass verification', () => {
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  const qaSql = fs.readFileSync(
+    'supabase/migrations/20261024000002_qa_feedback.sql',
+    'utf8'
+  );
+  const qaOverlayDart = fs.readFileSync('lib/qa/qa_overlay.dart', 'utf8');
+  const qaPortalDart = fs.readFileSync('lib/qa/qa_web_portal.dart', 'utf8');
+  const mainDart = fs.readFileSync('lib/main.dart', 'utf8');
+
+  // 1. Gemini AI Calibration & Millisecond Telemetry
+  assert.ok(judgingDart.includes('STRICT SCORING DISTRIBUTION MATRIX'));
+  assert.ok(judgingDart.includes('90-100_OSCAR_LEVEL'));
+  assert.ok(judgingDart.includes('70-89_AVERAGE_ATTEMPT'));
+  assert.ok(judgingDart.includes('0-49_LOW_ENERGY_OR_MISSED_CUE'));
+  assert.ok(judgingDart.includes('facial_micro_expressions'));
+  assert.ok(judgingDart.includes('vocal_prosody_shifts'));
+  assert.ok(judgingDart.includes('timestamp_ms'));
+
+  // 2. Supabase QA Backend SQL
+  assert.ok(qaSql.includes('create table if not exists public.qa_feedback'));
+  assert.ok(qaSql.includes('tester_handle text not null'));
+  assert.ok(qaSql.includes('app_version text not null'));
+  assert.ok(qaSql.includes('bug_type text not null'));
+  assert.ok(qaSql.includes('screenshot_url text'));
+  assert.ok(qaSql.includes('device_info jsonb not null'));
+  assert.ok(qaSql.includes('local_state_dump jsonb not null'));
+  assert.ok(qaSql.includes('qa-screenshots'));
+
+  // 3. Shake-to-Report Overlay & Companion Web Portal
+  assert.ok(qaOverlayDart.includes('userAccelerometerEventStream'));
+  assert.ok(qaOverlayDart.includes('RenderRepaintBoundary'));
+  assert.ok(qaOverlayDart.includes('qa-screenshots'));
+  assert.ok(qaPortalDart.includes('class QaWebPortalDashboardScreen'));
+  assert.ok(qaPortalDart.includes('LOCAL_STATE_DUMP & DEVICE_INFO JSON'));
+
+  // 4. Surgical injection into lib/main.dart without touching SafeBootErrorBoundary
+  assert.ok(mainDart.includes('SafeBootErrorBoundary(child: ActLikeItApp())'));
+  assert.ok(mainDart.includes('QaBugReporterOverlay'));
+  assert.ok(mainDart.includes("'/qa-dashboard': (_) => const QaWebPortalDashboardScreen()"));
+});
+

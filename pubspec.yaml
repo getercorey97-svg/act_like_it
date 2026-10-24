@@ -31,6 +31,7 @@ dependencies:
   path_provider: ^2.1.4
   connectivity_plus: ^7.3.0
   device_info_plus: ^13.3.0
+  sensors_plus: ^6.1.1
 
   # State Management, Local SQLite/Prefs Persistence, Utilities & Social Sharing
   provider: ^6.1.2
