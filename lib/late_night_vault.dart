@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
 import 'lobby.dart';
+import 'webrtc_manager.dart';
 import 'auth/auth_service.dart';
 import 'monetization/payment_dashboard_screen.dart';
+import 'ui/game_settings_modal.dart';
+import 'ui/parody_scenes_catalog.dart';
 
 /// Categorizes the intensity tiers inside the hidden Late-Night After-Hours Vault.
 enum LateNightSpiceTier {
@@ -305,18 +309,34 @@ class LateNightAfterHoursScreen extends StatefulWidget {
       _LateNightAfterHoursScreenState();
 }
 
-class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
+class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen>
+    with SingleTickerProviderStateMixin {
   late final LateNightVaultGateController _controller;
+  late final AnimationController _wheelSpinController;
   final TextEditingController _birthYearController =
       TextEditingController(text: '1988');
   final TextEditingController _pinController =
       TextEditingController(text: '2026');
+
+  // Fixture #15 (Part A): Speakeasy Dare Wheel state
+  double _wheelRotationRad = 0.0;
+  String? _activeSubtextDare;
+  LateNightPrompt? _spunWheelScene;
+
+  // Fixture #15 (Part B): "LIFE IS IMPROV" Real-World Secret Dare state
+  LifeIsImprovSetting _selectedImprovSetting =
+      LifeIsImprovSetting.housePartyBar;
+  int _activeDossierIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _controller = LateNightVaultGateController();
     _controller.addListener(_onUpdated);
+    _wheelSpinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
   }
 
   void _onUpdated() {
@@ -327,11 +347,79 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
 
   @override
   void dispose() {
+    _wheelSpinController.dispose();
     _controller.removeListener(_onUpdated);
     _controller.dispose();
     _birthYearController.dispose();
     _pinController.dispose();
     super.dispose();
+  }
+
+  void _spinSpeakeasyDareWheel() {
+    HapticFeedback.heavyImpact();
+    final rng = math.Random();
+    final prompts = _controller.prompts;
+    final chosenScene = prompts.isNotEmpty
+        ? prompts[rng.nextInt(prompts.length)]
+        : kLateNightAfterHoursScenes.first;
+    final subtext =
+        kSpeakeasySubtextDares[rng.nextInt(kSpeakeasySubtextDares.length)];
+
+    setState(() {
+      _wheelRotationRad += (math.pi * 4) + rng.nextDouble() * math.pi * 2;
+      _activeSubtextDare = subtext;
+      if (chosenScene is LateNightPrompt) {
+        _spunWheelScene = chosenScene;
+      } else {
+        _spunWheelScene = LateNightPrompt.fromScenePrompt(
+          chosenScene,
+          spiceTier: 3,
+          contentAdvisory: '18+ SPEAKEASY ROULETTE · 1.25x SPICE MULTIPLIER',
+        );
+      }
+    });
+    _wheelSpinController.forward(from: 0.0);
+  }
+
+  List<LifeIsImprovSecretDare> get _filteredImprovDossiers {
+    final matching = kLifeIsImprovSecretDares
+        .where((d) => d.setting == _selectedImprovSetting)
+        .toList();
+    return matching.isEmpty ? kLifeIsImprovSecretDares : matching;
+  }
+
+  void _launchLifeIsImprovStealthStage(LifeIsImprovSecretDare dare) {
+    HapticFeedback.heavyImpact();
+    GameSettingsModal.latestConfig =
+        GameSettingsModal.latestConfig.copyWith(
+      lifeIsImprovMode: true,
+      speakeasyDoubleOrNothingSubtext: true,
+    );
+    final roomCode =
+        (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
+    final scenePrompt = dare.toScenePrompt();
+    final session = LobbySession(
+      id: 'life-is-improv-$roomCode',
+      roomCode: roomCode,
+      hostId: AuthService.instance.currentProfile?.userId ?? 'local-s26-actor',
+      selectedCategory: SceneCategory.specialtyCultClassics,
+      status: 'performing',
+      activeActorId:
+          AuthService.instance.currentProfile?.userId ?? 'local-s26-actor',
+      activeScene: scenePrompt,
+      livekitRoomName: 'act_like_it_$roomCode',
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LiveKitSoundstageScreen(
+          lobbySession: session,
+          localUserId:
+              AuthService.instance.currentProfile?.userId ?? 'local-s26-actor',
+          localDisplayName:
+              AuthService.instance.currentProfile?.username ?? 'Undercover Star',
+        ),
+      ),
+    );
   }
 
   @override
@@ -383,7 +471,9 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
           decoration: BoxDecoration(
             color: const Color(0xF207090E),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFF5DEB3).withValues(alpha: 0.45), width: 1.5),
+            border: Border.all(
+                color: const Color(0xFFF5DEB3).withValues(alpha: 0.45),
+                width: 1.5),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x55520002),
@@ -416,7 +506,7 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Exclusive 18+ high-stakes dramatic dialogues, psychological thrillers, and uncensored prestige scripts with director\'s cut improv twists. Age verification required for soundstage entry.',
+                'Exclusive 18+ high-stakes dramatic dialogues, psychological thrillers, Speakeasy Dare Roulette, and "LIFE IS IMPROV" real-world undercover dares. Age verification required for soundstage entry.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.5,
@@ -530,6 +620,9 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
 
   Widget _buildUnlockedVaultView() {
     final hasVipPass = AuthService.instance.hasVipSpeakeasyPass;
+    final dossiers = _filteredImprovDossiers;
+    final activeDossier = dossiers[_activeDossierIndex % dossiers.length];
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -559,7 +652,7 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
               Expanded(
                 child: Text(
                   hasVipPass
-                      ? 'VIP Speakeasy Pass Active · All Tier 3 Double-Dare Scripts Unlocked'
+                      ? 'VIP Speakeasy Pass Active · All Tier 3 Double-Dare Scripts & Life Is Improv Dossiers Unlocked'
                       : 'VIP Speakeasy Pass (\$4.99/mo) · Unlock All Uncut Tier 3 Scripts & Monthly Drops',
                   style: const TextStyle(
                     fontSize: 12,
@@ -592,6 +685,442 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
             ],
           ),
         ),
+
+        // ===================================================================
+        // FIXTURE #15 (PART B): NEW FLAGSHIP 18+ REAL-WORLD MODE: "LIFE IS IMPROV"
+        // ===================================================================
+        Container(
+          margin: const EdgeInsets.only(bottom: 18),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF230A29),
+                Color(0xFF13071A),
+                Color(0xFF07090E),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFA55577), width: 2.4),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0xFF05070B),
+                offset: Offset(5, 5),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE11342),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFF5DEB3)),
+                    ),
+                    child: const Text(
+                      'FLAGSHIP 18+ REAL-WORLD MODE · 1.50x XP',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    '+2 AI TOKENS ON 80+ SCORE',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFF5DEB3),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '🎭 LIFE IS IMPROV — REAL-WORLD SECRET DARE MODE',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFF5DEB3),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'The world is your soundstage! Pick your real-world setting, study your Classified Secret Dare Dossier, flip to Stealth/POV Camera Mode, and pull off the undercover scenario on real people without breaking character.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: Color(0xFFCBD5E1),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '1. SELECT YOUR REAL-WORLD SETTING:',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0CB6D4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: LifeIsImprovSetting.values.map((setting) {
+                  final selected = _selectedImprovSetting == setting;
+                  return ChoiceChip(
+                    label: Text(
+                      '${setting.emoji} ${setting.label}',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: selected
+                            ? const Color(0xFF07090E)
+                            : const Color(0xFFF5DEB3),
+                      ),
+                    ),
+                    selected: selected,
+                    selectedColor: const Color(0xFFF5DEB3),
+                    backgroundColor: const Color(0xFF140D1F),
+                    onSelected: (_) {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _selectedImprovSetting = setting;
+                        _activeDossierIndex = 0;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              // Classified Secret Dare Dossier Card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF07090E),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFF5DEB3),
+                    width: 1.8,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'CLASSIFIED DOSSIER · ${activeDossier.dossierTitle.toUpperCase()}',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFE11342),
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _activeDossierIndex =
+                                  (_activeDossierIndex + 1) % dossiers.length;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.refresh_rounded,
+                            size: 15,
+                            color: Color(0xFF0CB6D4),
+                          ),
+                          label: const Text(
+                            'NEXT DOSSIER',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0CB6D4),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '🕵️ UNDERCOVER PERSONA: ${activeDossier.undercoverPersona}',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFF5DEB3),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '🗣️ OPENING LINE TO SAY OUT LOUD:\n"${activeDossier.openingLineToSayOutLoud}"',
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        height: 1.42,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF160B18),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFA55577)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '⚡ 15s MID-DARE ESCALATION (HAPTIC DOUBLE-TAP PULSE):\n${activeDossier.midDareEscalation15s}',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              height: 1.38,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '🎯 TARGET ROOM REACTION:\n${activeDossier.targetReactionFromRoom}',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              height: 1.38,
+                              color: Color(0xFF0CB6D4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE11342),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () =>
+                      _launchLifeIsImprovStealthStage(activeDossier),
+                  icon: const Icon(Icons.visibility_off_rounded, size: 18),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '🕵️ LAUNCH STEALTH / POV CAMERA & ROLL SECRET DARE',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ===================================================================
+        // FIXTURE #15 (PART A): 18+ SPEAKEASY DARE WHEEL & SUBTEXT DARES
+        // ===================================================================
+        Container(
+          margin: const EdgeInsets.only(bottom: 18),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF140914),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFA55577), width: 2.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  AnimatedBuilder(
+                    animation: _wheelSpinController,
+                    builder: (context, child) {
+                      final angle =
+                          _wheelRotationRad * Curves.easeOutCubic.transform(
+                        _wheelSpinController.value == 0
+                            ? 1.0
+                            : _wheelSpinController.value,
+                      );
+                      return Transform.rotate(
+                        angle: angle,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const SweepGradient(
+                          colors: [
+                            Color(0xFFE11342),
+                            Color(0xFFA55577),
+                            Color(0xFFF5DEB3),
+                            Color(0xFFE11342),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFFF5DEB3),
+                          width: 2.2,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.casino_rounded,
+                        color: Color(0xFF07090E),
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '🍸 SPEAKEASY DARE WHEEL · DOUBLE-OR-NOTHING',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFF5DEB3),
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'Spin for a Tier 3 (1.25x Spice Multiplier) scene + a Double-or-Nothing Subtext Dare (-10 pts if you chicken out!).',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (_activeSubtextDare != null && _spunWheelScene != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF07090E),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE11342)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🎯 SPUN SCENE: ${_spunWheelScene!.title} (1.25x SPICE MULTIPLIER)',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFF5DEB3),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '🔥 DOUBLE-OR-NOTHING SUBTEXT DARE:\n"$_activeSubtextDare"',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFF5DEB3),
+                            side: const BorderSide(color: Color(0xFFF5DEB3)),
+                          ),
+                          onPressed: () {
+                            GameSettingsModal.latestConfig =
+                                GameSettingsModal.latestConfig.copyWith(
+                              speakeasyDoubleOrNothingSubtext: true,
+                              lifeIsImprovMode: false,
+                            );
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => LobbyMatchmakingScreen(
+                                  startInJoinMode: false,
+                                  initialPromptOverride: _spunWheelScene,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.local_fire_department_rounded,
+                              size: 16),
+                          label: const Text(
+                            'ACCEPT 1.25x DOUBLE-OR-NOTHING DARE',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFA55577),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: _spinSpeakeasyDareWheel,
+                  icon: const Icon(Icons.rotate_left_rounded, size: 18),
+                  label: const Text(
+                    'SPIN SPEAKEASY DARE WHEEL (1.25x SPICE)',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         DropdownButtonFormField<LateNightSpiceTier>(
           value: _controller.selectedTier,
           decoration: const InputDecoration(
@@ -732,6 +1261,10 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () {
+                      GameSettingsModal.latestConfig =
+                          GameSettingsModal.latestConfig.copyWith(
+                        lifeIsImprovMode: false,
+                      );
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => LobbyMatchmakingScreen(

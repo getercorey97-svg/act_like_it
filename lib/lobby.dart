@@ -15,6 +15,7 @@ import 'ui/scene_vault_screen.dart';
 import 'ui/lobby_models_and_realtime.dart';
 import 'ui/premiere_doors_marquee.dart';
 import 'ui/premiere_red_carpet_painters.dart';
+import 'ui/parody_scenes_catalog.dart';
 import 'auth/auth_service.dart';
 
 export 'ui/lobby_models_and_realtime.dart';
@@ -1065,9 +1066,9 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                           ),
                           onPressed: () => _openGreenRoomSceneDrawer(session),
                           icon: const Icon(Icons.menu_book_rounded, size: 15),
-                          label: const Text(
-                            'SCENE DRAWER (90)',
-                            style: TextStyle(
+                          label: Text(
+                            'SCENE DRAWER ($totalGeneralSceneCount)',
+                            style: const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 10.5,
                               fontWeight: FontWeight.w800,
@@ -1156,6 +1157,132 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                       ),
                     ],
                     const SizedBox(height: 14),
+                    // Fixtures #4, #8, #12: 1-Tap Green Room Mode Pills
+                    Builder(
+                      builder: (context) {
+                        final cfg = GameSettingsModal.latestConfig;
+                        final actIndex = ((session.roundNumber - 1) % 3) + 1;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                FilterChip(
+                                  selected: cfg.stoneFacedNoLaughHazard,
+                                  selectedColor: const Color(0x3310B981),
+                                  checkmarkColor: const Color(0xFF10B981),
+                                  label: const Text(
+                                    '🗿 Stone-Faced Hazard (1.20x)',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  onSelected: (v) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      GameSettingsModal.latestConfig = cfg
+                                          .copyWith(stoneFacedNoLaughHazard: v);
+                                    });
+                                  },
+                                ),
+                                FilterChip(
+                                  selected: cfg.threeActBlockbusterTournament,
+                                  selectedColor: const Color(0x33FFD700),
+                                  checkmarkColor: const Color(0xFFFFD700),
+                                  label: const Text(
+                                    '🎬 3-Act Blockbuster Arc',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  onSelected: (v) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      GameSettingsModal.latestConfig =
+                                          cfg.copyWith(
+                                        threeActBlockbusterTournament: v,
+                                      );
+                                    });
+                                  },
+                                ),
+                                FilterChip(
+                                  selected: cfg.bigScreenPremiereHostView,
+                                  selectedColor: const Color(0x330CB6D4),
+                                  checkmarkColor: const Color(0xFF0CB6D4),
+                                  label: const Text(
+                                    '📺 TV / DeX Host View',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  onSelected: (v) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      GameSettingsModal.latestConfig = cfg
+                                          .copyWith(bigScreenPremiereHostView: v);
+                                    });
+                                  },
+                                ),
+                                FilterChip(
+                                  selected: cfg.cleanBroadcastScreenShareMode,
+                                  selectedColor: const Color(0x3310B981),
+                                  checkmarkColor: const Color(0xFF10B981),
+                                  label: const Text(
+                                    '📡 Clean Broadcast',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  onSelected: (v) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      GameSettingsModal.latestConfig =
+                                          cfg.copyWith(
+                                        cleanBroadcastScreenShareMode: v,
+                                      );
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            if (cfg.threeActBlockbusterTournament) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0B0E17),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(0xFFFFD700),
+                                  ),
+                                ),
+                                child: Text(
+                                  '🎬 3-ACT BLOCKBUSTER ARC · CURRENT: ACT $actIndex OF 3\n'
+                                  'Act I: The Setup (Era/Cult) → Act II: The Complication (+Curveball) → Act III: The Showstopper Climax (1.5x)',
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 9.5,
+                                    height: 1.35,
+                                    color: Color(0xFFF5DEB3),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -1344,10 +1471,10 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'GREEN ROOM SCENE DRAWER · 90 GENERAL SCRIPTS',
-                              style: TextStyle(
+                              'GREEN ROOM SCENE DRAWER · $totalGeneralSceneCount GENERAL SCRIPTS',
+                              style: const TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,

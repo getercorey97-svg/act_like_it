@@ -924,6 +924,108 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
 
           const SizedBox(height: 16),
 
+          // Fixture #9 & #15: 5-Tier Character Mastery Track & Undercover Legend Frame
+          Builder(
+            builder: (context) {
+              final activeArchetype =
+                  resolveAvatarArchetype(profile.avatarArchetypeId);
+              final totalTakes = offline.matchHistoryLog.length + 3;
+              final masteryTier = ((totalTakes ~/ 2) + 1).clamp(1, 5);
+              const tierNames = <String>[
+                'Tier 1: Understudy',
+                'Tier 2: Featured Extra',
+                'Tier 3: Method Specialist (Golden Aura Unlocked)',
+                'Tier 4: Box Office Draw',
+                'Tier 5: Studio Legend (Layer 5 Animated Prop FX Unlocked)',
+              ];
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B0E17),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFFFFD700),
+                    width: 1.8,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '🎖️ 5-TIER CHARACTER MASTERY · ${activeArchetype.name.toUpperCase()}',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFFD700),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0x33A55577),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFA55577)),
+                          ),
+                          child: const Text(
+                            '🕵️ UNDERCOVER LEGEND FRAME',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFF5DEB3),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      tierNames[masteryTier - 1],
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: (masteryTier / 5.0).clamp(0.2, 1.0),
+                        minHeight: 7,
+                        backgroundColor: const Color(0xFF1E293B),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xFFFFD700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Layer 5 Animated Prop FX: Method Actor (24K Gold Skull) · Mob Boss (Ember Cigar Smoke) · Diva (Diamond Flashbulb Halo) · Sci-Fi Pilot (Cyan Visor HUD)',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        height: 1.35,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 16),
+
           // 4. Onboarding & Acting DNA Summary (Editable)
           Container(
             padding: const EdgeInsets.all(16),

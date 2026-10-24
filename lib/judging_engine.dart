@@ -204,9 +204,19 @@ class TriModalJudgingEngine extends ChangeNotifier {
   bool _lastRoundWasWin = false;
   String? _roundHistoryId;
   double _improvBonus = 0.0;
+  bool _characterBrokenPenalty = false;
+  bool _standingOvationCrowdCombo = false;
+  bool _isLifeIsImprovTake = false;
+  bool _speakeasySubtextMultiplierActive = false;
+  static int spectatorTokenShards = 2;
+  static bool undercoverLegendUnlocked = false;
 
   AiTelemetricsReport? get aiReport => _aiReport;
   double get improvBonus => _improvBonus;
+  bool get characterBrokenPenalty => _characterBrokenPenalty;
+  bool get standingOvationCrowdCombo => _standingOvationCrowdCombo;
+  bool get isLifeIsImprovTake => _isLifeIsImprovTake;
+  bool get speakeasySubtextMultiplierActive => _speakeasySubtextMultiplierActive;
   bool get hasSavedMatchHistory => _hasSavedMatchHistory;
   bool get lastRoundWasWin => _lastRoundWasWin;
   String? get roundHistoryId => _roundHistoryId;
@@ -216,9 +226,126 @@ class TriModalJudgingEngine extends ChangeNotifier {
   bool get isUploadingLoop => _isUploadingLoop;
   String? get errorMessage => _errorMessage;
 
-  void setImprovTwistCompleted(bool completed) {
+  void setImprovTwistCompleted(
+    bool completed, {
+    bool characterBroken = false,
+    bool crowdCombo = false,
+    bool lifeIsImprov = false,
+    bool speakeasySubtext = false,
+  }) {
     _improvBonus = completed ? 5.0 : 0.0;
+    _characterBrokenPenalty = characterBroken;
+    _standingOvationCrowdCombo = crowdCombo;
+    _isLifeIsImprovTake = lifeIsImprov;
+    _speakeasySubtextMultiplierActive = speakeasySubtext;
     _safeNotifyListeners();
+  }
+
+  /// Fixture #2: Top 2 millisecond telemetry peak stamps for video loop & Premiere Reel export.
+  List<String> get millisecondReceiptStamps {
+    final r = _aiReport;
+    if (r == null) {
+      return const <String>[
+        '[00:01.18] 🔥 +8.5 PT VOCAL PEAK (-14.2 dBFS)',
+        '[00:03.90] 🎭 +6.2 PT EMOTIONAL SHIFT (91% INTENSITY)',
+      ];
+    }
+    final stamps = <String>[];
+    if (r.vocalProsodyShifts.isNotEmpty) {
+      final v = r.vocalProsodyShifts.first;
+      final sec = (v.timestampMs / 1000.0).toStringAsFixed(2).padLeft(5, '0');
+      stamps.add(
+        '[00:$sec] 🔥 ${v.impactOnScore.toUpperCase()} VOCAL PEAK (${v.decibelLevelDb.toStringAsFixed(1)} dBFS)',
+      );
+    }
+    if (r.facialMicroExpressions.isNotEmpty) {
+      final f = r.facialMicroExpressions.first;
+      final sec = (f.timestampMs / 1000.0).toStringAsFixed(2).padLeft(5, '0');
+      stamps.add(
+        '[00:$sec] 🎭 ${f.impactOnScore.toUpperCase()} ${f.microExpression.toUpperCase()}',
+      );
+    }
+    if (stamps.isEmpty) {
+      stamps.add('[00:01.42] 🔥 +8.0 PT VOCAL PROJECTION LOCK (-15.0 dBFS)');
+    }
+    return stamps.take(2).toList();
+  }
+
+  /// Fixture #11: AI Co-Star Personalities & Voting Biases in Peer Judging.
+  List<({String name, String biasTag, double score, String quote})>
+      get aiCoStarVerdicts {
+    final facial = _aiReport?.facialExpressionScore ?? 86.0;
+    final vocal = _aiReport?.vocalCadenceScore ?? 85.0;
+    final cue = _aiReport?.directorCueFidelity ?? 86.0;
+    final criticScore = ((cue * 0.65) + (facial * 0.35)).clamp(55.0, 99.0);
+    final stuntScore =
+        ((vocal * 0.65) + (_improvBonus > 0 ? 95.0 : 78.0) * 0.35)
+            .clamp(55.0, 99.0);
+    final divaScore = ((facial * 0.70) + (vocal * 0.30)).clamp(55.0, 99.0);
+    return [
+      (
+        name: 'The Veteran Film Critic',
+        biasTag: 'Rewards Cue Fidelity · Punishes Missed Pacing',
+        score: criticScore,
+        quote: criticScore >= 85
+            ? 'Impeccable subtext and pacing on the turn.'
+            : 'Watch your beat timing before the final line.',
+      ),
+      (
+        name: 'Blaze Mercer (Stunt Double)',
+        biasTag: 'Rewards High dB Projection & Curveball Commitment',
+        score: stuntScore,
+        quote: _improvBonus > 0
+            ? 'You ate that 15-second curveball without blinking!'
+            : 'Project from the diaphragm and swing bigger!',
+      ),
+      (
+        name: 'Valentina Lux (The Diva)',
+        biasTag: 'Rewards Dramatic Facial Range & Camera Magnetism',
+        score: divaScore,
+        quote: divaScore >= 85
+            ? 'Darling, the close-up lens adores you.'
+            : 'Give the camera more fire in the eyes, darling.',
+      ),
+    ];
+  }
+
+  /// Fixture #15 (Part B): 5-Pillar Real-World "Life Is Improv" Breakdown (20 pts each = 100).
+  List<({String pillar, double pointsOutOf20, String note})>
+      get lifeIsImprovFivePillars {
+    final f = (_aiReport?.facialExpressionScore ?? 88.0) / 5.0;
+    final v = (_aiReport?.vocalCadenceScore ?? 87.0) / 5.0;
+    final c = (_aiReport?.directorCueFidelity ?? 89.0) / 5.0;
+    return [
+      (
+        pillar: '1. Deadpan Commitment (No-Break / No-Smirk)',
+        pointsOutOf20: (_characterBrokenPenalty ? (f - 4.5) : (f + 1.2))
+            .clamp(8.0, 20.0),
+        note: _characterBrokenPenalty
+            ? 'Caught a smirk mid-dare (-15 pt hazard)'
+            : 'Zero character breaks under live pressure',
+      ),
+      (
+        pillar: '2. Opening Line & 15s Escalation Execution',
+        pointsOutOf20: (c + (_improvBonus > 0 ? 1.5 : 0.4)).clamp(10.0, 20.0),
+        note: 'Delivered the classified opening line & 15s double-tap twist',
+      ),
+      (
+        pillar: '3. Live Room / Bystander Reaction',
+        pointsOutOf20: ((peerScore / 5.0) + 0.8).clamp(10.0, 20.0),
+        note: 'Authentic room acoustics & unscripted bystander energy',
+      ),
+      (
+        pillar: '4. Improvisational Recovery',
+        pointsOutOf20: ((c + v) / 2.0 + 0.9).clamp(10.0, 20.0),
+        note: 'Pivoted cleanly off real-world interruptions',
+      ),
+      (
+        pillar: '5. Vocal & Physical Confidence',
+        pointsOutOf20: (v + 1.0).clamp(10.0, 20.0),
+        note: 'Natural conversational cadence without reading tone',
+      ),
+    ];
   }
 
   void _safeNotifyListeners() {
@@ -298,9 +425,27 @@ class TriModalJudgingEngine extends ChangeNotifier {
 
   double get compositeTriModalScore {
     final w = normalizedWeights;
-    final baseScore =
-        (aiScore * w.aiW) + (peerScore * w.peerW) + (socialScore * w.socialW);
-    return (baseScore + _improvBonus).clamp(0.0, 100.0);
+    final cfg = GameSettingsModal.latestConfig;
+    double score =
+        (aiScore * w.aiW) + (peerScore * w.peerW) + (socialScore * w.socialW) + _improvBonus;
+    // Fixture #4: Stone-Faced 1.20x Method Bonus or -15pt Character Broken penalty
+    if (cfg.stoneFacedNoLaughHazard) {
+      if (_characterBrokenPenalty) {
+        score -= 15.0;
+      } else {
+        score *= 1.20;
+      }
+    }
+    // Fixture #7: Standing Ovation Crowd Combo (1.15x)
+    if (_standingOvationCrowdCombo) {
+      score *= 1.15;
+    }
+    // Fixture #15: Speakeasy Double-or-Nothing Subtext Dare (1.25x)
+    if (_speakeasySubtextMultiplierActive ||
+        cfg.speakeasyDoubleOrNothingSubtext) {
+      score *= 1.25;
+    }
+    return score.clamp(0.0, 100.0);
   }
 
   ({String title, String subtitle, Color accent}) get showstopperArchetype {
@@ -764,6 +909,7 @@ Return strict JSON matching this exact schema:
         : 'OFFICIAL HOLLYWOOD SCREEN TEST';
     final shareUrl = _supabaseLoopUrl ?? 'https://github.com/act_like_it';
 
+    final receipts = millisecondReceiptStamps.join('\n');
     final payload = '''
 🎬 ACT LIKE IT — HOLLYWOOD CRITIC'S SCORECARD 🎬
 ⭐ $stamp ⭐
@@ -776,6 +922,10 @@ Scene: "${scene.title}" — ${scene.characterName} (${scene.filmOrSeries}, ${sce
 • Vocal Cadence: ${(_aiReport?.vocalCadenceScore ?? 85).toStringAsFixed(0)}/100
 • Cue Fidelity: ${(_aiReport?.directorCueFidelity ?? 86).toStringAsFixed(0)}/100
 • Peer Score: ${peerScore.toStringAsFixed(0)}/100
+👑 Kingmaker / Executive Producer: @ENSEMBLE_VIP (+50 XP)
+
+⏱️ MILLISECOND AI RECEIPTS:
+$receipts
 
 🗣️ Critic's Verdict: "$criticQuote"
 Watch Premiere Reel: $shareUrl
@@ -905,6 +1055,8 @@ class TriModalJudgingScreen extends StatefulWidget {
   final Uint8List? recordedMp4Bytes;
   final bool isOfflineLocalParty;
   final bool improvTwistCompleted;
+  final bool characterBrokenPenalty;
+  final bool standingOvationCrowdCombo;
 
   const TriModalJudgingScreen({
     super.key,
@@ -916,6 +1068,8 @@ class TriModalJudgingScreen extends StatefulWidget {
     this.recordedMp4Bytes,
     this.isOfflineLocalParty = false,
     this.improvTwistCompleted = false,
+    this.characterBrokenPenalty = false,
+    this.standingOvationCrowdCombo = false,
   });
 
   @override
@@ -932,6 +1086,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   bool _queuedForOfflineAi = false;
   bool _isPlaying = true;
   bool _isMuted = false;
+  bool _lifeImprovRewardClaimed = false;
 
   ScenePrompt get _scene =>
       widget.lobbySession.activeScene ??
@@ -942,9 +1097,25 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _engine = TriModalJudgingEngine();
-    _engine.setImprovTwistCompleted(widget.improvTwistCompleted);
+    final cfg = GameSettingsModal.latestConfig;
+    final isLifeImprov =
+        cfg.lifeIsImprovMode || _scene.id.startsWith('life_improv_');
+    _engine.setImprovTwistCompleted(
+      widget.improvTwistCompleted,
+      characterBroken: widget.characterBrokenPenalty,
+      crowdCombo: widget.standingOvationCrowdCombo,
+      lifeIsImprov: isLifeImprov,
+      speakeasySubtext: cfg.speakeasyDoubleOrNothingSubtext,
+    );
     _engine.addListener(_onEngineUpdated);
     _playOneShotVerdictSting();
+
+    // Fixture #7: Credit Spectator Hype Shard (+25 XP & +1 Shard; 3 Shards = +1 Free AI Token)
+    TriModalJudgingEngine.spectatorTokenShards += 1;
+    if (TriModalJudgingEngine.spectatorTokenShards >= 3) {
+      TriModalJudgingEngine.spectatorTokenShards = 0;
+      unawaited(AuthService.instance.addAiTokens(1));
+    }
 
     _engine
         .evaluatePerformanceWithGemini(
@@ -962,18 +1133,32 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
         isOfflineLocalParty: widget.isOfflineLocalParty,
       );
       final profile = AuthService.instance.currentProfile;
+      // Fixture #15 (Part B): +2 Free AI Tokens & "Undercover Legend" unlock for Life Is Improv >= 80.0
+      if (_engine.isLifeIsImprovTake &&
+          _engine.compositeTriModalScore >= 80.0 &&
+          !_lifeImprovRewardClaimed) {
+        _lifeImprovRewardClaimed = true;
+        TriModalJudgingEngine.undercoverLegendUnlocked = true;
+        await AuthService.instance.addAiTokens(2);
+      }
       await CuttingRoomFeedStore.publishCompletedPerformance(
-        takeId: 'crf_live_${saved.id}',
+        takeId: _engine.isLifeIsImprovTake
+            ? 'life_improv_${saved.id}'
+            : 'crf_live_${saved.id}',
         actorHandle:
             '@${(profile?.username ?? widget.performerDisplayName).toUpperCase()}',
         avatarArchetypeId: profile?.avatarArchetypeId ?? 'the_method_actor',
-        sceneTitle: _scene.title,
+        sceneTitle: _engine.isLifeIsImprovTake
+            ? '🕵️ [LIFE IS IMPROV] ${_scene.title}'
+            : _scene.title,
         filmOrSeries: _scene.filmOrSeries,
         releaseYear: _scene.releaseYear,
         scriptExcerpt: '"${_scene.promptScript}"',
-        directorCommentStamp: _engine.compositeTriModalScore >= 85.0
-            ? 'STANDING OVATION · CERTIFIED FRESH'
-            : 'OFFICIAL STUDIO SCREEN TEST',
+        directorCommentStamp: _engine.isLifeIsImprovTake
+            ? 'UNDERCOVER LEGEND · 1.50x FEARLESS IMPROV XP'
+            : (_engine.compositeTriModalScore >= 85.0
+                ? 'STANDING OVATION · CERTIFIED FRESH'
+                : 'OFFICIAL STUDIO SCREEN TEST'),
         compositeScore: _engine.compositeTriModalScore,
         videoUrl: _engine.supabaseLoopUrl,
       );
@@ -1175,23 +1360,56 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                   Positioned(
                     top: 12,
                     left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'VIDEO LOOP · AUTO-REPLAY ENABLED',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 10,
-                          color: Color(0xFF10B981),
+                    right: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'VIDEO LOOP · AUTO-REPLAY ENABLED',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 6),
+                        // Fixture #2: Millisecond AI Receipt Overlays on Video Loop
+                        for (final receipt in _engine.millisecondReceiptStamps)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xD905070B),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFFD700),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Text(
+                              receipt,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFF5DEB3),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   Positioned(
@@ -1398,6 +1616,58 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                         ),
                       ),
                     ],
+                    if (_engine.isLifeIsImprovTake) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF14091E),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFA55577), width: 1.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '🕵️ LIFE IS IMPROV · 5-PILLAR REAL-WORLD AI VERDICT (1.50x XP)',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFFFD700),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            for (final p in _engine.lifeIsImprovFivePillars)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Text(
+                                  '• ${p.pillar}: ${p.pointsOutOf20.toStringAsFixed(1)}/20 — ${p.note}',
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10.5,
+                                    color: Color(0xFFF5DEB3),
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                            if (_engine.compositeTriModalScore >= 80.0)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 4),
+                                child: Text(
+                                  '🏆 80+ REAL-WORLD BONUS UNLOCKED: +2 Free AI Tokens & "Undercover Legend" Neon Violet Frame!',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -1565,6 +1835,57 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                             ? 'Queued in Store & Forward Engine'
                             : 'Save Local Video & Queue Gemini AI Judging',
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Fixture #11: AI Co-Star Personalities & Voting Biases
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B0F17),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '🤖 AI CO-STAR ENSEMBLE VOTING BIASES (SOLO & FILL-IN PANEL)',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0CB6D4),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final judge in _engine.aiCoStarVerdicts)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 7),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${judge.name} · ${judge.score.toStringAsFixed(0)}/100 (${judge.biasTag})',
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFF5DEB3),
+                                  ),
+                                ),
+                                Text(
+                                  '"${judge.quote}"',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontStyle: FontStyle.italic,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -2374,6 +2695,24 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
               fontFamily: 'monospace',
               fontSize: 11,
               color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0x26FFD700),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFFD700)),
+            ),
+            child: Text(
+              '👑 KINGMAKER / EXECUTIVE PRODUCER: @ENSEMBLE_VIP (+50 XP · +25 Hype XP · Shards: ${TriModalJudgingEngine.spectatorTokenShards}/3)',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFF5DEB3),
+              ),
             ),
           ),
           const SizedBox(height: 14),

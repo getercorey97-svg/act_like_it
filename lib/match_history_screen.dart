@@ -92,6 +92,88 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 14),
+                // Fixture #10: Walk of Fame Brass Star Plaque
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF120D18),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF5DEB3), width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.stars_rounded,
+                        color: Color(0xFFFFD700),
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '⭐ HOLLYWOOD WALK OF FAME BRASS STAR PLAQUE',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFFFD700),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Engraved on Red Carpet · Peak Composite: ${mgr.averageFinalScore > 96.4 ? mgr.averageFinalScore.toStringAsFixed(1) : "96.4"}/100 · Wins: $totalWins · Era: 1970–1999',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                color: Color(0xFFF5DEB3),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Fixture #17: Sunday Night Box Office Weekly Awards (7-Day Rolling Leaderboard)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B0E17),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🏆 SUNDAY NIGHT BOX OFFICE AWARDS · 7-DAY ROLLING LEADERS',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFFFD700),
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        '1. Best Overall Actor (Highest Composite): @METHOD_MAVERICK — 96.4/100\n'
+                        '2. Biggest Scene Stealer (Best Duet Co-Star): @SCARLETT_VANE — 95.6/100\n'
+                        '3. Crowd Favorite (Most Golden Roses & Ovations): @FLASHBULB_FINN — 418 🌹\n'
+                        '4. Most Fearless Real-World Daredevil ("Life Is Improv"): @UNDERCOVER_MAVERICK — 97.2/100',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          height: 1.4,
+                          color: Color(0xFFCBD5E1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 20),
                 if (records.isEmpty)
                   Container(

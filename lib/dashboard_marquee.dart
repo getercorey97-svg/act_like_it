@@ -17,6 +17,7 @@ import 'ui/scene_vault_screen.dart';
 import 'ui/transitions.dart';
 import 'ui/intro_cinematic.dart';
 import 'ui/brand_logo.dart';
+import 'ui/parody_scenes_catalog.dart';
 import 'social/cutting_room_feed.dart';
 import 'auth/auth_service.dart';
 import 'profile/actor_profile_screen.dart';
@@ -777,6 +778,12 @@ class _LivingMarqueeDashboardScreenState
                                       trailingControls:
                                           _buildPaparazziPremiereHeader(),
                                     ),
+                                    const SizedBox(height: 12),
+                                    // Fixture #3: Daily Cattle Call — Global 24-Hour Challenge Banner
+                                    _buildDailyCattleCallCard(),
+                                    const SizedBox(height: 10),
+                                    // Fixture #10: First-Person Walk of Fame Brass Star Plaque on the Red Carpet
+                                    _buildWalkOfFameBrassStarPlaque(),
                                   ],
                                 ),
                               ),
@@ -910,6 +917,224 @@ class _LivingMarqueeDashboardScreenState
           ),
         ),
       ],
+    );
+  }
+
+  /// Fixture #3: Daily Cattle Call — Global 24-Hour Challenge Card (0 AI Tokens for first daily attempt).
+  Widget _buildDailyCattleCallCard() {
+    final challenge = getTodaysDailyCattleCallChallenge();
+    final nowUtc = DateTime.now().toUtc();
+    final hoursLeft = (23 - nowUtc.hour).clamp(1, 24);
+    final minsLeft = (59 - nowUtc.minute).clamp(0, 59);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xEB1B0A12), Color(0xEB0B0F1A)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFD700), width: 2.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(4, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '🎬 DAILY CATTLE CALL · GLOBAL 24H CHALLENGE',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0x3310B981),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF10B981)),
+                ),
+                child: Text(
+                  'RESETS IN ${hoursLeft}h ${minsLeft}m · 0 TOKENS',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Today\'s Global Scene (#${challenge.sceneNumberOf90}/90): "${challenge.scene.title}" — ${challenge.scene.characterName} (${challenge.scene.releaseYear})',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Daily Curveball: ${challenge.dailyCurveball}',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 10.5,
+              color: Color(0xFF0CB6D4),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD700),
+                foregroundColor: const Color(0xFF05070B),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              ),
+              onPressed: () async {
+                HapticFeedback.heavyImpact();
+                await _pauseMusicBeforeNavigation();
+                if (!mounted) return;
+                final roomCode = LobbyRealtimeManager.generateSixDigitCode();
+                final prompt = ScenePrompt(
+                  id: challenge.scene.id,
+                  category: SceneCategory.era1970To1999,
+                  title: challenge.scene.title,
+                  filmOrSeries: 'Daily Cattle Call (${challenge.dateKeyUtc})',
+                  releaseYear: challenge.scene.releaseYear,
+                  characterName: challenge.scene.characterName,
+                  promptScript: challenge.scene.script,
+                  directorCue: challenge.scene.directorNote,
+                  emotionalTarget: challenge.scene.targetEmotion,
+                  duetLeadA: challenge.scene.duetLeadA,
+                  duetLeadB: challenge.scene.duetLeadB,
+                  improvTwist: challenge.dailyCurveball,
+                );
+                final directSession = LobbySession(
+                  id: 'cattle_call_${challenge.dateKeyUtc}',
+                  roomCode: roomCode,
+                  hostId: 'local-s26-actor',
+                  selectedCategory: SceneCategory.era1970To1999,
+                  status: 'performing',
+                  activeActorId: 'local-s26-actor',
+                  activeScene: prompt,
+                  livekitRoomName: 'act_like_it_$roomCode',
+                );
+                await Navigator.of(context).push(
+                  StageSharedTransitionRoute(
+                    page: LiveKitSoundstageScreen(
+                      lobbySession: directSession,
+                      localUserId: 'local-s26-actor',
+                      localDisplayName: AuthService
+                              .instance.currentProfile?.displayName ??
+                          'Galaxy S26 Actor',
+                    ),
+                  ),
+                );
+                _refreshVipHudState();
+              },
+              icon: const Icon(Icons.campaign_rounded, size: 18),
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '🎬 AUDITION TODAY\'S CATTLE CALL (FREE DAILY ENTRY · TOP 10 REEL)',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Fixture #10: First-Person Walk of Fame Brass Star embedded in the Red Carpet floor.
+  Widget _buildWalkOfFameBrassStarPlaque() {
+    final profile = AuthService.instance.currentProfile;
+    final handle = profile?.username.isNotEmpty == true
+        ? '@${profile!.username.toUpperCase()}'
+        : '@GALAXY_S26_ACTOR';
+    final wins = OfflineManager.instance.totalCareerWins;
+    final avg = OfflineManager.instance.averageFinalScore;
+    final bestScore = math.max(96.4, avg);
+
+    return GestureDetector(
+      onTap: () async {
+        HapticFeedback.lightImpact();
+        await _pauseMusicBeforeNavigation();
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          StageSharedTransitionRoute(
+            page: const MatchHistoryScreen(),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xD9120D16),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFF5DEB3), width: 1.6),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.stars_rounded,
+              color: Color(0xFFFFD700),
+              size: 26,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⭐ HOLLYWOOD WALK OF FAME BRASS STAR · $handle',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Highest Verdict: ${bestScore.toStringAsFixed(1)}/100 · Academy Wins: $wins · Signature Era: 1970–1999',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 9.5,
+                      color: Color(0xFFF5DEB3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

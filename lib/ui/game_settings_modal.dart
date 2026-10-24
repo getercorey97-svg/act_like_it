@@ -13,6 +13,12 @@ class GameSettingsConfig {
   final bool socialJudgingEnabled;
   final bool improvRouletteWildcard;
   final bool screenTestDuetMode;
+  final bool stoneFacedNoLaughHazard;
+  final bool threeActBlockbusterTournament;
+  final bool bigScreenPremiereHostView;
+  final bool cleanBroadcastScreenShareMode;
+  final bool lifeIsImprovMode;
+  final bool speakeasyDoubleOrNothingSubtext;
   final int roundsCount;
   final String turnMode; // 'pass_and_play' | 'cross_internet_live'
 
@@ -22,9 +28,53 @@ class GameSettingsConfig {
     this.socialJudgingEnabled = true,
     this.improvRouletteWildcard = false,
     this.screenTestDuetMode = false,
+    this.stoneFacedNoLaughHazard = false,
+    this.threeActBlockbusterTournament = false,
+    this.bigScreenPremiereHostView = false,
+    this.cleanBroadcastScreenShareMode = false,
+    this.lifeIsImprovMode = false,
+    this.speakeasyDoubleOrNothingSubtext = false,
     this.roundsCount = 3,
     this.turnMode = 'cross_internet_live',
   });
+
+  GameSettingsConfig copyWith({
+    bool? aiTelemetricsEnabled,
+    bool? peerJudgingEnabled,
+    bool? socialJudgingEnabled,
+    bool? improvRouletteWildcard,
+    bool? screenTestDuetMode,
+    bool? stoneFacedNoLaughHazard,
+    bool? threeActBlockbusterTournament,
+    bool? bigScreenPremiereHostView,
+    bool? cleanBroadcastScreenShareMode,
+    bool? lifeIsImprovMode,
+    bool? speakeasyDoubleOrNothingSubtext,
+    int? roundsCount,
+    String? turnMode,
+  }) {
+    return GameSettingsConfig(
+      aiTelemetricsEnabled: aiTelemetricsEnabled ?? this.aiTelemetricsEnabled,
+      peerJudgingEnabled: peerJudgingEnabled ?? this.peerJudgingEnabled,
+      socialJudgingEnabled: socialJudgingEnabled ?? this.socialJudgingEnabled,
+      improvRouletteWildcard:
+          improvRouletteWildcard ?? this.improvRouletteWildcard,
+      screenTestDuetMode: screenTestDuetMode ?? this.screenTestDuetMode,
+      stoneFacedNoLaughHazard:
+          stoneFacedNoLaughHazard ?? this.stoneFacedNoLaughHazard,
+      threeActBlockbusterTournament:
+          threeActBlockbusterTournament ?? this.threeActBlockbusterTournament,
+      bigScreenPremiereHostView:
+          bigScreenPremiereHostView ?? this.bigScreenPremiereHostView,
+      cleanBroadcastScreenShareMode:
+          cleanBroadcastScreenShareMode ?? this.cleanBroadcastScreenShareMode,
+      lifeIsImprovMode: lifeIsImprovMode ?? this.lifeIsImprovMode,
+      speakeasyDoubleOrNothingSubtext:
+          speakeasyDoubleOrNothingSubtext ?? this.speakeasyDoubleOrNothingSubtext,
+      roundsCount: roundsCount ?? this.roundsCount,
+      turnMode: turnMode ?? this.turnMode,
+    );
+  }
 }
 
 /// "The Call Sheet" Pre-Game Settings Modal designed for `showModalBottomSheet`.
@@ -64,6 +114,14 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
   bool _improvRouletteWildcard =
       GameSettingsModal.latestConfig.improvRouletteWildcard;
   bool _screenTestDuetMode = GameSettingsModal.latestConfig.screenTestDuetMode;
+  bool _stoneFacedNoLaughHazard =
+      GameSettingsModal.latestConfig.stoneFacedNoLaughHazard;
+  bool _threeActBlockbusterTournament =
+      GameSettingsModal.latestConfig.threeActBlockbusterTournament;
+  bool _bigScreenPremiereHostView =
+      GameSettingsModal.latestConfig.bigScreenPremiereHostView;
+  bool _cleanBroadcastScreenShareMode =
+      GameSettingsModal.latestConfig.cleanBroadcastScreenShareMode;
   int _roundsCount = GameSettingsModal.latestConfig.roundsCount;
   String _turnMode = GameSettingsModal.latestConfig.turnMode;
 
@@ -129,7 +187,14 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
       socialJudgingEnabled: _socialJudgingEnabled,
       improvRouletteWildcard: _improvRouletteWildcard,
       screenTestDuetMode: _screenTestDuetMode,
-      roundsCount: _roundsCount,
+      stoneFacedNoLaughHazard: _stoneFacedNoLaughHazard,
+      threeActBlockbusterTournament: _threeActBlockbusterTournament,
+      bigScreenPremiereHostView: _bigScreenPremiereHostView,
+      cleanBroadcastScreenShareMode: _cleanBroadcastScreenShareMode,
+      lifeIsImprovMode: GameSettingsModal.latestConfig.lifeIsImprovMode,
+      speakeasyDoubleOrNothingSubtext:
+          GameSettingsModal.latestConfig.speakeasyDoubleOrNothingSubtext,
+      roundsCount: _threeActBlockbusterTournament ? 3 : _roundsCount,
       turnMode: _turnMode,
     );
     GameSettingsModal.latestConfig = config;
@@ -361,6 +426,71 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                 onChanged: (val) {
                   HapticFeedback.mediumImpact();
                   setState(() => _screenTestDuetMode = val);
+                },
+              ),
+              const SizedBox(height: 18),
+
+              // Fixture #4: Break Character / No-Laugh Hazard Setting
+              _buildStudioSoundboardToggle(
+                channelCode: 'HAZARD · 1.20x STONE-FACED BONUS / -15 PT BREAK',
+                title: 'Stone-Faced Method Mode (No-Laugh Hazard)',
+                subtitle:
+                    'Stay deadpan while spectators hurl tomatoes & roses! Cracking a laugh triggers a -15 pt siren; surviving awards 1.20x!',
+                icon: Icons.sentiment_neutral_rounded,
+                neonColor: const Color(0xFFE11342),
+                value: _stoneFacedNoLaughHazard,
+                onChanged: (val) {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _stoneFacedNoLaughHazard = val);
+                },
+              ),
+              const SizedBox(height: 18),
+
+              // Fixture #8: The 3-Act Blockbuster Tournament Mode
+              _buildStudioSoundboardToggle(
+                channelCode: 'TOURNAMENT · ACT I CATTLE CALL → ACT II DUET → ACT III 1.25x FINALE',
+                title: 'The 3-Act Blockbuster Tournament',
+                subtitle:
+                    'Structured 3-Act arc: Act I Solo Warm-Up, Act II Chemistry Read Duets, and Act III Director\'s Cut Finale (1.25x Weight + Double Curveballs)',
+                icon: Icons.emoji_events_rounded,
+                neonColor: const Color(0xFFF5DEB3),
+                value: _threeActBlockbusterTournament,
+                onChanged: (val) {
+                  HapticFeedback.mediumImpact();
+                  setState(() {
+                    _threeActBlockbusterTournament = val;
+                    if (val) _roundsCount = 3;
+                  });
+                },
+              ),
+              const SizedBox(height: 18),
+
+              // Fixture #12: Big Screen Premiere Mode (TV / Laptop / Samsung DeX / Screen-Share)
+              _buildStudioSoundboardToggle(
+                channelCode: 'BIG SCREEN · TV / SAMSUNG DeX / SCREEN-SHARE HOST VIEW',
+                title: '📺 TV / DeX / Screen-Share Host View',
+                subtitle:
+                    '3-pane Studio Control Deck on wide displays + keyboard shortcuts (Spacebar = Roll/Cut, 1–0 = Peer Score)',
+                icon: Icons.tv_rounded,
+                neonColor: const Color(0xFF0CB6D4),
+                value: _bigScreenPremiereHostView,
+                onChanged: (val) {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _bigScreenPremiereHostView = val);
+                },
+              ),
+              const SizedBox(height: 14),
+              _buildStudioSoundboardToggle(
+                channelCode: 'STREAM SAFE · ZOOM / DISCORD / TWITCH / SMART VIEW',
+                title: '📡 Clean Broadcast / Screen-Share Mode',
+                subtitle:
+                    'Locks high-contrast 16:9 framing, hides floating debug/QA chrome & routes echo-free IN_COMMUNICATION audio',
+                icon: Icons.cast_connected_rounded,
+                neonColor: const Color(0xFF10B981),
+                value: _cleanBroadcastScreenShareMode,
+                onChanged: (val) {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _cleanBroadcastScreenShareMode = val);
                 },
               ),
               const SizedBox(height: 22),

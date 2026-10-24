@@ -2077,3 +2077,270 @@ final List<ScenePrompt> kAll100ParodyScenes = <ScenePrompt>[
   ...kSpecialtyBlockbusterSciFiScenes,
   ...kLateNightAfterHoursScenes,
 ];
+
+/// Dynamic runtime list of custom scenes generated in The Writer's Room (Fixture #13).
+final List<ScenePrompt> kWritersRoomCustomScenes = <ScenePrompt>[];
+
+/// Dynamic elastic count of all general scenes (90 base + custom Writer's Room scenes).
+int get totalGeneralSceneCount {
+  int baseCount = 0;
+  for (final list in kParodyGeneralScenesByCategory.values) {
+    baseCount += list.length;
+  }
+  return baseCount + kWritersRoomCustomScenes.length;
+}
+
+/// Dynamic elastic count of all catalog scenes (90 general + 10 18+ + custom scenes).
+int get totalCatalogSceneCount =>
+    kAll100ParodyScenes.length + kWritersRoomCustomScenes.length;
+
+/// Deterministic 24-Hour Global Challenge ("Cyborg-Director's Daily Cattle Call" — Fixture #3).
+class DailyCattleCallChallenge {
+  final String utcDateKey;
+  final ScenePrompt featuredScene;
+  final String mandatoryCurveball;
+  final Duration timeRemainingUntilReset;
+
+  const DailyCattleCallChallenge({
+    required this.utcDateKey,
+    required this.featuredScene,
+    required this.mandatoryCurveball,
+    required this.timeRemainingUntilReset,
+  });
+}
+
+const List<String> kDailyCattleCallCurveballs = <String>[
+  'Deliver the final 10 seconds as if your microphone is wiretapped by the FBI!',
+  'Halfway through, act like you just realized your co-star is your long-lost twin!',
+  'Deliver the climax while struggling to hold back tears of sudden betrayal!',
+  'Switch to a conspiratorial whisper at the 15-second mark as paparazzi flashbulbs pop!',
+  'Act as if you just swallowed a truth serum that forces brutal honesty!',
+  'Maintain an unblinking power stare into the camera lens for the final line!',
+];
+
+DailyCattleCallChallenge getTodaysDailyCattleCallChallenge([DateTime? now]) {
+  final utc = (now ?? DateTime.now()).toUtc();
+  final dateKey =
+      '${utc.year.toString().padLeft(4, '0')}-${utc.month.toString().padLeft(2, '0')}-${utc.day.toString().padLeft(2, '0')}';
+  int hash = 2166136261;
+  for (final codeUnit in dateKey.codeUnits) {
+    hash ^= codeUnit;
+    hash = (hash * 16777619) & 0x7FFFFFFF;
+  }
+  final generalList = <ScenePrompt>[
+    for (final list in kParodyGeneralScenesByCategory.values) ...list,
+  ];
+  final chosenScene = generalList[hash % generalList.length];
+  final chosenCurveball =
+      kDailyCattleCallCurveballs[(hash ~/ 7) % kDailyCattleCallCurveballs.length];
+  final nextReset = DateTime.utc(utc.year, utc.month, utc.day + 1);
+  final remaining = nextReset.difference(utc);
+
+  return DailyCattleCallChallenge(
+    utcDateKey: dateKey,
+    featuredScene: chosenScene,
+    mandatoryCurveball: chosenCurveball,
+    timeRemainingUntilReset:
+        remaining.isNegative ? const Duration(hours: 24) : remaining,
+  );
+}
+
+/// Fixture #13 — "The Writer's Room" AI Custom Scene Generator helper.
+ScenePrompt buildFallbackWritersRoomScene({
+  required String bizarreObject,
+  required String occupation,
+  required String emotionalState,
+}) {
+  final cleanObj = bizarreObject.trim().isEmpty
+      ? 'a glowing flamingo lamp'
+      : bizarreObject.trim();
+  final cleanJob = occupation.trim().isEmpty
+      ? 'Disgraced Health Inspector'
+      : occupation.trim();
+  final cleanEmotion = emotionalState.trim().isEmpty
+      ? 'Operatic Paranoia'
+      : emotionalState.trim();
+  final ts = DateTime.now().millisecondsSinceEpoch % 100000;
+
+  return ScenePrompt(
+    id: 'writers_room_$ts',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'The ${cleanObj.split(' ').last.toUpperCase()} Incident',
+    filmOrSeries: 'The Writer\'s Room Original',
+    releaseYear: 2026,
+    characterName: cleanJob,
+    promptScript:
+        'Look at this $cleanObj sitting on my desk! Do you have any idea what a $cleanJob goes through when the entire city council tries to cover this up? I am not crazy—this $cleanObj is ticking, my badge is on the line, and if you take one step closer I am blowing the whistle on the whole department!',
+    duetLeadA:
+        'As a veteran $cleanJob, I demand to know why this $cleanObj was hidden inside my evidence locker!',
+    duetLeadB:
+        'Keep your voice down! If the Commissioner hears you talking about that $cleanObj, neither of us leaves this building employed!',
+    directorCue:
+        'Grip an imaginary $cleanObj toward the lens while channeling $cleanEmotion',
+    emotionalTarget: cleanEmotion,
+    improvTwist:
+        '15s Curveball: Suddenly realize the $cleanObj is broadcasting your voice live on national television!',
+  );
+}
+
+/// Fixture #15 (Part A) — 18+ Speakeasy "Double-or-Nothing Subtext Dares" (1.25x Spice Multiplier).
+const List<String> kSpeakeasySubtextDares = <String>[
+  'Deliver every line like you are hiding a scandalous alibi from the person sitting to your left.',
+  'Maintain unbroken bedroom-eyes contact with the camera lens while accusing your co-star of grand theft.',
+  'Deliver the monologue as a breathless midnight confession in a VIP penthouse elevator.',
+  'Speak with velvet, slow-burn composure until the final 5 words—then snap with icy dominance.',
+  'Act as if the person across from you just slipped you a classified keycard under the table.',
+  'Deliver the scene while biting back a wicked, knowing smirk after every sentence.',
+];
+
+/// Fixture #15 (Part B) — "LIFE IS IMPROV" Real-World Secret Dare Settings & Dossiers.
+enum LifeIsImprovSetting {
+  housePartyBar('House Party / Bar', '🍻', 'Work the room or bartender with a straight face'),
+  publicOutInWild('Public / Out in the Wild', '🏙️', 'Blend into a coffee shop, elevator, or street corner'),
+  lateNightCouchPartner('Late-Night Couch / Partner Dare', '🛋️', 'Bluff your partner or roommate in real time'),
+  phoneCallBluff('Phone Call Bluff', '📞', 'Put a friend on speakerphone and sell the scenario');
+
+  final String label;
+  final String emoji;
+  final String subtitle;
+  const LifeIsImprovSetting(this.label, this.emoji, this.subtitle);
+}
+
+class LifeIsImprovSecretDare {
+  final String id;
+  final LifeIsImprovSetting setting;
+  final String dossierTitle;
+  final String undercoverPersona;
+  final String openingLineToSayOutLoud;
+  final String midDareEscalation15s;
+  final String targetReactionFromRoom;
+  final int spiceTier;
+
+  const LifeIsImprovSecretDare({
+    required this.id,
+    required this.setting,
+    required this.dossierTitle,
+    required this.undercoverPersona,
+    required this.openingLineToSayOutLoud,
+    required this.midDareEscalation15s,
+    required this.targetReactionFromRoom,
+    this.spiceTier = 3,
+  });
+
+  ScenePrompt toScenePrompt() {
+    return ScenePrompt(
+      id: id,
+      category: SceneCategory.specialtyCultClassics,
+      title: 'LIFE IS IMPROV: $dossierTitle',
+      filmOrSeries: '18+ Speakeasy · ${setting.label}',
+      releaseYear: 2026,
+      characterName: undercoverPersona,
+      promptScript: openingLineToSayOutLoud,
+      duetLeadA: openingLineToSayOutLoud,
+      duetLeadB: targetReactionFromRoom,
+      directorCue: 'Undercover Persona: $undercoverPersona · Target: $targetReactionFromRoom',
+      emotionalTarget: 'Deadpan Real-World Commitment (${setting.label})',
+      improvTwist: '15s Escalation: $midDareEscalation15s',
+    );
+  }
+}
+
+const List<LifeIsImprovSecretDare> kLifeIsImprovSecretDares = <LifeIsImprovSecretDare>[
+  LifeIsImprovSecretDare(
+    id: 'lii_party_01',
+    setting: LifeIsImprovSetting.housePartyBar,
+    dossierTitle: 'The Undercover Sommelier',
+    undercoverPersona: 'World-Renowned Beverage Inspector',
+    openingLineToSayOutLoud:
+        'Excuse me, everyone—I hate to interrupt the vibe, but who authorized the ice cubes in this room? Because these have the exact mineral signature of a 1998 Swiss glacier heist.',
+    midDareEscalation15s:
+        'Hold a cup up to the light, squint suspiciously, and ask the nearest person to vouch for their whereabouts between 8 PM and 9 PM.',
+    targetReactionFromRoom:
+        'Get someone in the room to actually inspect their drink or defend where the ice came from.',
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_party_02',
+    setting: LifeIsImprovSetting.housePartyBar,
+    dossierTitle: 'The NDA Party Crash',
+    undercoverPersona: 'Celebrity Crisis Publicist',
+    openingLineToSayOutLoud:
+        'Alright, listen closely—before anyone posts a single story tonight, my legal team needs everyone within ten feet to verbally confirm they did NOT see a peacock in the hallway.',
+    midDareEscalation15s:
+        'Nod gravely at the first person who laughs and whisper: "So you ARE the leak."',
+    targetReactionFromRoom:
+        'Provoke genuine confusion, laughter, or someone asking "Wait, what peacock?!"',
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_wild_01',
+    setting: LifeIsImprovSetting.publicOutInWild,
+    dossierTitle: 'The Time-Traveler\'s Receipt',
+    undercoverPersona: 'Temporal Field Agent on a Coffee Run',
+    openingLineToSayOutLoud:
+        'Quick question for the room—what year did everyone agree it is right now? Because my calendar app just charged me a late fee for 2034.',
+    midDareEscalation15s:
+        'Tap your wrist twice and mutter: "Abort extraction, the locals are onto the timeline."',
+    targetReactionFromRoom:
+        'Capture a bystander or friend doing a double-take or answering the year out loud.',
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_wild_02',
+    setting: LifeIsImprovSetting.publicOutInWild,
+    dossierTitle: 'Invisible Paparazzi Decoy',
+    undercoverPersona: 'Incognito A-List Method Actor',
+    openingLineToSayOutLoud:
+        'Please, no flash photography while I’m off-set—I told Variety I’m doing my own stunts this week and my agent is already furious.',
+    midDareEscalation15s:
+        'Put on imaginary sunglasses and graciously offer to sign a napkin for the nearest person.',
+    targetReactionFromRoom:
+        'Get someone nearby to play along or ask what movie you are filming.',
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_couch_01',
+    setting: LifeIsImprovSetting.lateNightCouchPartner,
+    dossierTitle: 'The Secret Double Life',
+    undercoverPersona: 'Retired International Jewel Thief',
+    openingLineToSayOutLoud:
+        'Look, I promised I wouldn’t bring work home anymore, but if a French detective calls asking about a missing velvet painting, tell him we were bowling.',
+    midDareEscalation15s:
+        'Glance out the window dramatically and say: "Lock the snack cabinet. They know my weakness."',
+    targetReactionFromRoom:
+        'Keep a stone-cold face while your partner/roommate questions your sanity.',
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_couch_02',
+    setting: LifeIsImprovSetting.lateNightCouchPartner,
+    dossierTitle: 'The Reality Show Reveal',
+    undercoverPersona: 'Secret Executive Producer',
+    openingLineToSayOutLoud:
+        'I can finally tell you the truth—for the last six months, this apartment has been the season finale set of a Scandinavian psychological game show, and you’re currently winning.',
+    midDareEscalation15s:
+        'Point at a random lamp or pillow and whisper into it: "Cut to commercial, they’re taking it well."',
+    targetReactionFromRoom:
+        'Make your partner or roommate burst out laughing or check the lamp for a mic.',
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_phone_01',
+    setting: LifeIsImprovSetting.phoneCallBluff,
+    dossierTitle: 'The Emergency Alibi Hotline',
+    undercoverPersona: 'High-Stakes Fixer on Speakerphone',
+    openingLineToSayOutLoud:
+        'Hey, you’re on speaker—don’t ask questions, just confirm for the people in this room that I once saved your cousin’s yacht from a rogue pelican.',
+    midDareEscalation15s:
+        'Say urgently: "Wait, don’t mention the Mayor—just stick to the pelican story!"',
+    targetReactionFromRoom:
+        'Get the friend on speakerphone to improvise along or say "Wait, what are you talking about?!"',
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_phone_02',
+    setting: LifeIsImprovSetting.phoneCallBluff,
+    dossierTitle: 'The Casting Callback Prank',
+    undercoverPersona: 'Method Actor Mid-Audition',
+    openingLineToSayOutLoud:
+        'Thank god you picked up—Martin Scorsese’s casting assistant is listening right now and needs a 10-second character reference on whether I look intimidating in leather.',
+    midDareEscalation15s:
+        'Stage-whisper: "Say yes! There’s a craft services budget on the line!"',
+    targetReactionFromRoom:
+        'Get the caller to hype you up or roast you live on speakerphone.',
+  ),
+];
+

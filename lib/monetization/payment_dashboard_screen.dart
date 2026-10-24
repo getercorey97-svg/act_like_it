@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_screen.dart';
 import '../auth/auth_service.dart';
 import '../offline_manager.dart';
+import '../social/cutting_room_feed.dart';
 import '../ui/game_app_bar.dart';
 
 class SavedPaymentCard {
@@ -603,6 +604,123 @@ class _PaymentDashboardScreenState extends State<PaymentDashboardScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
       children: [
+        // FIXTURE #16: "Casting Director Duty" — Free Daily AI Token Loop
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0B2528), Color(0xFF0B0E17)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF10B981), width: 2.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0xFF05070B),
+                offset: Offset(4, 4),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0x2610B981),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF10B981)),
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'FREE DAILY TOKEN LOOP · FIXTURE #16',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '+2 FREE TOKENS / DAY',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '🎬 Casting Director Duty (Judge 5 Community Reels)',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Running low on AI Tokens? Step into the Cutting Room Feed and rate 5 peer auditions to earn +2 Free AI Telemetrics Tokens daily.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.38,
+                  color: Color(0xFFCBD5E1),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: const Color(0xFF05070B),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    HapticFeedback.heavyImpact();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const CuttingRoomFeedScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.how_to_vote_rounded, size: 18),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '🎬 LAUNCH CASTING DIRECTOR DUTY (+2 FREE TOKENS)',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         _buildSectionBanner(
           'AI TELEMETRICS TOKEN PACKS',
           'Power real-time Gemini 2.5 Flash facial micro-expression & vocal scans',

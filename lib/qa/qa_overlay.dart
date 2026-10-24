@@ -297,6 +297,48 @@ class QaTelemetryRepository {
     return report;
   }
 
+  /// Fixture #18 — 1-Tap Audience Test Screening Pulse (`[🔥 Instant Classic]`, `[😂 Great Curveball]`, `[⏱️ Pacing Off]`).
+  static Future<QaFeedbackReport> submitScenePulseRating({
+    required String sceneId,
+    required String sceneTitle,
+    required String gameMode,
+    required String pulseRating,
+    BuildContext? context,
+  }) async {
+    final handle =
+        AuthService.instance.currentProfile?.username ?? 's26_alpha_tester';
+    final deviceInfo = await collectDeviceInfo(context);
+    final localStateDump = await buildLocalStateDump(
+      testerNote:
+          '[SCENE_PULSE] scene_id=$sceneId | title="$sceneTitle" | game_mode=$gameMode | rating=$pulseRating',
+      activeRoute: '/match-finalization',
+    );
+    localStateDump['scene_id'] = sceneId;
+    localStateDump['scene_title'] = sceneTitle;
+    localStateDump['game_mode'] = gameMode;
+    localStateDump['audience_pulse_rating'] = pulseRating;
+
+    final report = QaFeedbackReport(
+      id: const Uuid().v4(),
+      testerHandle: handle.startsWith('@') ? handle : '@$handle',
+      appVersion: appVersionString,
+      bugType: 'Scene Pulse: $pulseRating',
+      screenshotUrl: null,
+      deviceInfo: deviceInfo,
+      localStateDump: localStateDump,
+      createdAt: DateTime.now().toUtc(),
+    );
+
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        await client.from(tableName).insert(report.toJson());
+      } catch (_) {}
+    }
+    await _saveReportToLocalCache(report);
+    return report;
+  }
+
   static Future<void> _saveReportToLocalCache(QaFeedbackReport report) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -465,13 +507,15 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final hideForBroadcast =
+        GameSettingsModal.latestConfig.cleanBroadcastScreenShareMode;
     return RepaintBoundary(
       key: _repaintBoundaryKey,
       child: Stack(
         fit: StackFit.expand,
         children: [
           widget.child,
-          if (_isTester)
+          if (_isTester && !hideForBroadcast)
             Positioned(
               right: 12,
               bottom: 92,

@@ -7,7 +7,9 @@ import '../dashboard_marquee.dart';
 import '../lobby.dart';
 import '../main.dart';
 import '../offline_manager.dart';
+import '../qa/qa_overlay.dart';
 import 'boondocks_character_rig.dart';
+import 'game_settings_modal.dart';
 
 /// PART 3: Match Finalization & Award Ceremony Engine
 /// (`lib/ui/match_finalization_screen.dart`).
@@ -67,6 +69,7 @@ class _MatchFinalizationScreenState extends State<MatchFinalizationScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _statuetteGlowController;
   int _earnedXp = 250;
+  String? _selectedPulseTag;
 
   @override
   void initState() {
@@ -75,10 +78,40 @@ class _MatchFinalizationScreenState extends State<MatchFinalizationScreen>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
-    _earnedXp = widget.compositeScore >= 85.0
+    final baseXp = widget.compositeScore >= 85.0
         ? 350
         : (widget.compositeScore >= 75.0 ? 250 : 150);
+    final isBlockbuster =
+        GameSettingsModal.latestConfig.threeActBlockbusterTournament;
+    _earnedXp = isBlockbuster ? (baseXp * 1.25).round() : baseXp;
     _finalizeMatchSessionAndAwardXp();
+  }
+
+  Future<void> _submitAudiencePulse(String pulseTag) async {
+    if (_selectedPulseTag == pulseTag) return;
+    HapticFeedback.selectionClick();
+    setState(() => _selectedPulseTag = pulseTag);
+    final activeScene = widget.resolvedScene;
+    await QaTelemetryRepository.instance.submitScenePulseRating(
+      sceneId: activeScene.id,
+      sceneTitle: activeScene.title,
+      pulseRating: pulseTag,
+      compositeScore: widget.compositeScore,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF065F46),
+        content: Text(
+          'Audience Test Screening Pulse logged: $pulseTag ("${activeScene.title}")',
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _finalizeMatchSessionAndAwardXp() async {
@@ -417,6 +450,110 @@ Play Live: https://act-like-it.vercel.app
                   ),
                 ),
 
+                const SizedBox(height: 16),
+
+                // FIXTURE #8: 3-Act Blockbuster Playbill Summary Banner
+                if (GameSettingsModal
+                    .latestConfig.threeActBlockbusterTournament) ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF171124),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFFFD700),
+                        width: 2.0,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '🎬 3-ACT BLOCKBUSTER TOURNAMENT PLAYBILL · 1.25x XP BONUS',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFFD700),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Act I (The Cold Open) → Act II (The Plot Twist) → Act III (The Climax 1.5x Weight) completed for "${widget.resolvedScene.title}"!',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.38,
+                            color: Color(0xFFF5DEB3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // FIXTURE #18: 1-Tap Audience Test Screening Pulse
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B0E17),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF0CB6D4),
+                      width: 1.6,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '📊 1-TAP AUDIENCE TEST SCREENING PULSE',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0CB6D4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'How did "${widget.resolvedScene.title}" feel on stage? Your 1-tap pulse tunes the LiveOps catalog.',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildPulseChoiceChip(
+                            label: '🔥 Instant Classic',
+                            accent: const Color(0xFF10B981),
+                          ),
+                          _buildPulseChoiceChip(
+                            label: '😂 Great Curveball',
+                            accent: const Color(0xFFFFD700),
+                          ),
+                          _buildPulseChoiceChip(
+                            label: '⏱️ Pacing Off',
+                            accent: const Color(0xFFF43F5E),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
                 const SizedBox(height: 20),
 
                 // 3 Clean Navigation Buttons (Zero Back-Navigation Pre-Roll Trap)
@@ -611,6 +748,49 @@ Play Live: https://act-like-it.vercel.app
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPulseChoiceChip({
+    required String label,
+    required Color accent,
+  }) {
+    final selected = _selectedPulseTag == label;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () => _submitAudiencePulse(label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? accent.withValues(alpha: 0.24)
+              : const Color(0xFF07090E),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? accent : accent.withValues(alpha: 0.45),
+            width: selected ? 2.0 : 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              Icon(Icons.check_circle_rounded, color: accent, size: 15),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: selected ? Colors.white : accent,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

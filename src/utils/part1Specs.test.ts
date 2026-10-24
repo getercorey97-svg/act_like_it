@@ -206,3 +206,91 @@ test('S.O.A. Alpha QA Systems (Gemini AI Calibration, qa_feedback SQL, Shake-to-
   assert.ok(mainDart.includes("'/qa-dashboard': (_) => const QaWebPortalDashboardScreen()"));
 });
 
+test('All 17 Viral, Gameplay, Progression & LiveOps Fixtures (#1-#5, #7-#18, skipping #6) + LIFE IS IMPROV mode pass verification', () => {
+  const catalogDart = fs.readFileSync('lib/ui/parody_scenes_catalog.dart', 'utf8');
+  const settingsDart = fs.readFileSync('lib/ui/game_settings_modal.dart', 'utf8');
+  const webrtcDart = fs.readFileSync('lib/webrtc_manager.dart', 'utf8');
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  const feedDart = fs.readFileSync('lib/social/cutting_room_feed.dart', 'utf8');
+  const lateNightDart = fs.readFileSync('lib/late_night_vault.dart', 'utf8');
+  const dashboardDart = fs.readFileSync('lib/dashboard_marquee.dart', 'utf8');
+  const sceneVaultDart = fs.readFileSync('lib/ui/scene_vault_screen.dart', 'utf8');
+  const profileDart = fs.readFileSync('lib/profile/actor_profile_screen.dart', 'utf8');
+  const matchHistoryDart = fs.readFileSync('lib/match_history_screen.dart', 'utf8');
+  const matchFinalDart = fs.readFileSync('lib/ui/match_finalization_screen.dart', 'utf8');
+  const paymentDart = fs.readFileSync('lib/monetization/payment_dashboard_screen.dart', 'utf8');
+  const lobbyDart = fs.readFileSync('lib/lobby.dart', 'utf8');
+
+  // Fixture #1: Open Co-Star Audition Links
+  assert.ok(webrtcDart.includes('openCoStarChallengeTakeId'));
+  assert.ok(feedDart.includes('ACCEPT CO-STAR AUDITION'));
+
+  // Fixture #2: Millisecond AI Receipt Stamps
+  assert.ok(judgingDart.includes('millisecondReceiptStamps'));
+
+  // Fixture #3: Daily Cattle Call Global 24h Challenge
+  assert.ok(catalogDart.includes('getTodaysDailyCattleCallChallenge'));
+  assert.ok(dashboardDart.includes('DAILY CATTLE CALL'));
+
+  // Fixture #4: Break Character / No-Laugh Stone-Faced Hazard
+  assert.ok(settingsDart.includes('stoneFacedNoLaughHazard'));
+  assert.ok(webrtcDart.includes('CHARACTER BROKEN (-15 PTS)'));
+
+  // Fixture #5: Persona Archetype HUD Trim & Cut-In
+  assert.ok(webrtcDart.includes('METHOD STREAK'));
+
+  // Fixture #6 intentionally skipped!
+  assert.equal(catalogDart.includes('ColdReadAudition'), false);
+
+  // Fixture #7: Standing Ovation Combo & Spectator Hype Shards
+  assert.ok(webrtcDart.includes('STANDING OVATION COMBO'));
+  assert.ok(judgingDart.includes('KINGMAKER / EXECUTIVE PRODUCER'));
+
+  // Fixture #8: 3-Act Blockbuster Tournament Mode
+  assert.ok(settingsDart.includes('threeActBlockbusterTournament'));
+  assert.ok(lobbyDart.includes('3-Act Blockbuster Arc'));
+  assert.ok(matchFinalDart.includes('3-ACT BLOCKBUSTER TOURNAMENT PLAYBILL'));
+
+  // Fixture #9: 5-Tier Character Mastery Track
+  assert.ok(profileDart.includes('5-TIER CHARACTER MASTERY'));
+
+  // Fixture #10: Hollywood Walk of Fame Brass Star
+  assert.ok(dashboardDart.includes('HOLLYWOOD WALK OF FAME BRASS STAR'));
+  assert.ok(matchHistoryDart.includes('HOLLYWOOD WALK OF FAME BRASS STAR'));
+
+  // Fixture #11: AI Co-Star & AI Studio Jury Personalities
+  assert.ok(judgingDart.includes('aiCoStarVerdicts'));
+
+  // Fixture #12: Big-Screen Premiere Host View & Clean Broadcast Mode
+  assert.ok(settingsDart.includes('bigScreenPremiereHostView'));
+  assert.ok(settingsDart.includes('cleanBroadcastScreenShareMode'));
+  assert.ok(webrtcDart.includes('_buildWideStudioControlDeckLayout'));
+
+  // Fixture #13: The Writer's Room AI Custom Scene Generator & Elastic Catalog
+  assert.ok(catalogDart.includes('totalGeneralSceneCount'));
+  assert.ok(sceneVaultDart.includes('_openWritersRoomCustomSceneModal'));
+
+  // Fixture #14: 5-Second "Green Room Roast" Voice Notes
+  assert.ok(feedDart.includes('5s ROAST'));
+
+  // Fixture #15 (Part A & Part B): Speakeasy Dare Wheel + "LIFE IS IMPROV"
+  assert.ok(catalogDart.includes('kLifeIsImprovSecretDares'));
+  assert.ok(lateNightDart.includes('LIFE IS IMPROV — REAL-WORLD SECRET DARE MODE'));
+  assert.ok(lateNightDart.includes('SPEAKEASY DARE WHEEL'));
+  assert.ok(webrtcDart.includes('STEALTH HUD'));
+  assert.ok(judgingDart.includes('lifeIsImprovFivePillars'));
+  assert.ok(profileDart.includes('UNDERCOVER LEGEND FRAME'));
+
+  // Fixture #16: Casting Director Duty (+2 Free AI Tokens Daily)
+  assert.ok(feedDart.includes('CASTING DUTY:'));
+  assert.ok(paymentDart.includes('Casting Director Duty'));
+
+  // Fixture #17: Sunday Night Box Office Awards
+  assert.ok(feedDart.includes('SUNDAY NIGHT BOX OFFICE AWARDS'));
+  assert.ok(matchHistoryDart.includes('SUNDAY NIGHT BOX OFFICE AWARDS'));
+
+  // Fixture #18: 1-Tap Audience Test Screening Pulse
+  assert.ok(matchFinalDart.includes('1-TAP AUDIENCE TEST SCREENING PULSE'));
+});
+
+

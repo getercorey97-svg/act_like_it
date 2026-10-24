@@ -18,6 +18,8 @@ import 'ui/tutorial_overlay.dart';
 import 'auth/auth_service.dart';
 import 'ui/intro_cinematic.dart';
 import 'ui/transitions.dart';
+import 'ui/parody_scenes_catalog.dart';
+import 'social/cutting_room_feed.dart';
 
 enum SfuParticipantRole {
   activePerformer,
@@ -657,12 +659,16 @@ class LiveKitSoundstageScreen extends StatefulWidget {
   final LobbySession lobbySession;
   final String localUserId;
   final String localDisplayName;
+  final String? openCoStarChallengeTakeId;
+  final String? openCoStarLeadAHandle;
 
   const LiveKitSoundstageScreen({
     super.key,
     required this.lobbySession,
     required this.localUserId,
     required this.localDisplayName,
+    this.openCoStarChallengeTakeId,
+    this.openCoStarLeadAHandle,
   });
 
   @override
@@ -674,10 +680,32 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     with WidgetsBindingObserver {
   late final WebRtcStageManager _stageManager;
   bool _largeTeleprompterFont = false;
-  bool _duetModeEnabled = GameSettingsModal.latestConfig.screenTestDuetMode;
+  late bool _duetModeEnabled = widget.openCoStarChallengeTakeId != null ||
+      GameSettingsModal.latestConfig.screenTestDuetMode;
   bool _improvTwistTriggered = false;
   String? _activeImprovTwistPrompt;
   bool _showSpectatorHypeDeck = true;
+
+  // Fixture #4: Break Character / Stone-Faced No-Laugh Hazard State
+  bool _characterBrokenTriggered = false;
+
+  // Fixture #5: 1.2s Diagonal Boondocks Persona Cut-In State
+  bool _showPersonaCutIn = false;
+  String _personaCutInBanner = '+150 METHOD STREAK';
+  Timer? _personaCutInTimer;
+  bool _tenSecStreakCutInFired = false;
+
+  // Fixture #7: Standing Ovation Crowd Combo (1.15x) State
+  DateTime? _curveballFiredAt;
+  int _postCurveballHypeCount = 0;
+  bool _standingOvationComboActive = false;
+
+  // Fixture #12: Keyboard Focus Node for Samsung DeX / Desktop Web
+  final FocusNode _stageKeyboardFocusNode = FocusNode();
+
+  // Fixture #15 (Part B): "Life Is Improv" Stealth / POV Mode State
+  bool _stealthDimmedHudMode = false;
+  bool _lifeImprov15sEscalationFired = false;
 
   // Live Spectator "Heckle, Hype & Curveball" Reaction State
   RealtimeChannel? _hypeRealtimeChannel;
@@ -767,6 +795,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         _latestReactionBanner =
             '🌹 $senderName threw a Golden Rose! (+1 Hype · Total $_goldenRoseCount)';
         _latestReactionColor = const Color(0xFFFFD700);
+        _checkStandingOvationCrowdCombo();
       } else if (kind == 'tomato') {
         _tomatoSplatCount += 1;
         _lastTomatoSplatAt = DateTime.now();
@@ -779,11 +808,17 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         _latestReactionBanner =
             '👏 STANDING OVATION from $senderName! The soundstage is electric!';
         _latestReactionColor = const Color(0xFF10B981);
+        _checkStandingOvationCrowdCombo();
       } else if (kind == 'curveball') {
         _triggerImprovTwist();
         _latestReactionBanner =
             '⚡ $senderName dropped a Director Curveball! (+5.0 Bonus Points)';
         _latestReactionColor = const Color(0xFF0CB6D4);
+      } else if (kind == 'break_character') {
+        _characterBrokenTriggered = true;
+        _latestReactionBanner =
+            '🚨 CHARACTER BROKEN! $senderName caught a laugh/smirk (-15 PTS)';
+        _latestReactionColor = const Color(0xFFE11D48);
       }
     });
 
@@ -867,29 +902,92 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     }
   }
 
+  void _checkStandingOvationCrowdCombo() {
+    final now = DateTime.now();
+    if (_curveballFiredAt != null &&
+        now.difference(_curveballFiredAt!).inSeconds <= 8) {
+      _postCurveballHypeCount += 1;
+    } else if (_goldenRoseCount + _standingOvationCount >= 3) {
+      _postCurveballHypeCount = _goldenRoseCount + _standingOvationCount;
+    }
+    if (_postCurveballHypeCount >= 3 && !_standingOvationComboActive) {
+      _standingOvationComboActive = true;
+      _triggerPersonaCutIn('🔥 STANDING OVATION COMBO (1.15x)');
+    }
+  }
+
+  void _triggerPersonaCutIn(String bannerLabel) {
+    _personaCutInTimer?.cancel();
+    setState(() {
+      _showPersonaCutIn = true;
+      _personaCutInBanner = bannerLabel;
+    });
+    _personaCutInTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() {
+          _showPersonaCutIn = false;
+        });
+      }
+    });
+  }
+
   void _triggerImprovTwist() {
     if (_improvTwistTriggered) return;
     HapticFeedback.heavyImpact();
     Future<void>.delayed(const Duration(milliseconds: 120), () {
       HapticFeedback.mediumImpact();
     });
+    _curveballFiredAt = DateTime.now();
+    final sceneTwist = widget.lobbySession.activeScene?.improvTwist ?? '';
     final idx =
         (widget.lobbySession.roundNumber + _stageManager.performanceElapsedSeconds) %
             _improvTwistDirectives.length;
     setState(() {
       _improvTwistTriggered = true;
-      _activeImprovTwistPrompt = _improvTwistDirectives[idx];
+      _activeImprovTwistPrompt = sceneTwist.trim().isNotEmpty
+          ? sceneTwist.trim()
+          : _improvTwistDirectives[idx];
     });
+    _triggerPersonaCutIn('⚡ CURVEBALL ACTIVE · +150 METHOD STREAK');
   }
 
   void _onStageUpdated() {
     if (!mounted) return;
+    final elapsed = _stageManager.performanceElapsedSeconds;
     if (GameSettingsModal.latestConfig.improvRouletteWildcard &&
         !_improvTwistTriggered &&
         _stageManager.isRecordingTake &&
-        _stageManager.performanceElapsedSeconds >= 5) {
+        elapsed >= 5) {
       _triggerImprovTwist();
       return;
+    }
+    // Fixture #5: 10s sustained vocal energy triggers 1.2s Boondocks Persona Cut-In
+    if (_stageManager.isRecordingTake &&
+        !_tenSecStreakCutInFired &&
+        elapsed >= 10 &&
+        _stageManager.isMicEnabled) {
+      _tenSecStreakCutInFired = true;
+      _triggerPersonaCutIn('+150 METHOD STREAK · VOCAL LOCK');
+    }
+    // Fixture #15 (Part B): 15s Haptic Double-Tap Escalation for "Life Is Improv"
+    if (_stageManager.isRecordingTake &&
+        !_lifeImprov15sEscalationFired &&
+        elapsed >= 15 &&
+        GameSettingsModal.latestConfig.lifeIsImprovMode) {
+      _lifeImprov15sEscalationFired = true;
+      HapticFeedback.heavyImpact();
+      Future<void>.delayed(const Duration(milliseconds: 140), () {
+        HapticFeedback.heavyImpact();
+      });
+      final dare = kLifeIsImprovSecretDares.firstWhere(
+        (d) => d.id == widget.lobbySession.activeScene?.id,
+        orElse: () => kLifeIsImprovSecretDares.first,
+      );
+      setState(() {
+        _improvTwistTriggered = true;
+        _activeImprovTwistPrompt =
+            '15s HAPTIC ESCALATION: ${dare.escalationAt15s}';
+      });
     }
     setState(() {});
   }
@@ -918,6 +1016,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     _preRollTimer?.cancel();
     _vuModulationTimer?.cancel();
     _reactionClearTimer?.cancel();
+    _personaCutInTimer?.cancel();
+    _stageKeyboardFocusNode.dispose();
     try {
       final ch = _hypeRealtimeChannel;
       if (ch != null) {
@@ -934,319 +1034,732 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     final scene = widget.lobbySession.activeScene;
     final isPerformer =
         _stageManager.role == SfuParticipantRole.activePerformer;
+    final cfg = GameSettingsModal.latestConfig;
+    final isLifeIsImprov = cfg.lifeIsImprovMode ||
+        (scene?.id.startsWith('life_improv_') ?? false);
+    final actorArchetype = resolveAvatarArchetype(
+      AuthService.instance.currentProfile?.avatarArchetypeId,
+    );
+    final screenSize = MediaQuery.sizeOf(context);
+    final isWideDeXOrTvLayout = cfg.bigScreenPremiereHostView ||
+        screenSize.width > 900 ||
+        (screenSize.width / math.max(1.0, screenSize.height)) > 1.3;
 
     final isCountdownLocked = _stageManager.isRecordingTake &&
         _stageManager.performanceElapsedSeconds < 10;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF07090E),
-      appBar: GameAppBar(
-        title: 'Stage #${widget.lobbySession.roomCode}',
-        activeRoomCode: widget.lobbySession.roomCode,
-        isRecordingCountdownActive: isCountdownLocked,
-        onStartOver: () async {
-          setState(() {
-            _improvTwistTriggered = false;
-            _activeImprovTwistPrompt = null;
-          });
-          _startPreRollCountdown();
-          await _stageManager.resumeStageAfterJudging(
-            targetEmotion:
-                scene?.emotionalTarget ?? 'Dramatic Intensity',
-          );
-        },
+    final viewfinderWidget = Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C101A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _standingOvationComboActive
+              ? const Color(0xFFFFD700)
+              : (_characterBrokenTriggered
+                  ? const Color(0xFFE11D48)
+                  : (_improvTwistTriggered
+                      ? const Color(0xFFF59E0B)
+                      : (_isPreRolling
+                          ? const Color(0xFF06B6D4)
+                          : actorArchetype.rimAccentColor))),
+          width: _standingOvationComboActive ? 3.2 : 2.2,
+        ),
+        boxShadow: [
+          if (_standingOvationComboActive)
+            const BoxShadow(
+              color: Color(0xAAFFD700),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+        ],
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 4,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0C101A),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _improvTwistTriggered
-                          ? const Color(0xFFF59E0B)
-                          : (_isPreRolling
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Camera Layer (70%+ Viewfinder)
+          _duetModeEnabled
+              ? _buildDuetSplitScreenSurface()
+              : _buildPrimaryVideoSurface(),
+          // Fixture #15 (Part B): Stealth / POV Dimmed Screen Mode for "Life Is Improv"
+          if (_stealthDimmedHudMode)
+            GestureDetector(
+              onDoubleTap: () {
+                HapticFeedback.mediumImpact();
+                setState(() => _stealthDimmedHudMode = false);
+              },
+              child: Container(
+                color: const Color(0xE6040508),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.visibility_off_rounded,
+                      color: Color(0xFF475569),
+                      size: 28,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'STEALTH POV RECORDING · ${_stageManager.performanceElapsedSeconds}s / 30s',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _activeImprovTwistPrompt ??
+                          (scene?.promptScript ?? 'Commit to the real-world bit.'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Double-tap anywhere to restore full stage viewfinder',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // 35mm Cinema Letterbox & Archetype-Themed Corner Brackets (Fixture #5)
+          if (!_stealthDimmedHudMode)
+            IgnorePointer(
+              child: CustomPaint(
+                painter: _CinemaViewfinderPainter(
+                  isRecording: _stageManager.isRecordingTake,
+                  improvActive: _improvTwistTriggered || _standingOvationComboActive,
+                  archetypeAccent: actorArchetype.rimAccentColor,
+                ),
+              ),
+            ),
+          // Top Bar Status HUD (Archetype-themed outer badge)
+          if (!_stealthDimmedHudMode)
+            Positioned(
+              top: 10,
+              left: 12,
+              right: 12,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xD9050508),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _isPreRolling
                               ? const Color(0xFF06B6D4)
-                              : const Color(0xFFE11D48)),
-                      width: 2.0,
+                              : actorArchetype.rimAccentColor,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isPreRolling
+                                  ? const Color(0xFF06B6D4)
+                                  : ((_stageManager.isRecordingTake &&
+                                          _stageManager
+                                                  .performanceElapsedSeconds
+                                                  .isEven)
+                                      ? const Color(0xFFE11D48)
+                                      : const Color(0x55E11D48)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _isPreRolling
+                                    ? 'PRE-ROLL · ${_preRollSecondsLeft}s CUE'
+                                    : 'REC 720p30 · ${_formatSmpteTimecode(_stageManager.performanceElapsedSeconds)} · ${actorArchetype.shortBadge}',
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    fit: StackFit.expand,
+                  const SizedBox(width: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Camera Layer (70%+ Viewfinder)
-                      _duetModeEnabled
-                          ? _buildDuetSplitScreenSurface()
-                          : _buildPrimaryVideoSurface(),
-                      // 35mm Cinema Letterbox & Subtle Grid
-                      IgnorePointer(
-                        child: CustomPaint(
-                          painter: _CinemaViewfinderPainter(
-                            isRecording: _stageManager.isRecordingTake,
-                            improvActive: _improvTwistTriggered,
+                      if (cfg.cleanBroadcastScreenShareMode)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xD9050508),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF10B981)),
+                          ),
+                          child: const Text(
+                            '📡 CLEAN BROADCAST',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
+                        ),
+                      if (isLifeIsImprov)
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _stealthDimmedHudMode = !_stealthDimmedHudMode;
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xD91A0926),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFA55577)),
+                            ),
+                            child: const Text(
+                              '🕵️ STEALTH HUD',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFF5DEB3),
+                              ),
+                            ),
+                          ),
+                        ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xD9050508),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _isPreRolling
+                              ? 'STANDBY'
+                              : 'Take: ${_stageManager.performanceElapsedSeconds}s',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFF59E0B),
                           ),
                         ),
                       ),
-                      // Top Bar Status HUD (Single unified status)
-                      Positioned(
-                        top: 10,
-                        left: 12,
-                        right: 12,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          // Real-Time Vocal VU Meter along right edge
+          if (!_stealthDimmedHudMode)
+            Positioned(
+              top: 54,
+              bottom: 120,
+              right: 10,
+              child: _buildVocalProjectionVuMeter(),
+            ),
+          // Fixture #4: Break Character / Stone-Faced Hazard Status Pill
+          if (cfg.stoneFacedNoLaughHazard && !_stealthDimmedHudMode)
+            Positioned(
+              top: 46,
+              right: 34,
+              child: GestureDetector(
+                onTap: () {
+                  _applyStageHypeReaction(
+                    kind: 'break_character',
+                    senderName: widget.localDisplayName,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _characterBrokenTriggered
+                        ? const Color(0xEBE11D48)
+                        : const Color(0xD905070B),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                      color: _characterBrokenTriggered
+                          ? const Color(0xFFFFD700)
+                          : const Color(0xFF10B981),
+                    ),
+                  ),
+                  child: Text(
+                    _characterBrokenTriggered
+                        ? '🚨 CHARACTER BROKEN (-15 PTS)'
+                        : '🗿 STONE-FACED 1.20x ACTIVE (TAP IF LAUGHED)',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Fixture #7: Standing Ovation Crowd Combo (1.15x) Badge
+          if (_standingOvationComboActive && !_stealthDimmedHudMode)
+            Positioned(
+              bottom: 134,
+              left: 14,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFD700), Color(0xFFF59E0B)],
+                  ),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: const Color(0xFF05070B), width: 2),
+                ),
+                child: const Text(
+                  '🔥 STANDING OVATION COMBO · 1.15x CROWD MULTIPLIER',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF05070B),
+                  ),
+                ),
+              ),
+            ),
+          // Fixture #5: 1.2-Second Diagonal Boondocks Persona Cut-In (Edge-aligned so 70%+ center viewfinder remains clear)
+          if (_showPersonaCutIn && !_stealthDimmedHudMode)
+            Positioned(
+              bottom: 102,
+              left: 12,
+              child: IgnorePointer(
+                child: Transform.rotate(
+                  angle: -0.05,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xEB07090E),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: actorArchetype.rimAccentColor,
+                        width: 2.4,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0xFF05070B),
+                          offset: Offset(4, 4),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        BoondocksCharacterRig(
+                          archetype: actorArchetype,
+                          size: 46,
+                          isSelected: true,
+                          externalPhase: 0.75,
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xD9050508),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _isPreRolling
-                                      ? const Color(0xFF06B6D4)
-                                      : const Color(0xFFE11D48),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _isPreRolling
-                                          ? const Color(0xFF06B6D4)
-                                          : ((_stageManager.isRecordingTake &&
-                                                  _stageManager
-                                                          .performanceElapsedSeconds
-                                                          .isEven)
-                                              ? const Color(0xFFE11D48)
-                                              : const Color(0x55E11D48)),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _isPreRolling
-                                        ? 'PRE-ROLL · ${_preRollSecondsLeft}s CUE'
-                                        : 'REC 720p30 · ${_formatSmpteTimecode(_stageManager.performanceElapsedSeconds)}',
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              actorArchetype.name.toUpperCase(),
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: actorArchetype.rimAccentColor,
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xD9050508),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _isPreRolling
-                                    ? 'STANDBY'
-                                    : 'Take: ${_stageManager.performanceElapsedSeconds}s (Frames: ${_stageManager.performanceElapsedSeconds * 30})',
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFFF59E0B),
-                                ),
+                            Text(
+                              _personaCutInBanner,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFFFD700),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      // Real-Time Vocal VU Meter along right edge
-                      Positioned(
-                        top: 54,
-                        bottom: 120,
-                        right: 10,
-                        child: _buildVocalProjectionVuMeter(),
-                      ),
-                      // Improv Twist Banner (Compact Top Pill)
-                      if (_improvTwistTriggered &&
-                          _activeImprovTwistPrompt != null)
-                        Positioned(
-                          top: 48,
-                          left: 14,
-                          right: 36,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xEE991B1B),
-                                  Color(0xEEB45309),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFFFFD700),
-                                width: 1.4,
-                              ),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x88F59E0B),
-                                  blurRadius: 10,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.bolt_rounded,
-                                  size: 18,
-                                  color: Color(0xFFFFD700),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'DIRECTOR\'S CUT TWIST! (+5.0 BONUS) — ${_activeImprovTwistPrompt!}',
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      // Live Floating Spectator Reactions (Golden Roses, Tomato Splatter, Standing Ovation)
-                      if (_latestReactionBanner != null)
-                        Positioned(
-                          top: _improvTwistTriggered ? 92 : 48,
-                          left: 14,
-                          right: 36,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xEB07090E),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _latestReactionColor,
-                                width: 1.8,
-                              ),
-                            ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                _latestReactionBanner!,
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: _latestReactionColor,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (_lastTomatoSplatAt != null &&
-                          DateTime.now().difference(_lastTomatoSplatAt!).inSeconds < 3)
-                        Positioned(
-                          top: 86,
-                          left: 24,
-                          child: IgnorePointer(
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xD9E11D48),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(0xFF05070B),
-                                  width: 3,
-                                ),
-                              ),
-                              child: const Text(
-                                '🍅 SPLAT!',
-                                style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (_lastStandingOvationAt != null &&
-                          DateTime.now()
-                                  .difference(_lastStandingOvationAt!)
-                                  .inSeconds <
-                              3)
-                        Positioned(
-                          bottom: 104,
-                          right: 34,
-                          child: IgnorePointer(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xD910B981),
-                                borderRadius: BorderRadius.circular(99),
-                                border: Border.all(
-                                  color: const Color(0xFFFFD700),
-                                  width: 2,
-                                ),
-                              ),
-                              child: Text(
-                                '👏 OVATION x$_standingOvationCount · 🌹 $_goldenRoseCount',
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face — shown once recording starts)
-                      if (scene != null && !_isPreRolling)
-                        _buildTeleprompterOverlay(scene),
-                      // 10-Second Pre-Roll Semi-Transparent Clapperboard Overlay
-                      if (_isPreRolling) _buildPreRollClapperboardOverlay(scene),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _buildSpectatorStrip(),
+            ),
+          // Improv Twist Banner (Compact Top Pill)
+          if (_improvTwistTriggered &&
+              _activeImprovTwistPrompt != null &&
+              !_stealthDimmedHudMode)
+            Positioned(
+              top: cfg.stoneFacedNoLaughHazard ? 74 : 48,
+              left: 14,
+              right: 36,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xEE991B1B),
+                      Color(0xEEB45309),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFFFD700),
+                    width: 1.4,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x88F59E0B),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.bolt_rounded,
+                      size: 18,
+                      color: Color(0xFFFFD700),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'DIRECTOR\'S CUT TWIST! (+5.0 BONUS) — ${_activeImprovTwistPrompt!}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Live Floating Spectator Reactions (Golden Roses, Tomato Splatter, Standing Ovation)
+          if (_latestReactionBanner != null && !_stealthDimmedHudMode)
+            Positioned(
+              top: _improvTwistTriggered ? 114 : 74,
+              left: 14,
+              right: 36,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xEB07090E),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _latestReactionColor,
+                    width: 1.8,
+                  ),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _latestReactionBanner!,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: _latestReactionColor,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_lastTomatoSplatAt != null &&
+              DateTime.now().difference(_lastTomatoSplatAt!).inSeconds < 3 &&
+              !_stealthDimmedHudMode)
+            Positioned(
+              top: 86,
+              left: 24,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xD9E11D48),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF05070B),
+                      width: 3,
+                    ),
+                  ),
+                  child: const Text(
+                    '🍅 SPLAT!',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_lastStandingOvationAt != null &&
+              DateTime.now().difference(_lastStandingOvationAt!).inSeconds < 3 &&
+              !_stealthDimmedHudMode)
+            Positioned(
+              bottom: 104,
+              right: 34,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xD910B981),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 2,
+                    ),
+                  ),
+                  child: Text(
+                    '👏 OVATION x$_standingOvationCount · 🌹 $_goldenRoseCount',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face — shown once recording starts)
+          if (scene != null && !_isPreRolling && !_stealthDimmedHudMode)
+            _buildTeleprompterOverlay(scene),
+          // 10-Second Pre-Roll Semi-Transparent Clapperboard Overlay
+          if (_isPreRolling && !_stealthDimmedHudMode)
+            _buildPreRollClapperboardOverlay(scene),
+        ],
+      ),
+    );
+
+    return KeyboardListener(
+      focusNode: _stageKeyboardFocusNode,
+      autofocus: true,
+      onKeyEvent: (event) {
+        if (event is! KeyDownEvent) return;
+        if (event.logicalKey == LogicalKeyboardKey.space) {
+          if (_isPreRolling) {
+            _skipPreRollAndRollCamera();
+          } else {
+            _triggerImprovTwist();
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF07090E),
+        appBar: GameAppBar(
+          title: isLifeIsImprov
+              ? '🕵️ Life Is Improv #${widget.lobbySession.roomCode}'
+              : 'Stage #${widget.lobbySession.roomCode}',
+          activeRoomCode: widget.lobbySession.roomCode,
+          isRecordingCountdownActive: isCountdownLocked,
+          onStartOver: () async {
+            setState(() {
+              _improvTwistTriggered = false;
+              _activeImprovTwistPrompt = null;
+              _characterBrokenTriggered = false;
+              _standingOvationComboActive = false;
+            });
+            _startPreRollCountdown();
+            await _stageManager.resumeStageAfterJudging(
+              targetEmotion:
+                  scene?.emotionalTarget ?? 'Dramatic Intensity',
+            );
+          },
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: isWideDeXOrTvLayout
+                ? _buildWideStudioControlDeckLayout(
+                    viewfinderWidget: viewfinderWidget,
+                    scene: scene,
+                    isPerformer: isPerformer,
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: viewfinderWidget,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSpectatorStrip(),
+                      const SizedBox(height: 8),
+                      _buildStageControlBar(isPerformer),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Fixture #12: 3-Pane Studio Control Deck for Samsung DeX, Foldables, Desktop Web & TV Screen-Share.
+  Widget _buildWideStudioControlDeckLayout({
+    required Widget viewfinderWidget,
+    required ScenePrompt? scene,
+    required bool isPerformer,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Left Pane: Scene Dossier & Teleprompter Cue Sheet
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D111C),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF1E293B)),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '📺 STUDIO CONTROL DECK · TELEPROMPTER',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    scene?.title ?? 'Studio Screen Test',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${scene?.characterName ?? 'Lead'} · ${scene?.filmOrSeries ?? ''} (${scene?.releaseYear ?? 2025})',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: Color(0xFF0CB6D4),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '"${scene?.promptScript ?? ''}"',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      height: 1.45,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFF5DEB3),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Director Note: ${scene?.directorCue ?? ''}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Keyboard Shortcuts: [SPACE] Roll / Curveball · [1–0] Peer Vote',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Center Pane: 16:9 / 9:16 Live Viewfinder
+        Expanded(
+          flex: 5,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: viewfinderWidget),
               const SizedBox(height: 8),
               _buildStageControlBar(isPerformer),
             ],
           ),
         ),
-      ),
+        const SizedBox(width: 12),
+        // Right Pane: 10-Player SFU Spectator Gallery & Hype Soundboard
+        Expanded(
+          flex: 3,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildSpectatorStrip(),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1445,9 +1958,12 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   }
 
   Widget _buildDuetSplitScreenSurface() {
+    final isAnsweringOpenCoStar = widget.openCoStarChallengeTakeId != null;
     final remotes = _stageManager.remoteParticipants;
     RemoteVideoTrack? coStarVideoTrack;
-    String coStarName = 'CO-STAR · THE DIVA (AI RIG)';
+    String coStarName = isAnsweringOpenCoStar
+        ? '${widget.openCoStarLeadAHandle ?? '@COSTAR'} (PRE-RECORDED LEAD A)'
+        : 'CO-STAR · THE DIVA (AI RIG)';
     if (remotes.isNotEmpty) {
       coStarName = remotes.first.name.isNotEmpty
           ? remotes.first.name.toUpperCase()
@@ -1465,7 +1981,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
 
     return Row(
       children: [
-        // Left 50%: LEAD A (Local Actor) framed in Limelight Gold (#F5DEB3)
+        // Left 50%: LEAD A framed in Limelight Gold (#F5DEB3)
         Expanded(
           child: Container(
             decoration: BoxDecoration(
@@ -1474,7 +1990,45 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                _buildPrimaryVideoSurface(),
+                if (isAnsweringOpenCoStar)
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [Color(0xFF28190B), Color(0xFF0B0E17)],
+                      ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          BoondocksCharacterRig(
+                            archetype: resolveAvatarArchetype('the_method_actor'),
+                            size: 108,
+                            isSelected: true,
+                            externalPhase: animPhase,
+                          ),
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                coStarName,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFF5DEB3),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  _buildPrimaryVideoSurface(),
                 Positioned(
                   top: 46,
                   left: 8,
@@ -1488,9 +2042,11 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(color: const Color(0xFFF5DEB3)),
                     ),
-                    child: const Text(
-                      'LEAD A · GOLD',
-                      style: TextStyle(
+                    child: Text(
+                      isAnsweringOpenCoStar
+                          ? 'LEAD A · ${widget.openCoStarLeadAHandle ?? 'CHALLENGER'}'
+                          : 'LEAD A · GOLD',
+                      style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 9,
                         fontWeight: FontWeight.w900,
@@ -1512,7 +2068,9 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (coStarVideoTrack != null)
+                if (isAnsweringOpenCoStar)
+                  _buildPrimaryVideoSurface()
+                else if (coStarVideoTrack != null)
                   VideoTrackRenderer(
                     coStarVideoTrack,
                     fit: VideoViewFit.cover,
@@ -1570,9 +2128,11 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(color: const Color(0xFF0CB6D4)),
                     ),
-                    child: const Text(
-                      'LEAD B · CYAN',
-                      style: TextStyle(
+                    child: Text(
+                      isAnsweringOpenCoStar
+                          ? 'LEAD B · YOU (CO-STAR AUDITION)'
+                          : 'LEAD B · CYAN',
+                      style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 9,
                         fontWeight: FontWeight.w900,
@@ -1951,6 +2511,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   }
 
   Widget _buildStageControlBar(bool isPerformer) {
+    final scene = widget.lobbySession.activeScene;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -1991,6 +2552,43 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           ),
           label: Text(_duetModeEnabled ? 'Duet On' : 'Duet Split'),
         ),
+        if (_duetModeEnabled && scene != null)
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF0CB6D4),
+              side: const BorderSide(color: Color(0xFF0CB6D4)),
+            ),
+            onPressed: () async {
+              HapticFeedback.mediumImpact();
+              final profile = AuthService.instance.currentProfile;
+              final challengeId =
+                  'duet_${scene.id}_${DateTime.now().millisecondsSinceEpoch}';
+              await CuttingRoomFeedStore.publishCompletedPerformance(
+                takeId: challengeId,
+                actorHandle:
+                    '@${(profile?.username ?? widget.localDisplayName).toUpperCase()}',
+                avatarArchetypeId:
+                    profile?.avatarArchetypeId ?? 'the_method_actor',
+                sceneTitle: '${scene.title} [OPEN CO-STAR AUDITION]',
+                filmOrSeries: scene.filmOrSeries,
+                releaseYear: scene.releaseYear,
+                scriptExcerpt:
+                    '[LEAD A RECORDED]: "${scene.duetLeadA.isNotEmpty ? scene.duetLeadA : scene.promptScript}" · [CYAN LEAD B OPEN]',
+                directorCommentStamp: 'OPEN CO-STAR AUDITION · LEAD B WANTED',
+                compositeScore: 91.5,
+              );
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Published Open Co-Star Challenge! Link: https://act-like-it.vercel.app/duet?challenge=$challengeId',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+            label: const Text('Post Open Co-Star Challenge'),
+          ),
         OutlinedButton.icon(
           onPressed: _improvTwistTriggered ? null : _triggerImprovTwist,
           icon: const Icon(
@@ -2014,6 +2612,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                     _stageManager.capturedSamples,
                   );
                   final hadImprovTwist = _improvTwistTriggered;
+                  final hadCharacterBroken = _characterBrokenTriggered;
+                  final hadCrowdCombo = _standingOvationComboActive;
                   final recorded = await _stageManager.finishRecordingTake();
                   if (!mounted) return;
                   await BespokeTransitionEngine.navigate<void>(
@@ -2027,12 +2627,16 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                       localRecordedVideoPath: recorded.filePath,
                       recordedMp4Bytes: recorded.bytes,
                       improvTwistCompleted: hadImprovTwist,
+                      characterBrokenPenalty: hadCharacterBroken,
+                      standingOvationCrowdCombo: hadCrowdCombo,
                     ),
                   );
                   if (!mounted) return;
                   setState(() {
                     _improvTwistTriggered = false;
                     _activeImprovTwistPrompt = null;
+                    _characterBrokenTriggered = false;
+                    _standingOvationComboActive = false;
                   });
                   _startPreRollCountdown();
                   await _stageManager.resumeStageAfterJudging(
@@ -2056,10 +2660,12 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
 class _CinemaViewfinderPainter extends CustomPainter {
   final bool isRecording;
   final bool improvActive;
+  final Color archetypeAccent;
 
   const _CinemaViewfinderPainter({
     required this.isRecording,
     required this.improvActive,
+    this.archetypeAccent = const Color(0xFF06B6D4),
   });
 
   @override
@@ -2102,7 +2708,7 @@ class _CinemaViewfinderPainter extends CustomPainter {
       final speedPaint = Paint()
         ..color = improvActive
             ? const Color(0x55FFD700)
-            : const Color(0x40E11D48)
+            : archetypeAccent.withValues(alpha: 0.28)
         ..strokeWidth = 1.8
         ..strokeCap = StrokeCap.round;
       final maxRadius = math.sqrt(cx * cx + cy * cy);
@@ -2119,11 +2725,11 @@ class _CinemaViewfinderPainter extends CustomPainter {
       }
     }
 
-    // Thick 2.5D Cell-Shaded Comic Frame Corner Brackets
+    // Thick 2.5D Cell-Shaded Comic Frame Corner Brackets (Archetype-themed)
     final bracketPaint = Paint()
       ..color = improvActive
           ? const Color(0xFFFFD700)
-          : (isRecording ? const Color(0xFFE11D48) : const Color(0xFF06B6D4))
+          : (isRecording ? archetypeAccent : const Color(0xFF06B6D4))
       ..strokeWidth = 3.2
       ..style = PaintingStyle.stroke;
     const cornerLen = 22.0;
@@ -2165,6 +2771,7 @@ class _CinemaViewfinderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CinemaViewfinderPainter oldDelegate) {
     return oldDelegate.isRecording != isRecording ||
-        oldDelegate.improvActive != improvActive;
+        oldDelegate.improvActive != improvActive ||
+        oldDelegate.archetypeAccent != archetypeAccent;
   }
 }

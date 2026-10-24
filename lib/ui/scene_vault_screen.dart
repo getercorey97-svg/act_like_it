@@ -6,6 +6,7 @@ import '../lobby.dart';
 import '../auth/auth_service.dart';
 import '../monetization/payment_dashboard_screen.dart';
 import 'premiere_red_carpet_painters.dart';
+import 'parody_scenes_catalog.dart';
 import 'game_app_bar.dart';
 import 'game_settings_modal.dart';
 
@@ -248,7 +249,7 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'VINTAGE BOX OFFICE WINDOW · 9 CATEGORIES · 90 GENERAL SCRIPTS',
+                      'VINTAGE BOX OFFICE WINDOW · 9 CATEGORIES · $totalGeneralSceneCount GENERAL SCRIPTS',
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
@@ -258,17 +259,50 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'THE SCENE VAULT',
-                        style: GoogleFonts.limelight(
-                          fontSize: 30,
-                          color: Colors.white,
-                          letterSpacing: 1.5,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'THE SCENE VAULT',
+                              style: GoogleFonts.limelight(
+                                fontSize: 30,
+                                color: Colors.white,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        // Fixture #13: "The Writer's Room" AI Custom Scene Generator Button (1 AI Token)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFFFD700),
+                            side: const BorderSide(
+                              color: Color(0xFFFFD700),
+                              width: 1.6,
+                            ),
+                            backgroundColor: const Color(0xD9161108),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                          ),
+                          onPressed: _openWritersRoomCustomSceneModal,
+                          icon: const Icon(Icons.edit_note_rounded, size: 17),
+                          label: const Text(
+                            '✍️ WRITER\'S ROOM (1 TOKEN)',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -684,6 +718,145 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
         ),
       ),
     );
+  }
+
+  /// Fixture #13: "The Writer's Room" AI Custom Scene Generator (1 AI Token).
+  Future<void> _openWritersRoomCustomSceneModal() async {
+    HapticFeedback.mediumImpact();
+    final objectCtrl = TextEditingController(text: 'A Haunted Toaster');
+    final jobCtrl = TextEditingController(text: 'A Corrupt Senator');
+    final emotionCtrl = TextEditingController(text: 'Paranoid Whispering');
+
+    final createdScene = await showModalBottomSheet<OriginalParodySceneEntry>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0B0E17),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              18,
+              20,
+              MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '✍️ THE WRITER\'S ROOM · AI CUSTOM SCENE GENERATOR',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Pitch 3 ingredients (1 AI Token). Gemini 2.5 Flash synthesizes a custom Solo + Duet script with a 15-second Improv Curveball.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: objectCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: '1. Bizarre Object (e.g., A Haunted Toaster)',
+                    filled: true,
+                    fillColor: Color(0xFF141926),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: jobCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: '2. Occupation (e.g., A Corrupt Senator)',
+                    filled: true,
+                    fillColor: Color(0xFF141926),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: emotionCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: '3. Emotional State (e.g., Paranoid Whispering)',
+                    filled: true,
+                    fillColor: Color(0xFF141926),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD700),
+                    foregroundColor: const Color(0xFF05070B),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () {
+                    final scene = buildFallbackWritersRoomScene(
+                      bizarreObject: objectCtrl.text,
+                      occupation: jobCtrl.text,
+                      emotionalState: emotionCtrl.text,
+                    );
+                    Navigator.of(ctx).pop(scene);
+                  },
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'GENERATE CUSTOM SCRIPT & STEP ONTO SET (1 AI TOKEN)',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (createdScene != null && mounted) {
+      kWritersRoomCustomScenes.insert(0, createdScene);
+      setState(() {});
+      final customPrompt = ScenePrompt(
+        id: createdScene.id,
+        category: SceneCategory.specialtyCultClassics,
+        title: createdScene.title,
+        filmOrSeries: 'The Writer\'s Room Original',
+        releaseYear: createdScene.releaseYear,
+        characterName: createdScene.characterName,
+        promptScript: createdScene.script,
+        directorCue: createdScene.directorNote,
+        emotionalTarget: createdScene.targetEmotion,
+        duetLeadA: createdScene.duetLeadA,
+        duetLeadB: createdScene.duetLeadB,
+        improvTwist: createdScene.improvTwist,
+      );
+      await Navigator.of(context).push(
+        StageSharedTransitionRoute(
+          page: LobbyMatchmakingScreen(
+            initialCategory: SceneCategory.specialtyCultClassics,
+            initialPromptOverride: customPrompt,
+            startInJoinMode: false,
+            autoCreateOnInit: true,
+          ),
+        ),
+      );
+    }
   }
 }
 
