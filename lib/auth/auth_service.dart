@@ -196,6 +196,8 @@ class ActorProfileState {
           DateTime.now().toUtc(),
     );
   }
+
+  String get displayName => username.trim().isNotEmpty ? username : 'StageStar';
 }
 
 /// Global authentication, multi-profile switcher, and persistent profile state manager.
@@ -807,6 +809,8 @@ class AuthService extends ChangeNotifier {
     await persistProfileToSupabaseAndCache(updated);
     return updated;
   }
+
+  Future<ActorProfileState?> addAiTokens(int amount) => topUpAiTokens(amount);
 
   Future<ActorProfileState?> unlockScenePack(String packKey) async {
     final base = _currentProfile ??

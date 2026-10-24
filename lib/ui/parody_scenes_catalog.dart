@@ -2094,19 +2094,27 @@ int get totalGeneralSceneCount {
 int get totalCatalogSceneCount =>
     kAll100ParodyScenes.length + kWritersRoomCustomScenes.length;
 
+typedef OriginalParodySceneEntry = ScenePrompt;
+
 /// Deterministic 24-Hour Global Challenge ("Cyborg-Director's Daily Cattle Call" — Fixture #3).
 class DailyCattleCallChallenge {
   final String utcDateKey;
+  final int sceneNumberOf90;
   final ScenePrompt featuredScene;
   final String mandatoryCurveball;
   final Duration timeRemainingUntilReset;
 
   const DailyCattleCallChallenge({
     required this.utcDateKey,
+    this.sceneNumberOf90 = 1,
     required this.featuredScene,
     required this.mandatoryCurveball,
     required this.timeRemainingUntilReset,
   });
+
+  ScenePrompt get scene => featuredScene;
+  String get dailyCurveball => mandatoryCurveball;
+  String get dateKeyUtc => utcDateKey;
 }
 
 const List<String> kDailyCattleCallCurveballs = <String>[
@@ -2130,7 +2138,8 @@ DailyCattleCallChallenge getTodaysDailyCattleCallChallenge([DateTime? now]) {
   final generalList = <ScenePrompt>[
     for (final list in kParodyGeneralScenesByCategory.values) ...list,
   ];
-  final chosenScene = generalList[hash % generalList.length];
+  final chosenIndex = hash % generalList.length;
+  final chosenScene = generalList[chosenIndex];
   final chosenCurveball =
       kDailyCattleCallCurveballs[(hash ~/ 7) % kDailyCattleCallCurveballs.length];
   final nextReset = DateTime.utc(utc.year, utc.month, utc.day + 1);
@@ -2138,6 +2147,7 @@ DailyCattleCallChallenge getTodaysDailyCattleCallChallenge([DateTime? now]) {
 
   return DailyCattleCallChallenge(
     utcDateKey: dateKey,
+    sceneNumberOf90: chosenIndex + 1,
     featuredScene: chosenScene,
     mandatoryCurveball: chosenCurveball,
     timeRemainingUntilReset:
@@ -2226,6 +2236,8 @@ class LifeIsImprovSecretDare {
     required this.targetReactionFromRoom,
     this.spiceTier = 3,
   });
+
+  String get escalationAt15s => midDareEscalation15s;
 
   ScenePrompt toScenePrompt() {
     return ScenePrompt(

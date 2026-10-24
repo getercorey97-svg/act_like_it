@@ -162,6 +162,7 @@ class StageSharedTransitionRoute<T> extends PageRouteBuilder<T> {
 
 class ScenePrompt {
   final String id;
+  final SceneCategory category;
   final String title;
   final String filmOrSeries;
   final int releaseYear;
@@ -178,6 +179,7 @@ class ScenePrompt {
 
   const ScenePrompt({
     required this.id,
+    this.category = SceneCategory.era1970To1999,
     required this.title,
     required this.filmOrSeries,
     required this.releaseYear,
@@ -189,8 +191,8 @@ class ScenePrompt {
     required this.emotionalTarget,
     this.improvTwist = '',
     this.is18Plus = false,
-    required this.durationSeconds,
-    required this.difficultyTier,
+    this.durationSeconds = 35,
+    this.difficultyTier = 4,
   });
 
   String get script => promptScript;
@@ -211,6 +213,9 @@ class ScenePrompt {
         .toString();
     return ScenePrompt(
       id: json['id']?.toString() ?? '',
+      category: SceneCategory.fromDbKey(
+        (json['category'] ?? 'era_1970_1999').toString(),
+      ),
       title: json['title']?.toString() ?? 'Untitled Scene',
       filmOrSeries:
           (json['actor_name'] ?? json['film_or_series'] ?? 'Featured Actor')
@@ -238,6 +243,7 @@ class ScenePrompt {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'category': category.dbKey,
         'title': title,
         'film_or_series': filmOrSeries,
         'release_year': releaseYear,
@@ -264,6 +270,8 @@ class ScenePrompt {
 /// The 10 adult scenes (`is_18_plus: true`) live in `kLateNightAfterHoursScenes`.
 const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault =
     kParodyGeneralScenesByCategory;
+
+typedef LobbyParticipant = LobbyPlayer;
 
 class LobbyPlayer {
   final String id;

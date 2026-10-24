@@ -120,6 +120,10 @@ class QaFeedbackReport {
 /// Repository handling screenshot uploads to `qa-screenshots` and inserts/streams
 /// for `public.qa_feedback` with automatic local cache fallback.
 class QaTelemetryRepository {
+  const QaTelemetryRepository();
+
+  static const QaTelemetryRepository instance = QaTelemetryRepository();
+
   static const String storageBucket = 'qa-screenshots';
   static const String tableName = 'qa_feedback';
   static const String localCachePrefsKey = 'qa_feedback_local_cache_v1';
@@ -298,11 +302,12 @@ class QaTelemetryRepository {
   }
 
   /// Fixture #18 — 1-Tap Audience Test Screening Pulse (`[🔥 Instant Classic]`, `[😂 Great Curveball]`, `[⏱️ Pacing Off]`).
-  static Future<QaFeedbackReport> submitScenePulseRating({
+  Future<QaFeedbackReport> submitScenePulseRating({
     required String sceneId,
     required String sceneTitle,
-    required String gameMode,
+    String gameMode = 'Tri-Modal Audition',
     required String pulseRating,
+    double? compositeScore,
     BuildContext? context,
   }) async {
     final handle =
@@ -310,13 +315,16 @@ class QaTelemetryRepository {
     final deviceInfo = await collectDeviceInfo(context);
     final localStateDump = await buildLocalStateDump(
       testerNote:
-          '[SCENE_PULSE] scene_id=$sceneId | title="$sceneTitle" | game_mode=$gameMode | rating=$pulseRating',
+          '[SCENE_PULSE] scene_id=$sceneId | title="$sceneTitle" | game_mode=$gameMode | rating=$pulseRating | score=${compositeScore?.toStringAsFixed(1) ?? "N/A"}',
       activeRoute: '/match-finalization',
     );
     localStateDump['scene_id'] = sceneId;
     localStateDump['scene_title'] = sceneTitle;
     localStateDump['game_mode'] = gameMode;
     localStateDump['audience_pulse_rating'] = pulseRating;
+    if (compositeScore != null) {
+      localStateDump['composite_score'] = compositeScore;
+    }
 
     final report = QaFeedbackReport(
       id: const Uuid().v4(),

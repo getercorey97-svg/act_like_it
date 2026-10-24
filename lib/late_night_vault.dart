@@ -49,6 +49,7 @@ class LateNightPrompt extends ScenePrompt {
 
   const LateNightPrompt({
     required super.id,
+    super.category = SceneCategory.specialtyCultClassics,
     required super.title,
     required super.filmOrSeries,
     required super.releaseYear,
@@ -60,8 +61,8 @@ class LateNightPrompt extends ScenePrompt {
     required super.emotionalTarget,
     super.improvTwist = '',
     super.is18Plus = true,
-    required super.durationSeconds,
-    required super.difficultyTier,
+    super.durationSeconds = 35,
+    super.difficultyTier = 4,
     required this.spiceTier,
     required this.contentAdvisory,
     required this.improvisationTwist,

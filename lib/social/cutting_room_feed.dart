@@ -1561,13 +1561,15 @@ ${take.scriptExcerpt}
                                     final session = LobbySession(
                                       id: 'duet_${take.id}',
                                       roomCode: 'DUET88',
-                                      hostUserId: 'local-costar',
+                                      hostId: 'local-costar',
                                       selectedCategory:
                                           SceneCategory.era2000To2026,
-                                      status: LobbyStatus.performing,
+                                      status: 'performing',
                                       roundNumber: 1,
+                                      activeActorId: 'local-costar',
                                       activeScene: defaultScene,
-                                      participants: const <LobbyParticipant>[],
+                                      livekitRoomName: 'act_like_it_DUET88',
+                                      players: const <LobbyPlayer>[],
                                     );
                                     Navigator.of(context).push(
                                       MaterialPageRoute(

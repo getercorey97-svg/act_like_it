@@ -34,6 +34,9 @@ class BoondocksAvatarArchetype {
 
   /// Canonical bundled asset path for this character's official illustration.
   String get assetPath => 'assets/characters/$id.jpg';
+
+  /// Compact badge label for the Soundstage HUD.
+  String get shortBadge => roleBadge;
 }
 
 /// Master registry of all 14 persistent 2.5D Cell-Shaded Avatar Archetypes,

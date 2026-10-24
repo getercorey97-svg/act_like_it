@@ -293,4 +293,45 @@ test('All 17 Viral, Gameplay, Progression & LiveOps Fixtures (#1-#5, #7-#18, ski
   assert.ok(matchFinalDart.includes('1-TAP AUDIENCE TEST SCREENING PULSE'));
 });
 
+test('Dart Release Build API & Constructor Contracts (Flutter 3.47.8 CI parity)', () => {
+  const lobbyModelsDart = fs.readFileSync('lib/ui/lobby_models_and_realtime.dart', 'utf8');
+  const catalogDart = fs.readFileSync('lib/ui/parody_scenes_catalog.dart', 'utf8');
+  const authDart = fs.readFileSync('lib/auth/auth_service.dart', 'utf8');
+  const qaOverlayDart = fs.readFileSync('lib/qa/qa_overlay.dart', 'utf8');
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  const feedDart = fs.readFileSync('lib/social/cutting_room_feed.dart', 'utf8');
+  const rigDart = fs.readFileSync('lib/ui/boondocks_character_rig.dart', 'utf8');
 
+  // 1. ScenePrompt supports optional category, durationSeconds, difficultyTier
+  assert.ok(lobbyModelsDart.includes('this.category = SceneCategory.era1970To1999'));
+  assert.ok(lobbyModelsDart.includes('this.durationSeconds = 35'));
+  assert.ok(lobbyModelsDart.includes('this.difficultyTier = 4'));
+  assert.ok(lobbyModelsDart.includes('typedef LobbyParticipant = LobbyPlayer;'));
+
+  // 2. DailyCattleCallChallenge & LifeIsImprovSecretDare getters
+  assert.ok(catalogDart.includes('typedef OriginalParodySceneEntry = ScenePrompt;'));
+  assert.ok(catalogDart.includes('final int sceneNumberOf90;'));
+  assert.ok(catalogDart.includes('ScenePrompt get scene => featuredScene;'));
+  assert.ok(catalogDart.includes('String get dailyCurveball => mandatoryCurveball;'));
+  assert.ok(catalogDart.includes('String get dateKeyUtc => utcDateKey;'));
+  assert.ok(catalogDart.includes('String get escalationAt15s => midDareEscalation15s;'));
+
+  // 3. ActorProfileState.displayName & AuthService.addAiTokens
+  assert.ok(authDart.includes('String get displayName =>'));
+  assert.ok(authDart.includes('Future<ActorProfileState?> addAiTokens(int amount) => topUpAiTokens(amount);'));
+
+  // 4. QaTelemetryRepository.instance & submitScenePulseRating
+  assert.ok(qaOverlayDart.includes('static const QaTelemetryRepository instance = QaTelemetryRepository();'));
+  assert.ok(qaOverlayDart.includes('Future<QaFeedbackReport> submitScenePulseRating({'));
+
+  // 5. dart:async imported in judging_engine.dart for unawaited(...)
+  assert.ok(judgingDart.includes("import 'dart:async';"));
+
+  // 6. LobbySession in cutting_room_feed.dart uses canonical hostId, livekitRoomName, players
+  assert.equal(feedDart.includes('hostUserId:'), false);
+  assert.equal(feedDart.includes('LobbyStatus.performing'), false);
+  assert.ok(feedDart.includes("hostId: 'local-costar'"));
+
+  // 7. BoondocksAvatarArchetype.shortBadge getter
+  assert.ok(rigDart.includes('String get shortBadge => roleBadge;'));
+});
