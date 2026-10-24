@@ -213,7 +213,7 @@ class ScenePrompt {
         .toString();
     return ScenePrompt(
       id: json['id']?.toString() ?? '',
-      category: SceneCategory.fromDbKey(
+      category: SceneCategory.fromKey(
         (json['category'] ?? 'era_1970_1999').toString(),
       ),
       title: json['title']?.toString() ?? 'Untitled Scene',
@@ -243,7 +243,7 @@ class ScenePrompt {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'category': category.dbKey,
+        'category': category.key,
         'title': title,
         'film_or_series': filmOrSeries,
         'release_year': releaseYear,

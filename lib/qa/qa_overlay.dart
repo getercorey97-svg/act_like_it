@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../auth/auth_service.dart';
 import '../main.dart';
+import '../ui/game_settings_modal.dart';
 import 'qa_web_portal.dart';
 
 /// Tracks the active `PageRoute` across the application so Shake-to-Report
