@@ -406,21 +406,45 @@ class TriModalJudgingEngine extends ChangeNotifier {
     return raw.clamp(0.0, 100.0);
   }
 
+  /// Sum of enabled base weights (AI=45, Peer=35, Social=20).
+  int get enabledWeightSum {
+    final cfg = GameSettingsModal.latestConfig;
+    return (cfg.aiTelemetricsEnabled ? 45 : 0) +
+        (cfg.peerJudgingEnabled ? 35 : 0) +
+        (cfg.socialJudgingEnabled ? 20 : 0);
+  }
+
+  /// Dynamically normalized percentage (0–100) for AI Telemetrics.
+  double get actualAiWeight {
+    final cfg = GameSettingsModal.latestConfig;
+    final sum = enabledWeightSum;
+    if (sum <= 0) return 45.0;
+    return cfg.aiTelemetricsEnabled ? (45.0 / sum) * 100.0 : 0.0;
+  }
+
+  /// Dynamically normalized percentage (0–100) for Peer Loop Judging.
+  double get actualPeerWeight {
+    final cfg = GameSettingsModal.latestConfig;
+    final sum = enabledWeightSum;
+    if (sum <= 0) return 35.0;
+    return cfg.peerJudgingEnabled ? (35.0 / sum) * 100.0 : 0.0;
+  }
+
+  /// Dynamically normalized percentage (0–100) for Social Viral Judging.
+  double get actualSocialWeight {
+    final cfg = GameSettingsModal.latestConfig;
+    final sum = enabledWeightSum;
+    if (sum <= 0) return 20.0;
+    return cfg.socialJudgingEnabled ? (20.0 / sum) * 100.0 : 0.0;
+  }
+
   /// Dynamically normalizes the enabled judging channels from `GameSettingsModal`
   /// so active weights always sum to 100% (1.0).
   ({double aiW, double peerW, double socialW}) get normalizedWeights {
-    final cfg = GameSettingsModal.latestConfig;
-    final rawAi = cfg.aiTelemetricsEnabled ? 0.45 : 0.0;
-    final rawPeer = cfg.peerJudgingEnabled ? 0.35 : 0.0;
-    final rawSocial = cfg.socialJudgingEnabled ? 0.20 : 0.0;
-    final total = rawAi + rawPeer + rawSocial;
-    if (total <= 0.001) {
-      return (aiW: 0.45, peerW: 0.35, socialW: 0.20);
-    }
     return (
-      aiW: rawAi / total,
-      peerW: rawPeer / total,
-      socialW: rawSocial / total,
+      aiW: actualAiWeight / 100.0,
+      peerW: actualPeerWeight / 100.0,
+      socialW: actualSocialWeight / 100.0,
     );
   }
 
@@ -1058,6 +1082,8 @@ class TriModalJudgingScreen extends StatefulWidget {
   final bool improvTwistCompleted;
   final bool characterBrokenPenalty;
   final bool standingOvationCrowdCombo;
+  final int? currentPlayerIndex;
+  final int? totalLocalPlayers;
 
   const TriModalJudgingScreen({
     super.key,
@@ -1071,6 +1097,8 @@ class TriModalJudgingScreen extends StatefulWidget {
     this.improvTwistCompleted = false,
     this.characterBrokenPenalty = false,
     this.standingOvationCrowdCombo = false,
+    this.currentPlayerIndex,
+    this.totalLocalPlayers,
   });
 
   @override
@@ -1148,7 +1176,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
             : 'crf_live_${saved.id}',
         actorHandle:
             '@${(profile?.username ?? widget.performerDisplayName).toUpperCase()}',
-        avatarArchetypeId: profile?.avatarArchetypeId ?? 'the_method_actor',
+        avatarArchetypeId: AuthService.instance.currentUserAvatar,
         sceneTitle: _engine.isLifeIsImprovTake
             ? '🕵️ [LIFE IS IMPROV] ${_scene.title}'
             : _scene.title,
@@ -1287,13 +1315,13 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                   ),
                 ),
               ],
-              const TutorialOverlay(
+              TutorialOverlay(
                 tutorialKey: 'judging_peer_swipe_v1',
                 badgeLabel: 'TRI-MODAL JUDGING TIP',
                 title: 'Watch the Loop & Slide to Rate Peers',
                 message:
-                    'Your take replays continuously above while Gemini AI (45%), Peer Voting (35%), and Social Shares (20%) combine into your final Composite Verdict.',
-                neonAccent: Color(0xFFF59E0B),
+                    'Your take replays continuously above while Gemini AI (${_engine.actualAiWeight.round()}%), Peer Voting (${_engine.actualPeerWeight.round()}%), and Social Shares (${_engine.actualSocialWeight.round()}%) combine into your final Composite Verdict.',
+                neonAccent: const Color(0xFFF59E0B),
                 icon: Icons.thumbs_up_down_rounded,
               ),
               _buildAnimeFreezeFrameClimaxBanner(),
@@ -2061,79 +2089,129 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
             const SizedBox(height: 16),
             _buildHollywoodCriticsScorecard(report),
             const SizedBox(height: 18),
-            // Official Match Finalization & Award Ceremony Button
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.heavyImpact();
-                _verdictStingPlayer?.stop();
-                _engine.loopController?.pause();
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => MatchFinalizationScreen(
-                      lobbySession: widget.lobbySession,
-                      performerUserId: widget.performerUserId,
-                      performerDisplayName: widget.performerDisplayName,
-                      leadPerformerName: widget.performerDisplayName,
-                      scene: _scene,
-                      compositeScore: _engine.compositeTriModalScore,
-                      aiScore: _engine.aiScore,
-                      peerScore: _engine.peerScore,
-                      socialScore: _engine.socialScore,
-                      improvBonus: _engine.improvBonus,
-                      showstopperTitle: _engine.showstopperArchetype.title,
+            // Official Match Finalization or Pass-and-Play Turn Rotation Button
+            Builder(
+              builder: (context) {
+                final effectivePlayerIndex = widget.currentPlayerIndex ??
+                    widget.lobbySession.currentPlayerIndex;
+                final effectiveTotalPlayers = widget.totalLocalPlayers ??
+                    math.max(
+                      widget.lobbySession.totalLocalPlayers,
+                      widget.lobbySession.players.length,
+                    );
+                final hasRemainingLocalPlayers =
+                    (effectivePlayerIndex + 1) < effectiveTotalPlayers;
+                final nextPlayerIndex = effectivePlayerIndex + 1;
+                final LobbyPlayer? nextPlayer =
+                    nextPlayerIndex < widget.lobbySession.players.length
+                        ? widget.lobbySession.players[nextPlayerIndex]
+                        : null;
+                final nextPlayerName =
+                    nextPlayer?.displayName ?? 'Player ${nextPlayerIndex + 1}';
+
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    _verdictStingPlayer?.stop();
+                    _engine.loopController?.pause();
+
+                    if (hasRemainingLocalPlayers) {
+                      final nextSession = widget.lobbySession.copyWith(
+                        currentPlayerIndex: nextPlayerIndex,
+                        totalLocalPlayers: effectiveTotalPlayers,
+                      );
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => MatchHoldingRoomScreen(
+                            lobbySession: nextSession,
+                            nextPlayerIndex: nextPlayerIndex,
+                            totalLocalPlayers: effectiveTotalPlayers,
+                            nextPlayerId: nextPlayer?.userId ??
+                                'local_p_${nextPlayerIndex + 1}',
+                            nextPlayerName: nextPlayerName,
+                            nextPlayerAvatarId: nextPlayer?.avatarArchetypeId ??
+                                'the_ leading_lady'.replaceAll(' ', ''),
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => MatchFinalizationScreen(
+                          lobbySession: widget.lobbySession,
+                          performerUserId: widget.performerUserId,
+                          performerDisplayName: widget.performerDisplayName,
+                          leadPerformerName: widget.performerDisplayName,
+                          scene: _scene,
+                          compositeScore: _engine.compositeTriModalScore,
+                          aiScore: _engine.aiScore,
+                          peerScore: _engine.peerScore,
+                          socialScore: _engine.socialScore,
+                          improvBonus: _engine.improvBonus,
+                          showstopperTitle: _engine.showstopperArchetype.title,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: hasRemainingLocalPlayers
+                            ? const [Color(0xFF0CB6D4), Color(0xFF0284C7)]
+                            : const [Color(0xFFFFD700), Color(0xFFF59E0B)],
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFF05070B),
+                        width: 3.0,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0xFF05070B),
+                          offset: Offset(5, 5),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          hasRemainingLocalPlayers
+                              ? Icons.phone_android_rounded
+                              : Icons.emoji_events_rounded,
+                          color: const Color(0xFF05070B),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              hasRemainingLocalPlayers
+                                  ? '🎬 PASS DEVICE TO ${nextPlayerName.toUpperCase()}'
+                                  : '🏆 FINALIZE MATCH & OFFICIAL VERDICT',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.9,
+                                color: Color(0xFF05070B),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
               },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 18,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFD700), Color(0xFFF59E0B)],
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: const Color(0xFF05070B),
-                    width: 3.0,
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0xFF05070B),
-                      offset: Offset(5, 5),
-                      blurRadius: 0,
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.emoji_events_rounded,
-                      color: Color(0xFF05070B),
-                      size: 24,
-                    ),
-                    SizedBox(width: 10),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          '🏆 FINALIZE MATCH & OFFICIAL VERDICT',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.9,
-                            color: Color(0xFF05070B),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
             const SizedBox(height: 20),
           ],
@@ -2146,7 +2224,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   Widget _buildAnimeFreezeFrameClimaxBanner() {
     final composite = _engine.compositeTriModalScore;
     final actorArchetype = resolveAvatarArchetype(
-      AuthService.instance.currentProfile?.avatarArchetypeId,
+      AuthService.instance.currentUserAvatar,
     );
     final isStandingOvation = composite >= 85.0;
 
@@ -2197,11 +2275,14 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                 ),
                 child: Row(
                   children: [
-                    BoondocksAvatarPortrait(
-                      archetype: actorArchetype,
-                      size: 86,
-                      isSelected: true,
-                      animationPhase: 0.65,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: BoondocksAvatarPortrait(
+                        archetype: actorArchetype,
+                        size: 86,
+                        isSelected: true,
+                        animationPhase: 0.0,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -2297,6 +2378,11 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   }
 
   Widget _buildStaggeredThreePillarCounters() {
+    final cfg = GameSettingsModal.latestConfig;
+    final aiPct = _engine.actualAiWeight.round();
+    final peerPct = _engine.actualPeerWeight.round();
+    final socialPct = _engine.actualSocialWeight.round();
+
     final pillars = <({
       String title,
       String weight,
@@ -2306,21 +2392,21 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
     })>[
       (
         title: 'AI TELEMETRICS',
-        weight: '45% WEIGHT',
+        weight: cfg.aiTelemetricsEnabled ? '$aiPct% WEIGHT' : 'OFF (0%)',
         score: _engine.aiScore,
         accent: const Color(0xFFE11D48),
         durationMs: 750,
       ),
       (
         title: 'PEER LOOP',
-        weight: '35% WEIGHT',
+        weight: cfg.peerJudgingEnabled ? '$peerPct% WEIGHT' : 'OFF (0%)',
         score: _engine.peerScore,
         accent: const Color(0xFF10B981),
         durationMs: 1050,
       ),
       (
         title: 'SOCIAL VIRAL',
-        weight: '20% WEIGHT',
+        weight: cfg.socialJudgingEnabled ? '$socialPct% WEIGHT' : 'OFF (0%)',
         score: _engine.socialScore,
         accent: const Color(0xFFF59E0B),
         durationMs: 1350,
@@ -2431,11 +2517,14 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          BoondocksAvatarPortrait(
-            archetype: directorArchetype,
-            size: 62,
-            isSelected: true,
-            animationPhase: 0.35,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: BoondocksAvatarPortrait(
+              archetype: directorArchetype,
+              size: 62,
+              isSelected: true,
+              animationPhase: 0.0,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2907,3 +2996,210 @@ class _AnimeClimaxSpeedLinesPainter extends CustomPainter {
     return oldDelegate.accentColor != accentColor;
   }
 }
+
+/// Intermediate Pass-and-Play "Match Holding Room" screen that hides the previous
+/// player's score, instructs the room to hand the device to the next actor, and
+/// launches their camera pre-roll when they tap "I'M READY".
+class MatchHoldingRoomScreen extends StatelessWidget {
+  final LobbySession lobbySession;
+  final int nextPlayerIndex;
+  final int totalLocalPlayers;
+  final String nextPlayerId;
+  final String nextPlayerName;
+  final String nextPlayerAvatarId;
+
+  const MatchHoldingRoomScreen({
+    super.key,
+    required this.lobbySession,
+    required this.nextPlayerIndex,
+    required this.totalLocalPlayers,
+    required this.nextPlayerId,
+    required this.nextPlayerName,
+    required this.nextPlayerAvatarId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final archetype = resolveAvatarArchetype(nextPlayerAvatarId);
+    final scene = lobbySession.activeScene;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF07090E),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.0, -0.3),
+            radius: 1.25,
+            colors: [
+              Color(0xFF520002),
+              Color(0xFF14070D),
+              Color(0xFF07090E),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B0E17),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: const Color(0xFFFFD700),
+                        width: 2.0,
+                      ),
+                    ),
+                    child: Text(
+                      'COUCH CO-OP HOLDING ROOM · ACTOR ${nextPlayerIndex + 1} OF $totalLocalPlayers',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                        color: Color(0xFFFFD700),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B0E17),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: const Color(0xFF05070B),
+                      width: 3.5,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0xFF05070B),
+                        offset: Offset(6, 6),
+                        blurRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: BoondocksAvatarPortrait(
+                          archetype: archetype,
+                          size: 96,
+                          isSelected: true,
+                          animationPhase: 0.0,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'PREVIOUS SCORE LOCKED IN STUDIO VAULT',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
+                          color: Color(0xFF0CB6D4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Pass the phone to $nextPlayerName',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        scene != null
+                            ? 'Up Next: "${scene.title}" (${scene.filmOrSeries})'
+                            : 'Get ready for your 10-second camera pre-roll.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFFF5DEB3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => LiveKitSoundstageScreen(
+                          lobbySession: lobbySession,
+                          localUserId: nextPlayerId,
+                          localDisplayName: nextPlayerName,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 20,
+                      horizontal: 20,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFD700), Color(0xFFF59E0B)],
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFF05070B),
+                        width: 3.0,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0xFF05070B),
+                          offset: Offset(5, 5),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.videocam_rounded,
+                          color: Color(0xFF05070B),
+                          size: 26,
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          '🎬 I\'M READY · ROLL PRE-ROLL',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.0,
+                            color: Color(0xFF05070B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

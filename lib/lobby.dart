@@ -16,11 +16,14 @@ import 'ui/lobby_models_and_realtime.dart';
 import 'ui/premiere_doors_marquee.dart';
 import 'ui/premiere_red_carpet_painters.dart';
 import 'ui/parody_scenes_catalog.dart';
+import 'ui/boondocks_character_rig.dart';
+import 'ui/living_25d_animation_engine.dart';
 import 'auth/auth_service.dart';
 
 export 'ui/lobby_models_and_realtime.dart';
 export 'ui/premiere_doors_marquee.dart';
 export 'ui/premiere_red_carpet_painters.dart';
+export 'ui/living_25d_animation_engine.dart';
 
 class LobbyMatchmakingScreen extends StatefulWidget {
   final SceneCategory initialCategory;
@@ -259,13 +262,12 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               fit: StackFit.expand,
               children: [
                 RepaintBoundary(
-                  child: CustomPaint(
-                    painter: PaparazziRedCarpetPainter(
-                      scrollOffset: _scrollOffset,
-                      phase: phase,
-                      scrollVelocity: _scrollVelocity,
-                      touchPosition: _activeTouchPosition,
-                    ),
+                  child: RedCarpet25DParallaxEnvironment(
+                    scrollOffset: _scrollOffset,
+                    scrollVelocity: _scrollVelocity,
+                    touchPosition: _activeTouchPosition,
+                    extraFrenzyIntensity: frenzy,
+                    showFlankCardsOverlay: true,
                   ),
                 ),
                 IgnorePointer(
@@ -371,6 +373,8 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Living25DHeroCharactersTrioSection(),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -1287,10 +1291,15 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () {
+                          final syncedSession = session.copyWith(
+                            players: players,
+                            currentPlayerIndex: 0,
+                            totalLocalPlayers: math.max(1, players.length),
+                          );
                           Navigator.of(context).push(
                             StageSharedTransitionRoute(
                               page: LiveKitSoundstageScreen(
-                                lobbySession: session,
+                                lobbySession: syncedSession,
                                 localUserId: _lobbyManager.localUserId,
                                 localDisplayName:
                                     _lobbyManager.localDisplayName,
@@ -1323,89 +1332,143 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               ),
             ),
             if (players.length < session.maxPlayers)
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFF59E0B),
-                  side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+              Wrap(
+                spacing: 6,
+                children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0CB6D4),
+                      side: const BorderSide(
+                        color: Color(0xFF0CB6D4),
+                        width: 1.5,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _lobbyManager.addLocalPassAndPlayPlayer();
+                    },
+                    icon: const Icon(Icons.group_add_rounded, size: 15),
+                    label: const Text(
+                      '+ Pass & Play',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  _lobbyManager.addAiCoStar();
-                },
-                icon: const Icon(Icons.person_add_alt_1_rounded, size: 15),
-                label: const Text(
-                  '+ Add AI Co-Star',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFF59E0B),
+                      side: const BorderSide(
+                        color: Color(0xFFF59E0B),
+                        width: 1.5,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _lobbyManager.addAiCoStar();
+                    },
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 15),
+                    label: const Text(
+                      '+ AI Co-Star',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
           ],
         ),
         const SizedBox(height: 10),
         ...players.map(
-          (player) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF121722),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF1E293B)),
-            ),
-            child: ListTile(
-              title: Text(
-                player.displayName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+          (player) {
+            final isLocalUser = player.userId == _lobbyManager.localUserId;
+            final resolvedAvatarId = isLocalUser
+                ? AuthService.instance.currentUserAvatar
+                : player.avatarArchetypeId;
+            final playerArchetype = resolveAvatarArchetype(resolvedAvatarId);
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF121722),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isLocalUser
+                      ? playerArchetype.rimAccentColor.withValues(alpha: 0.65)
+                      : const Color(0xFF1E293B),
+                ),
               ),
-              subtitle: Text(
-                player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    player.isReady ? 'ON SET' : 'STANDBY',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: player.isReady
-                          ? const Color(0xFF10B981)
-                          : const Color(0xFFF59E0B),
-                    ),
+              child: ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: BoondocksAvatarPortrait(
+                    archetype: playerArchetype,
+                    size: 44,
+                    isSelected: isLocalUser,
+                    animationPhase: 0.0,
                   ),
-                  if (player.userId != _lobbyManager.localUserId) ...[
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.flag_outlined,
-                        size: 16,
-                        color: Color(0xFF64748B),
+                ),
+                title: Text(
+                  player.displayName,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  '${player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast'} · ${playerArchetype.name}',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      player.isReady ? 'ON SET' : 'STANDBY',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: player.isReady
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFFF59E0B),
                       ),
-                      tooltip: 'Report or Block Actor',
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        _lobbyManager.blockAndRemovePlayer(player.userId);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Reported & removed ${player.displayName} from your Green Room.',
-                            ),
-                          ),
-                        );
-                      },
                     ),
+                    if (player.userId != _lobbyManager.localUserId) ...[
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.flag_outlined,
+                          size: 16,
+                          color: Color(0xFF64748B),
+                        ),
+                        tooltip: 'Report or Block Actor',
+                        onPressed: () {
+                          HapticFeedback.mediumImpact();
+                          _lobbyManager.blockAndRemovePlayer(player.userId);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Reported & removed ${player.displayName} from your Green Room.',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
         const SizedBox(height: 20),
         Row(

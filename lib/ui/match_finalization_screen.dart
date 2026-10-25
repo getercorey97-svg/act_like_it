@@ -189,9 +189,8 @@ Play Live: https://act-like-it.vercel.app
 
   @override
   Widget build(BuildContext context) {
-    final profile = AuthService.instance.currentProfile;
     final actorArchetype =
-        resolveAvatarArchetype(profile?.avatarArchetypeId);
+        resolveAvatarArchetype(AuthService.instance.currentUserAvatar);
     final isStatuetteWinner = widget.compositeScore >= 75.0;
     final starsCount = (widget.compositeScore / 20.0).round().clamp(1, 5);
     final totalWins = OfflineManager.instance.totalCareerWins;
@@ -293,10 +292,14 @@ Play Live: https://act-like-it.vercel.app
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              BoondocksCharacterRig(
-                                archetype: actorArchetype,
-                                size: 92,
-                                isSelected: true,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: BoondocksAvatarPortrait(
+                                  archetype: actorArchetype,
+                                  size: 92,
+                                  isSelected: true,
+                                  animationPhase: 0.0,
+                                ),
                               ),
                               const SizedBox(width: 16),
                               Container(

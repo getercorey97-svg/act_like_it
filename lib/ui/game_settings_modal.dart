@@ -75,6 +75,24 @@ class GameSettingsConfig {
       turnMode: turnMode ?? this.turnMode,
     );
   }
+
+  /// Dynamic Judging Weight Normalization:
+  /// Base weights: AI = 45, Peer = 35, Social = 20.
+  int get enabledWeightSum {
+    final sum = (aiTelemetricsEnabled ? 45 : 0) +
+        (peerJudgingEnabled ? 35 : 0) +
+        (socialJudgingEnabled ? 20 : 0);
+    return sum <= 0 ? 45 : sum;
+  }
+
+  double get actualAiWeight =>
+      aiTelemetricsEnabled ? (45.0 / enabledWeightSum) * 100.0 : 0.0;
+
+  double get actualPeerWeight =>
+      peerJudgingEnabled ? (35.0 / enabledWeightSum) * 100.0 : 0.0;
+
+  double get actualSocialWeight =>
+      socialJudgingEnabled ? (20.0 / enabledWeightSum) * 100.0 : 0.0;
 }
 
 /// "The Call Sheet" Pre-Game Settings Modal designed for `showModalBottomSheet`.
@@ -134,6 +152,28 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
   String _cameraResolution = '1080p60 Cinematic';
   bool _hasSavedCredentials = false;
   bool _showDeveloperDiagnostics = false;
+
+  int get _enabledWeightSum {
+    final isAiEnabled = _aiTelemetricsEnabled;
+    final isPeerEnabled = _peerJudgingEnabled;
+    final isSocialEnabled = _socialJudgingEnabled;
+    final enabledWeightSum = (isAiEnabled ? 45 : 0) +
+        (isPeerEnabled ? 35 : 0) +
+        (isSocialEnabled ? 20 : 0);
+    return enabledWeightSum <= 0 ? 45 : enabledWeightSum;
+  }
+
+  double get _actualAiWeight => !_aiTelemetricsEnabled &&
+          !_peerJudgingEnabled &&
+          !_socialJudgingEnabled
+      ? 100.0
+      : (_aiTelemetricsEnabled ? (45.0 / _enabledWeightSum) * 100.0 : 0.0);
+
+  double get _actualPeerWeight =>
+      _peerJudgingEnabled ? (35.0 / _enabledWeightSum) * 100.0 : 0.0;
+
+  double get _actualSocialWeight =>
+      _socialJudgingEnabled ? (20.0 / _enabledWeightSum) * 100.0 : 0.0;
 
   @override
   void initState() {
@@ -340,59 +380,113 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
               const SizedBox(height: 28),
 
               // Section Label: Studio Judging Faders
-              const Text(
-                'TRI-MODAL JUDGING SOUNDBOARD',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.4,
-                  color: Color(0xFFF5DEB3),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'TRI-MODAL JUDGING SOUNDBOARD',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
+                        color: Color(0xFFF5DEB3),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0x2610B981),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF10B981)),
+                    ),
+                    child: Text(
+                      'NORMALIZED: ${(_actualAiWeight + _actualPeerWeight + _actualSocialWeight).round()}% TOTAL',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
               // Studio Toggle 1: AI Telemetrics
               _buildStudioSoundboardToggle(
-                channelCode: 'CH 01 · 45% WEIGHT',
-                title: 'AI Telemetrics',
+                channelCode: _aiTelemetricsEnabled
+                    ? 'CH 01 · ${_actualAiWeight.toStringAsFixed(1)}% NORMALIZED WEIGHT (BASE 45%)'
+                    : 'CH 01 · 0.0% WEIGHT (BYPASSED)',
+                title: 'AI Telemetrics (${_actualAiWeight.round()}%)',
                 subtitle: 'Gemini facial micro-expressions & vocal prosody scan',
                 icon: Icons.psychology_alt_rounded,
                 neonColor: const Color(0xFFE11342),
                 value: _aiTelemetricsEnabled,
                 onChanged: (val) {
                   HapticFeedback.selectionClick();
-                  setState(() => _aiTelemetricsEnabled = val);
+                  setState(() {
+                    _aiTelemetricsEnabled = val;
+                    if (!_aiTelemetricsEnabled &&
+                        !_peerJudgingEnabled &&
+                        !_socialJudgingEnabled) {
+                      _aiTelemetricsEnabled = true;
+                    }
+                  });
                 },
               ),
               const SizedBox(height: 20),
 
               // Studio Toggle 2: Peer Judging
               _buildStudioSoundboardToggle(
-                channelCode: 'CH 02 · 35% WEIGHT',
-                title: 'Peer Judging',
+                channelCode: _peerJudgingEnabled
+                    ? 'CH 02 · ${_actualPeerWeight.toStringAsFixed(1)}% NORMALIZED WEIGHT (BASE 35%)'
+                    : 'CH 02 · 0.0% WEIGHT (BYPASSED)',
+                title: 'Peer Judging (${_actualPeerWeight.round()}%)',
                 subtitle: 'Screening Room loop replay & 1–10 ensemble vote',
                 icon: Icons.thumbs_up_down_rounded,
                 neonColor: const Color(0xFF0CB6D4),
                 value: _peerJudgingEnabled,
                 onChanged: (val) {
                   HapticFeedback.selectionClick();
-                  setState(() => _peerJudgingEnabled = val);
+                  setState(() {
+                    _peerJudgingEnabled = val;
+                    if (!_aiTelemetricsEnabled &&
+                        !_peerJudgingEnabled &&
+                        !_socialJudgingEnabled) {
+                      _aiTelemetricsEnabled = true;
+                    }
+                  });
                 },
               ),
               const SizedBox(height: 20),
 
               // Studio Toggle 3: Social Judging
               _buildStudioSoundboardToggle(
-                channelCode: 'CH 03 · 20% WEIGHT',
-                title: 'Social Judging',
+                channelCode: _socialJudgingEnabled
+                    ? 'CH 03 · ${_actualSocialWeight.toStringAsFixed(1)}% NORMALIZED WEIGHT (BASE 20%)'
+                    : 'CH 03 · 0.0% WEIGHT (BYPASSED)',
+                title: 'Social Judging (${_actualSocialWeight.round()}%)',
                 subtitle: 'External clip shares & crowd reaction multiplier',
                 icon: Icons.share_arrival_time_rounded,
                 neonColor: const Color(0xFFF5DEB3),
                 value: _socialJudgingEnabled,
                 onChanged: (val) {
                   HapticFeedback.selectionClick();
-                  setState(() => _socialJudgingEnabled = val);
+                  setState(() {
+                    _socialJudgingEnabled = val;
+                    if (!_aiTelemetricsEnabled &&
+                        !_peerJudgingEnabled &&
+                        !_socialJudgingEnabled) {
+                      _aiTelemetricsEnabled = true;
+                    }
+                  });
                 },
               ),
               const SizedBox(height: 28),

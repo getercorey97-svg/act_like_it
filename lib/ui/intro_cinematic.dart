@@ -11,11 +11,13 @@ import '../auth/auth_service.dart';
 import '../dashboard_marquee.dart';
 import 'boondocks_character_rig.dart';
 import 'brand_logo.dart';
+import 'living_25d_animation_engine.dart';
 import 'opening_maestro_hero.dart';
 import 'transitions.dart';
 
 export 'boondocks_character_rig.dart';
 export 'brand_logo.dart';
+export 'living_25d_animation_engine.dart';
 export 'opening_maestro_hero.dart';
 
 /// MODULE 1: Official 8-Second "ACT LIKE IT" Opening Video & Logo Climax
@@ -275,10 +277,11 @@ class _CellShadedIntroCinematicScreenState
                   children: [
                     Transform.translate(
                       offset: Offset(stepSwayX, stepBobY),
-                      child: CustomPaint(
-                        painter: _FirstPersonCellShadedCarpetWalkPainter(
-                          walkProgress: walkProgress,
-                        ),
+                      child: RedCarpet25DParallaxEnvironment(
+                        scrollOffset: walkProgress * 640.0,
+                        scrollVelocity: 12.0,
+                        extraFrenzyIntensity: shockwaveT,
+                        showFlankCardsOverlay: true,
                       ),
                     ),
                     ..._buildRedCarpetAdvancingCharacterRigs(

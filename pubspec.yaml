@@ -55,6 +55,7 @@ flutter:
     - assets/app_logo.png
     - assets/app_logo.jpg
     - assets/characters/
+    - assets/living_25d/
     - assets/videos/
 
 dependency_overrides:

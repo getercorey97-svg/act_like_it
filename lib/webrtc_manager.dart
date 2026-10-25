@@ -679,6 +679,9 @@ class LiveKitSoundstageScreen extends StatefulWidget {
 class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     with WidgetsBindingObserver {
   late final WebRtcStageManager _stageManager;
+  late final PageController _panoramicPageController =
+      PageController(initialPage: 1);
+  int _activePanoramicTab = 1;
   bool _largeTeleprompterFont = false;
   late bool _duetModeEnabled = widget.openCoStarChallengeTakeId != null ||
       GameSettingsModal.latestConfig.screenTestDuetMode;
@@ -1017,6 +1020,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     _vuModulationTimer?.cancel();
     _reactionClearTimer?.cancel();
     _personaCutInTimer?.cancel();
+    _panoramicPageController.dispose();
     _stageKeyboardFocusNode.dispose();
     try {
       final ch = _hypeRealtimeChannel;
@@ -1038,7 +1042,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     final isLifeIsImprov = cfg.lifeIsImprovMode ||
         (scene?.id.startsWith('life_improv_') ?? false);
     final actorArchetype = resolveAvatarArchetype(
-      AuthService.instance.currentProfile?.avatarArchetypeId,
+      AuthService.instance.currentUserAvatar,
     );
     final screenSize = MediaQuery.sizeOf(context);
     final isWideDeXOrTvLayout = cfg.bigScreenPremiereHostView ||
@@ -1391,11 +1395,14 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        BoondocksCharacterRig(
-                          archetype: actorArchetype,
-                          size: 46,
-                          isSelected: true,
-                          externalPhase: 0.75,
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: BoondocksAvatarPortrait(
+                            archetype: actorArchetype,
+                            size: 46,
+                            isSelected: true,
+                            animationPhase: 0.0,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Column(
@@ -1626,26 +1633,424 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(12.0),
-            child: isWideDeXOrTvLayout
-                ? _buildWideStudioControlDeckLayout(
-                    viewfinderWidget: viewfinderWidget,
-                    scene: scene,
-                    isPerformer: isPerformer,
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildPanoramicFloatingTabBar(),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: PageView(
+                    controller: _panoramicPageController,
+                    onPageChanged: (index) {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _activePanoramicTab = index;
+                      });
+                    },
                     children: [
-                      Expanded(
-                        flex: 4,
-                        child: viewfinderWidget,
+                      // Panel 1 (Left - Director's Booth): Hardware toggles & stage controls
+                      _buildDirectorsBoothPanel(
+                        isPerformer: isPerformer,
+                        scene: scene,
                       ),
-                      const SizedBox(height: 8),
-                      _buildSpectatorStrip(),
-                      const SizedBox(height: 8),
-                      _buildStageControlBar(isPerformer),
+                      // Panel 2 (Center - Main Stage): 100% dedicated to CameraPreview / LiveKit feed & Teleprompter
+                      isWideDeXOrTvLayout
+                          ? _buildWideStudioControlDeckLayout(
+                              viewfinderWidget: viewfinderWidget,
+                              scene: scene,
+                              isPerformer: isPerformer,
+                            )
+                          : viewfinderWidget,
+                      // Panel 3 (Right - Spectator Lounge): Live Studio Audience viewport
+                      _buildLiveStudioAudiencePanel(),
                     ],
                   ),
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPanoramicFloatingTabBar() {
+    const tabs = <({int index, String label})>[
+      (index: 0, label: '🎛️ BOOTH'),
+      (index: 1, label: '🎬 STAGE'),
+      (index: 2, label: '🍿 AUDIENCE'),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xEB0B0E17),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF05070B),
+          width: 2.5,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(4, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Row(
+        children: tabs.map((tab) {
+          final isSelected = _activePanoramicTab == tab.index;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  _activePanoramicTab = tab.index;
+                });
+                _panoramicPageController.animateToPage(
+                  tab.index,
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                );
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                decoration: BoxDecoration(
+                  gradient: isSelected
+                      ? const LinearGradient(
+                          colors: [Color(0xFFE11342), Color(0xFF991B1B)],
+                        )
+                      : null,
+                  color: isSelected ? null : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  border: isSelected
+                      ? Border.all(color: const Color(0xFFFFD700), width: 1.6)
+                      : null,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    tab.label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      color: isSelected
+                          ? const Color(0xFFFFD700)
+                          : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildDirectorsBoothPanel({
+    required bool isPerformer,
+    required ScenePrompt? scene,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0E17),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF05070B),
+          width: 3.0,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(5, 5),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x26FFD700),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFFD700)),
+                  ),
+                  child: const Text(
+                    '🎛️ DIRECTOR\'S BOOTH · HARDWARE & RIGGING',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Configure your camera, microphone, lens orientation, or end the take for Tri-Modal Judging. Swipe right or tap 🎬 STAGE above to return to the unobstructed viewfinder.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildStageControlBar(isPerformer),
+            if (scene != null) ...[
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111624),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF1E293B)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ACTIVE SCENE DOSSIER · ${scene.title.toUpperCase()}',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0CB6D4),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '"${scene.promptScript}"',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFF5DEB3),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Director Cue: ${scene.directorCue}',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFFFD700),
+                side: const BorderSide(color: Color(0xFFFFD700), width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: () {
+                _panoramicPageController.animateToPage(
+                  1,
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                );
+              },
+              icon: const Icon(Icons.videocam_rounded, size: 18),
+              label: const Text(
+                'RETURN TO 🎬 MAIN STAGE VIEWFINDER',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLiveStudioAudiencePanel() {
+    final lobbyPlayers = widget.lobbySession.players;
+    final effectivePlayers = lobbyPlayers.isNotEmpty
+        ? lobbyPlayers
+        : <LobbyPlayer>[
+            LobbyPlayer(
+              userId: widget.localUserId,
+              displayName: widget.localDisplayName,
+              isHost: true,
+              isReady: true,
+              avatarArchetypeId: AuthService.instance.currentUserAvatar,
+            ),
+          ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0E17),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF05070B),
+          width: 3.0,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(5, 5),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Flexible(
+                  child: Text(
+                    '🍿 LIVE STUDIO AUDIENCE VIEWPORT',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF121722),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: const Color(0xFF0CB6D4)),
+                  ),
+                  child: Text(
+                    '🌹 $_goldenRoseCount  ·  🍅 $_tomatoSplatCount  ·  👏 $_standingOvationCount',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...effectivePlayers.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final player = entry.value;
+              final isLocal = player.userId == widget.localUserId;
+              final resolvedAvatarId = isLocal
+                  ? AuthService.instance.currentUserAvatar
+                  : player.avatarArchetypeId;
+              final archetype = resolveAvatarArchetype(resolvedAvatarId);
+              final isActiveTurn =
+                  idx == widget.lobbySession.currentPlayerIndex;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111624),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isActiveTurn
+                        ? const Color(0xFFFFD700)
+                        : archetype.rimAccentColor.withValues(alpha: 0.6),
+                    width: isActiveTurn ? 2.2 : 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: BoondocksAvatarPortrait(
+                        archetype: archetype,
+                        size: 52,
+                        isSelected: isActiveTurn || isLocal,
+                        animationPhase: 0.0,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${player.displayName}${isLocal ? ' (YOU)' : ''}',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${archetype.name} · ${isActiveTurn ? 'ON STAGE NOW' : 'SPECTATING IN LOUNGE'}',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isActiveTurn
+                                  ? const Color(0xFFFFD700)
+                                  : const Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '🌹 $_goldenRoseCount',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFFD700),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '🍅 $_tomatoSplatCount',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFE11D48),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            _buildSpectatorStrip(),
+          ],
         ),
       ),
     );
@@ -2629,6 +3034,12 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                       improvTwistCompleted: hadImprovTwist,
                       characterBrokenPenalty: hadCharacterBroken,
                       standingOvationCrowdCombo: hadCrowdCombo,
+                      currentPlayerIndex:
+                          widget.lobbySession.currentPlayerIndex,
+                      totalLocalPlayers: math.max(
+                        widget.lobbySession.totalLocalPlayers,
+                        widget.lobbySession.players.length,
+                      ),
                     ),
                   );
                   if (!mounted) return;

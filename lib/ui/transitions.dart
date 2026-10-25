@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../auth/auth_service.dart';
+import 'game_settings_modal.dart';
 import 'intro_cinematic.dart';
 
 /// Identifies which bespoke First-Person 2.5D Cell-Shaded transition sequence
@@ -39,15 +43,80 @@ enum BespokeTransitionType {
 /// Wraps route navigation in a high-contrast 2.5D cell-shaded first-person
 /// sequence tailored to the specific Red Carpet door or portal tapped.
 class BespokeTransitionEngine {
+  static AudioPlayer? _transitionSfxPlayer;
+
+  /// Strict Hero flightShuttleBuilder containing a `ClipRRect` and `FadeTransition`
+  /// so transitioning Hero avatars and tickets morph cleanly within their bounding
+  /// boxes without bleeding across the screen ("Scrolling Face" Hero Bleed fix).
+  static Widget buildClippedHeroFlightShuttle(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection flightDirection,
+    BuildContext fromHeroContext,
+    BuildContext toHeroContext,
+  ) {
+    final Hero toHero = toHeroContext.widget as Hero;
+    final fadeAnimation = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeInOutCubic,
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.hardEdge,
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 0.84, end: 1.0).animate(fadeAnimation),
+        child: Material(
+          type: MaterialType.transparency,
+          child: toHero.child,
+        ),
+      ),
+    );
+  }
+
+  /// Plays bespoke synthesized sound effects for Clapperboard ("SNAP!"),
+  /// Silver Elevator ("WHOOSH & DING!"), and Camera Flash ("POP & WHINE").
+  static Future<void> playTransitionSoundEffect(
+    BespokeTransitionType type,
+  ) async {
+    try {
+      final player = _transitionSfxPlayer ??= AudioPlayer();
+      await player.stop();
+      await player.setReleaseMode(ReleaseMode.stop);
+      await player.setVolume(
+        (GameSettingsModal.masterAudioVolume * 0.75).clamp(0.0, 1.0),
+      );
+
+      Uint8List wavBytes;
+      switch (type) {
+        case BespokeTransitionType.clapperboardSnap:
+        case BespokeTransitionType.soundstageDoorSlam:
+          HapticFeedback.heavyImpact();
+          wavBytes =
+              BespokeTransitionAudioSynthesizer.buildClapperboardSnapWav();
+          break;
+        case BespokeTransitionType.silverElevatorVelvetRope:
+        case BespokeTransitionType.velvetCurtainDraw:
+          wavBytes = BespokeTransitionAudioSynthesizer
+              .buildSilverElevatorWhooshDingWav();
+          break;
+        case BespokeTransitionType.vintageFlashbulbPop:
+        case BespokeTransitionType.mobBossCigarSmoke:
+          wavBytes = BespokeTransitionAudioSynthesizer
+              .buildVintageFlashbulbPopWhineWav();
+          break;
+      }
+      await player.play(BytesSource(wavBytes));
+    } catch (_) {}
+  }
+
   static Future<T?> navigate<T>({
     required BuildContext context,
     required BespokeTransitionType type,
     required Widget destination,
   }) {
     HapticFeedback.heavyImpact();
-    final activeArchetypeId =
-        AuthService.instance.currentProfile?.avatarArchetypeId ??
-            'the_method_actor';
+    unawaited(playTransitionSoundEffect(type));
+    final activeArchetypeId = AuthService.instance.currentUserAvatar;
     final chosenArchetype = resolveAvatarArchetype(activeArchetypeId);
 
     final duration = type == BespokeTransitionType.silverElevatorVelvetRope
@@ -853,12 +922,15 @@ class _SilverElevatorFirstPersonOverlay extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          BoondocksAvatarPortrait(
-                            archetype: playerArchetype,
-                            size: 138,
-                            isSelected: true,
-                            isMirroredReflection: true,
-                            animationPhase: progress * math.pi * 2,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: BoondocksAvatarPortrait(
+                              archetype: playerArchetype,
+                              size: 138,
+                              isSelected: true,
+                              isMirroredReflection: true,
+                              animationPhase: 0.0,
+                            ),
                           ),
                         ],
                       ),
@@ -1074,5 +1146,156 @@ class _SilverElevatorPortalPainter extends CustomPainter {
         oldDelegate.ropeDropT != ropeDropT ||
         oldDelegate.doorCloseT != doorCloseT ||
         oldDelegate.showVelvetRope != showVelvetRope;
+  }
+}
+
+/// Pure-Dart 16-bit PCM WAV synthesizer for bespoke transition audio effects:
+/// 1. Clapperboard (`ACTION!`): Sharp wooden "SNAP!" transient + resonance.
+/// 2. Silver Elevator (`Cutting Room Floor`): Mechanical sliding "WHOOSH" + metallic "DING!".
+/// 3. Camera Flash (`Scene Vault`): Vintage bulb "POP" + rising capacitor "WHINE".
+class BespokeTransitionAudioSynthesizer {
+  static Uint8List? _cachedClapperSnapWav;
+  static Uint8List? _cachedElevatorWhooshDingWav;
+  static Uint8List? _cachedFlashbulbPopWhineWav;
+
+  static Uint8List buildClapperboardSnapWav() {
+    if (_cachedClapperSnapWav != null) return _cachedClapperSnapWav!;
+    const int sampleRate = 22050;
+    const double durationSec = 0.42;
+    final int numSamples = (sampleRate * durationSec).round();
+    final samples = Int16List(numSamples);
+    final rng = math.Random(42);
+
+    for (int i = 0; i < numSamples; i++) {
+      final t = i / sampleRate;
+      double signal = 0.0;
+      if (t >= 0.04) {
+        final dt = t - 0.04;
+        // Sharp wooden crack transient + hardwood body resonance (820Hz + 1480Hz + 340Hz)
+        final crackEnv = math.exp(-dt * 48.0);
+        final woodResonance = (math.sin(2 * math.pi * 820.0 * dt) * 0.45 +
+                math.sin(2 * math.pi * 1480.0 * dt) * 0.35 +
+                math.sin(2 * math.pi * 340.0 * dt) * 0.25) *
+            math.exp(-dt * 26.0);
+        final noiseBurst = (rng.nextDouble() * 2.0 - 1.0) * crackEnv * 0.65;
+        signal = woodResonance + noiseBurst;
+      }
+      final pcm = (signal.clamp(-0.95, 0.95) * 32767.0).round();
+      samples[i] = pcm.clamp(-32768, 32767);
+    }
+
+    _cachedClapperSnapWav = _encodePcm16MonoWav(samples, sampleRate);
+    return _cachedClapperSnapWav!;
+  }
+
+  static Uint8List buildSilverElevatorWhooshDingWav() {
+    if (_cachedElevatorWhooshDingWav != null) {
+      return _cachedElevatorWhooshDingWav!;
+    }
+    const int sampleRate = 22050;
+    const double durationSec = 0.95;
+    final int numSamples = (sampleRate * durationSec).round();
+    final samples = Int16List(numSamples);
+    final rng = math.Random(108);
+
+    for (int i = 0; i < numSamples; i++) {
+      final t = i / sampleRate;
+      double signal = 0.0;
+
+      // 0.0s - 0.55s: Mechanical pneumatic door sliding "WHOOSH"
+      if (t < 0.58) {
+        final whooshEnv = math.sin((t / 0.58) * math.pi);
+        final sweepFreq = 180.0 + 260.0 * (t / 0.58);
+        final tonalSlide = math.sin(2 * math.pi * sweepFreq * t) * 0.22;
+        final brushedAir = (rng.nextDouble() * 2.0 - 1.0) * 0.26;
+        signal += (tonalSlide + brushedAir) * whooshEnv;
+      }
+
+      // 0.48s - 0.95s: Metallic Penthouse Bell "DING!" (A6 1760Hz + E7 2637Hz)
+      if (t >= 0.48) {
+        final dt = t - 0.48;
+        final bellEnv = math.exp(-dt * 6.5);
+        final bell = math.sin(2 * math.pi * 1760.0 * dt) * 0.52 +
+            math.sin(2 * math.pi * 2637.0 * dt) * 0.24 +
+            math.sin(2 * math.pi * 3520.0 * dt) * 0.12 * math.exp(-dt * 14.0);
+        signal += bell * bellEnv;
+      }
+
+      final pcm = (signal.clamp(-0.95, 0.95) * 32767.0).round();
+      samples[i] = pcm.clamp(-32768, 32767);
+    }
+
+    _cachedElevatorWhooshDingWav = _encodePcm16MonoWav(samples, sampleRate);
+    return _cachedElevatorWhooshDingWav!;
+  }
+
+  static Uint8List buildVintageFlashbulbPopWhineWav() {
+    if (_cachedFlashbulbPopWhineWav != null) {
+      return _cachedFlashbulbPopWhineWav!;
+    }
+    const int sampleRate = 22050;
+    const double durationSec = 0.72;
+    final int numSamples = (sampleRate * durationSec).round();
+    final samples = Int16List(numSamples);
+    final rng = math.Random(77);
+
+    double whinePhase = 0.0;
+    for (int i = 0; i < numSamples; i++) {
+      final t = i / sampleRate;
+      double signal = 0.0;
+
+      // 0.0s - 0.14s: Vintage flashbulb filament "POP!"
+      if (t < 0.16) {
+        final popEnv = math.exp(-t * 36.0);
+        final popThump = math.sin(2 * math.pi * (420.0 - t * 1800.0) * t) * 0.55;
+        final popSnap = (rng.nextDouble() * 2.0 - 1.0) * 0.50;
+        signal += (popThump + popSnap) * popEnv;
+      }
+
+      // 0.06s - 0.72s: Classic press camera capacitor recharge "WHINE" (1.6kHz -> 4.4kHz)
+      if (t >= 0.06) {
+        final dt = (t - 0.06) / 0.66;
+        final instFreq = 1650.0 + 2750.0 * Curves.easeOutQuad.transform(dt.clamp(0.0, 1.0));
+        whinePhase += (2 * math.pi * instFreq) / sampleRate;
+        final whineEnv = math.sin(dt.clamp(0.0, 1.0) * math.pi) * 0.28;
+        signal += math.sin(whinePhase) * whineEnv;
+      }
+
+      final pcm = (signal.clamp(-0.95, 0.95) * 32767.0).round();
+      samples[i] = pcm.clamp(-32768, 32767);
+    }
+
+    _cachedFlashbulbPopWhineWav = _encodePcm16MonoWav(samples, sampleRate);
+    return _cachedFlashbulbPopWhineWav!;
+  }
+
+  static Uint8List _encodePcm16MonoWav(Int16List samples, int sampleRate) {
+    final int dataSize = samples.length * 2;
+    final ByteData buffer = ByteData(44 + dataSize);
+    const List<int> riff = <int>[0x52, 0x49, 0x46, 0x46]; // "RIFF"
+    const List<int> wave = <int>[0x57, 0x41, 0x56, 0x45]; // "WAVE"
+    const List<int> fmt = <int>[0x66, 0x6D, 0x74, 0x20]; // "fmt "
+    const List<int> data = <int>[0x64, 0x61, 0x74, 0x61]; // "data"
+
+    for (int i = 0; i < 4; i++) {
+      buffer.setUint8(i, riff[i]);
+      buffer.setUint8(8 + i, wave[i]);
+      buffer.setUint8(12 + i, fmt[i]);
+      buffer.setUint8(36 + i, data[i]);
+    }
+    buffer.setUint32(4, 36 + dataSize, Endian.little);
+    buffer.setUint32(16, 16, Endian.little);
+    buffer.setUint16(20, 1, Endian.little); // PCM
+    buffer.setUint16(22, 1, Endian.little); // Mono
+    buffer.setUint32(24, sampleRate, Endian.little);
+    buffer.setUint32(28, sampleRate * 2, Endian.little);
+    buffer.setUint16(32, 2, Endian.little);
+    buffer.setUint16(34, 16, Endian.little);
+    buffer.setUint32(40, dataSize, Endian.little);
+
+    for (int i = 0; i < samples.length; i++) {
+      buffer.setInt16(44 + i * 2, samples[i], Endian.little);
+    }
+    return buffer.buffer.asUint8List();
   }
 }

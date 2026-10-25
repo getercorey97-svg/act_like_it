@@ -17,6 +17,7 @@ import 'ui/scene_vault_screen.dart';
 import 'ui/transitions.dart';
 import 'ui/intro_cinematic.dart';
 import 'ui/brand_logo.dart';
+import 'ui/living_25d_animation_engine.dart';
 import 'ui/parody_scenes_catalog.dart';
 import 'social/cutting_room_feed.dart';
 import 'auth/auth_service.dart';
@@ -24,6 +25,7 @@ import 'profile/actor_profile_screen.dart';
 import 'monetization/payment_dashboard_screen.dart';
 
 export 'ui/brand_logo.dart';
+export 'ui/living_25d_animation_engine.dart';
 
 /// Represents a neon movie ticket entry inside the horizontally scrolling
 /// Scene Vault carousel on "The Living Marquee & Neon Backstage" dashboard.
@@ -546,13 +548,12 @@ class _LivingMarqueeDashboardScreenState
                 RepaintBoundary(
                   child: Transform.translate(
                     offset: Offset(povStepSwayX, povStepBobY),
-                    child: CustomPaint(
-                      painter: PaparazziRedCarpetPainter(
-                        scrollOffset: _redCarpetScrollOffset,
-                        phase: phase,
-                        scrollVelocity: _redCarpetScrollVelocity,
-                        touchPosition: _activeTouchPosition,
-                      ),
+                    child: RedCarpet25DParallaxEnvironment(
+                      scrollOffset: _redCarpetScrollOffset,
+                      scrollVelocity: _redCarpetScrollVelocity,
+                      touchPosition: _activeTouchPosition,
+                      extraFrenzyIntensity: frenzy,
+                      showFlankCardsOverlay: true,
                     ),
                   ),
                 ),
@@ -777,6 +778,11 @@ class _LivingMarqueeDashboardScreenState
                                           _triggerPaparazziFrenzy,
                                       trailingControls:
                                           _buildPaparazziPremiereHeader(),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    RedCarpetFlankShowcaseRow(
+                                      scrollOffset: _redCarpetScrollOffset,
+                                      onFlashTriggered: _triggerPaparazziFrenzy,
                                     ),
                                     const SizedBox(height: 12),
                                     // Fixture #3: Daily Cattle Call — Global 24-Hour Challenge Banner

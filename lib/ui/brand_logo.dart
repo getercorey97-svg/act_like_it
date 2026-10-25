@@ -369,14 +369,25 @@ class _ActLikeItBrandLogoState extends State<ActLikeItBrandLogo>
         toHeroContext,
       ) {
         final Hero toHero = toHeroContext.widget as Hero;
-        return Material(
-          type: MaterialType.transparency,
-          child: FittedBox(
-            fit: BoxFit.contain,
-            child: SizedBox(
-              width: 340,
-              height: widget.height,
-              child: toHero.child,
+        final fadeCurve = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeInOutCubic,
+        );
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.hardEdge,
+          child: FadeTransition(
+            opacity: Tween<double>(begin: 0.85, end: 1.0).animate(fadeCurve),
+            child: Material(
+              type: MaterialType.transparency,
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: 340,
+                  height: widget.height,
+                  child: toHero.child,
+                ),
+              ),
             ),
           ),
         );

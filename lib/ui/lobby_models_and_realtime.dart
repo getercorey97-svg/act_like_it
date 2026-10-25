@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../offline_manager.dart';
 import '../auth/auth_service.dart';
+import 'game_settings_modal.dart';
 import 'intro_cinematic.dart';
 import 'parody_scenes_catalog.dart';
 export 'parody_scenes_catalog.dart';
@@ -109,22 +110,24 @@ class SceneHeroTags {
     BuildContext toHeroContext,
   ) {
     final Hero toHero = toHeroContext.widget as Hero;
-    final curved = CurvedAnimation(
+    final fadeAnimation = CurvedAnimation(
       parent: animation,
       curve: Curves.easeInOutCubic,
     );
 
-    return AnimatedBuilder(
-      animation: curved,
-      builder: (context, _) {
-        return Material(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.hardEdge,
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 0.82, end: 1.0).animate(fadeAnimation),
+        child: Material(
           type: MaterialType.transparency,
           child: SingleChildScrollView(
             physics: const NeverScrollableScrollPhysics(),
             child: toHero.child,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -278,6 +281,7 @@ class LobbyPlayer {
   final String lobbyId;
   final String userId;
   final String displayName;
+  final String avatarArchetypeId;
   final bool isHost;
   final bool isReady;
   final double aiTelemetricsScore;
@@ -289,6 +293,7 @@ class LobbyPlayer {
     required this.lobbyId,
     required this.userId,
     required this.displayName,
+    this.avatarArchetypeId = 'the_method_actor',
     required this.isHost,
     required this.isReady,
     this.aiTelemetricsScore = 0,
@@ -300,6 +305,8 @@ class LobbyPlayer {
       (aiTelemetricsScore * 0.4) + (peerScore * 0.4) + (socialScore * 0.2);
 
   LobbyPlayer copyWith({
+    String? displayName,
+    String? avatarArchetypeId,
     bool? isReady,
     double? aiTelemetricsScore,
     double? peerScore,
@@ -309,7 +316,8 @@ class LobbyPlayer {
       id: id,
       lobbyId: lobbyId,
       userId: userId,
-      displayName: displayName,
+      displayName: displayName ?? this.displayName,
+      avatarArchetypeId: avatarArchetypeId ?? this.avatarArchetypeId,
       isHost: isHost,
       isReady: isReady ?? this.isReady,
       aiTelemetricsScore: aiTelemetricsScore ?? this.aiTelemetricsScore,
@@ -321,6 +329,7 @@ class LobbyPlayer {
   factory LobbyPlayer.fromJson(
     Map<String, dynamic> json, {
     String? hostId,
+    String? localUserId,
   }) {
     final profileMap = json['profiles'] is Map
         ? Map<String, dynamic>.from(json['profiles'] as Map)
@@ -331,12 +340,20 @@ class LobbyPlayer {
         'Actor';
     final resolvedIsHost = json['is_host'] == true ||
         (hostId != null && hostId.isNotEmpty && resolvedUserId == hostId);
+    final isLocalActor =
+        localUserId != null && localUserId.isNotEmpty && resolvedUserId == localUserId;
+    final resolvedAvatarId = isLocalActor
+        ? AuthService.instance.currentUserAvatar
+        : (json['avatar_archetype']?.toString() ??
+            profileMap?['avatar_archetype']?.toString() ??
+            AuthService.instance.currentUserAvatar);
 
     return LobbyPlayer(
       id: json['id']?.toString() ?? '',
       lobbyId: json['lobby_id']?.toString() ?? '',
       userId: resolvedUserId,
       displayName: resolvedDisplayName,
+      avatarArchetypeId: resolvedAvatarId,
       isHost: resolvedIsHost,
       isReady: json['is_ready'] == true,
       aiTelemetricsScore:
@@ -360,6 +377,8 @@ class LobbySession {
   final int roundNumber;
   final String livekitRoomName;
   final List<LobbyPlayer> players;
+  final int currentPlayerIndex;
+  final int totalLocalPlayers;
 
   const LobbySession({
     required this.id,
@@ -374,6 +393,8 @@ class LobbySession {
     this.roundNumber = 1,
     required this.livekitRoomName,
     this.players = const <LobbyPlayer>[],
+    this.currentPlayerIndex = 0,
+    this.totalLocalPlayers = 1,
   });
 
   LobbySession copyWith({
@@ -384,7 +405,10 @@ class LobbySession {
     int? roundNumber,
     String? livekitRoomName,
     List<LobbyPlayer>? players,
+    int? currentPlayerIndex,
+    int? totalLocalPlayers,
   }) {
+    final nextPlayers = players ?? this.players;
     return LobbySession(
       id: id,
       roomCode: roomCode,
@@ -397,7 +421,10 @@ class LobbySession {
       activeScene: activeScene ?? this.activeScene,
       roundNumber: roundNumber ?? this.roundNumber,
       livekitRoomName: livekitRoomName ?? this.livekitRoomName,
-      players: players ?? this.players,
+      players: nextPlayers,
+      currentPlayerIndex: currentPlayerIndex ?? this.currentPlayerIndex,
+      totalLocalPlayers: totalLocalPlayers ??
+          (nextPlayers.isNotEmpty ? nextPlayers.length : this.totalLocalPlayers),
     );
   }
 
@@ -439,6 +466,10 @@ class LobbySession {
           ? rawLiveKitRoom
           : 'act_like_it_$roomCode',
       players: players,
+      currentPlayerIndex: (json['current_player_index'] as num?)?.toInt() ?? 0,
+      totalLocalPlayers: players.isNotEmpty
+          ? players.length
+          : ((json['total_local_players'] as num?)?.toInt() ?? 1),
     );
   }
 }
@@ -566,7 +597,16 @@ class LobbyRealtimeManager extends ChangeNotifier {
     }
   }
 
+  void _syncSessionPlayers() {
+    if (_session == null) return;
+    _session = _session!.copyWith(
+      players: List<LobbyPlayer>.unmodifiable(_players),
+      totalLocalPlayers: _players.isNotEmpty ? _players.length : 1,
+    );
+  }
+
   void _notifySafely() {
+    _syncSessionPlayers();
     if (!_isDisposed) {
       notifyListeners();
     }
@@ -663,6 +703,10 @@ class LobbyRealtimeManager extends ChangeNotifier {
             );
 
             await _refreshPlayers(_session!.id);
+            if (GameSettingsModal.latestConfig.turnMode == 'pass_and_play' &&
+                _players.length < 2) {
+              addLocalPassAndPlayPlayer();
+            }
             _subscribeToLobbyRealtime(_session!);
             unawaited(saveActiveRoomSession(_session!.roomCode));
             _setLoading(false);
@@ -675,6 +719,18 @@ class LobbyRealtimeManager extends ChangeNotifier {
     final livekitRoomName = 'act_like_it_$roomCode';
     final lobbyId = _generateEphemeralUuid();
 
+    _players = [
+      LobbyPlayer(
+        id: 'p-host',
+        lobbyId: lobbyId,
+        userId: _localUserId,
+        displayName: localDisplayName,
+        avatarArchetypeId: AuthService.instance.currentUserAvatar,
+        isHost: true,
+        isReady: true,
+      ),
+    ];
+
     _session = LobbySession(
       id: lobbyId,
       roomCode: roomCode,
@@ -684,20 +740,45 @@ class LobbyRealtimeManager extends ChangeNotifier {
       activeActorId: _localUserId,
       activeScene: defaultPrompt,
       livekitRoomName: livekitRoomName,
+      players: _players,
+      currentPlayerIndex: 0,
+      totalLocalPlayers: _players.length,
     );
 
+    if (GameSettingsModal.latestConfig.turnMode == 'pass_and_play' &&
+        _players.length < 2) {
+      addLocalPassAndPlayPlayer();
+    }
+    unawaited(saveActiveRoomSession(roomCode));
+    _setLoading(false);
+  }
+
+  /// Adds 1 local Pass-and-Play player (e.g. Player 2, Player 3) for Couch Co-Op turn rotation.
+  void addLocalPassAndPlayPlayer([String? customName]) {
+    final currentSession = _session;
+    if (currentSession == null) return;
+    if (_players.length >= currentSession.maxPlayers) return;
+
+    final nextNumber = _players.length + 1;
+    final archetype =
+        kFourteenAvatarArchetypes[(nextNumber - 1) % kFourteenAvatarArchetypes.length];
+    final playerName = (customName != null && customName.trim().isNotEmpty)
+        ? customName.trim()
+        : 'Player $nextNumber';
+
     _players = [
+      ..._players,
       LobbyPlayer(
-        id: 'p-host',
-        lobbyId: lobbyId,
-        userId: _localUserId,
-        displayName: localDisplayName,
-        isHost: true,
+        id: 'p-local-$nextNumber',
+        lobbyId: currentSession.id,
+        userId: 'local-player-$nextNumber',
+        displayName: playerName,
+        avatarArchetypeId: archetype.id,
+        isHost: false,
         isReady: true,
       ),
     ];
-    unawaited(saveActiveRoomSession(roomCode));
-    _setLoading(false);
+    _notifySafely();
   }
 
   /// Adds 1 ready AI Co-Star per tap up to 8 total cast members in the Green Room.
@@ -718,6 +799,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
         lobbyId: currentSession.id,
         userId: 'ai-costar-$nextIndex',
         displayName: coStarName,
+        avatarArchetypeId: archetype.id,
         isHost: false,
         isReady: true,
       ),
@@ -794,6 +876,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
         lobbyId: lobbyId,
         userId: _localUserId,
         displayName: localDisplayName,
+        avatarArchetypeId: AuthService.instance.currentUserAvatar,
         isHost: true,
         isReady: true,
       ),
@@ -802,10 +885,12 @@ class LobbyRealtimeManager extends ChangeNotifier {
         lobbyId: lobbyId,
         userId: 'remote-peer-1',
         displayName: 'Host Stage Partner',
+        avatarArchetypeId: kFourteenAvatarArchetypes[1].id,
         isHost: false,
         isReady: true,
       ),
     ];
+    _syncSessionPlayers();
     unawaited(saveActiveRoomSession(sanitizedCode));
     _setLoading(false);
   }
@@ -1028,7 +1113,11 @@ class LobbyRealtimeManager extends ChangeNotifier {
             localDisplayName.isNotEmpty) {
           map['display_name'] = localDisplayName;
         }
-        return LobbyPlayer.fromJson(map, hostId: hostId);
+        return LobbyPlayer.fromJson(
+          map,
+          hostId: hostId,
+          localUserId: _localUserId,
+        );
       }).toList();
 
       if (fetchedPlayers.isNotEmpty) {
@@ -1060,11 +1149,16 @@ class LobbyRealtimeManager extends ChangeNotifier {
         final existing = _players[i];
         final p = presenceByUser[existing.userId];
         if (p != null) {
+          final isLocal = existing.userId == _localUserId;
           _players[i] = LobbyPlayer(
             id: existing.id,
             lobbyId: existing.lobbyId,
             userId: existing.userId,
             displayName: p['display_name']?.toString() ?? existing.displayName,
+            avatarArchetypeId: isLocal
+                ? AuthService.instance.currentUserAvatar
+                : (p['avatar_archetype']?.toString() ??
+                    existing.avatarArchetypeId),
             isHost: p['is_host'] == true || existing.isHost,
             isReady: p['is_ready'] is bool
                 ? p['is_ready'] as bool

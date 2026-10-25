@@ -211,15 +211,22 @@ class AuthService extends ChangeNotifier {
   static const String _kSavedProfilesRegistryKey = 'saved_actor_profiles_v1';
   static const String _kTelemetricsTokensPrefsKey =
       'act_like_it_telemetrics_tokens_v1';
+  static const String _kSelectedAvatarPrefsKey =
+      'act_like_it_selected_avatar_v1';
   static const int kDefaultStarterAiTokens = 25;
 
   ActorProfileState? _currentProfile;
+  String _cachedSelectedAvatarId = 'the_method_actor';
   final List<ActorProfileState> _savedProfiles = <ActorProfileState>[];
   bool _isLoading = false;
   String? _lastError;
   StreamSubscription<AuthState>? _authSubscription;
 
   ActorProfileState? get currentProfile => _currentProfile;
+  String get currentUserAvatar =>
+      (_currentProfile?.avatarArchetypeId.trim().isNotEmpty == true)
+          ? _currentProfile!.avatarArchetypeId.trim()
+          : _cachedSelectedAvatarId;
   List<ActorProfileState> get savedProfiles =>
       List<ActorProfileState>.unmodifiable(_savedProfiles);
   bool get isLoading => _isLoading;
@@ -279,12 +286,19 @@ class AuthService extends ChangeNotifier {
       }
 
       final prefs = await SharedPreferences.getInstance();
+      final savedAvatarId = prefs.getString(_kSelectedAvatarPrefsKey)?.trim();
+      if (savedAvatarId != null && savedAvatarId.isNotEmpty) {
+        _cachedSelectedAvatarId = savedAvatarId;
+      }
       final lastUserId = prefs.getString(_kLastActiveUserIdKey);
       if (lastUserId != null && lastUserId.isNotEmpty) {
         final cached = await _readLocalProfile(lastUserId);
         if (cached != null) {
-          _currentProfile = cached;
-          await _syncRegistryWithProfile(cached);
+          _currentProfile = savedAvatarId != null && savedAvatarId.isNotEmpty
+              ? cached.copyWith(avatarArchetypeId: savedAvatarId)
+              : cached;
+          _cachedSelectedAvatarId = _currentProfile!.avatarArchetypeId;
+          await _syncRegistryWithProfile(_currentProfile!);
           notifyListeners();
           return;
         }
@@ -292,6 +306,7 @@ class AuthService extends ChangeNotifier {
 
       if (_savedProfiles.isNotEmpty) {
         _currentProfile = _savedProfiles.first;
+        _cachedSelectedAvatarId = _currentProfile!.avatarArchetypeId;
         notifyListeners();
       } else {
         final defaultProfile = ActorProfileState(
@@ -894,8 +909,15 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _writeLocalProfile(ActorProfileState profile) async {
+    _cachedSelectedAvatarId = profile.avatarArchetypeId.trim().isNotEmpty
+        ? profile.avatarArchetypeId.trim()
+        : 'the_method_actor';
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _kSelectedAvatarPrefsKey,
+        _cachedSelectedAvatarId,
+      );
       await prefs.setString(
         '$_kLocalProfilePrefix${profile.userId}',
         jsonEncode(profile.toJson()),

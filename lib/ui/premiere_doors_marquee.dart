@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../auth/auth_service.dart';
 import 'intro_cinematic.dart';
+import 'living_25d_animation_engine.dart';
 import 'premiere_red_carpet_painters.dart';
+
+export 'living_25d_animation_engine.dart';
 
 // ============================================================================
 // INTERACTIVE 3D HOLOGRAPHIC MARQUEE ("ACT LIKE IT")
@@ -453,6 +456,8 @@ class BespokePremiereDoorsList {
   }) {
     return [
       _buildPersistentFirstPersonArchetypeCrowdBar(phase: phase),
+      const SizedBox(height: 16),
+      const Living25DHeroCharactersTrioSection(),
       const SizedBox(height: 18),
       Interactive3DDoorCard(
         scrollController: scrollController,
@@ -722,65 +727,14 @@ class BespokePremiereDoorsList {
           const SizedBox(height: 14),
           Row(
             children: [
-              Container(
+              SizedBox(
                 width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: <Color>[
-                      Color(0xFFE2E8F0),
-                      Color(0xFF94A3B8),
-                      Color(0xFF475569),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border:
-                      Border.all(color: const Color(0xFF05070B), width: 3.0),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(width: 2.5, color: const Color(0xFF05070B)),
-                    Positioned(
-                      bottom: 18,
-                      left: 6,
-                      right: 6,
-                      child: Container(
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE11D48),
-                          borderRadius: BorderRadius.circular(99),
-                          border: Border.all(
-                            color: const Color(0xFFFFD700),
-                            width: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const Positioned(
-                      top: 8,
-                      left: 6,
-                      child: Icon(
-                        Icons.security_rounded,
-                        size: 16,
-                        color: Color(0xFF05070B),
-                      ),
-                    ),
-                    const Positioned(
-                      top: 8,
-                      right: 6,
-                      child: Icon(
-                        Icons.security_rounded,
-                        size: 16,
-                        color: Color(0xFF05070B),
-                      ),
-                    ),
-                  ],
+                child: Living25DAnimatedPropRig(
+                  propType: Living25DPropCardType.cuttingRoomReelShears,
+                  externalPhase: phase,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -894,34 +848,11 @@ class BespokePremiereDoorsList {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             child: Row(
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE11342), Color(0xFF520002)],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: const Color(0xFF05070B),
-                      width: 2.5,
-                    ),
-                    boxShadow: [
-                      const BoxShadow(
-                        color: Color(0xFF05070B),
-                        offset: Offset(3, 3),
-                        blurRadius: 0,
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFFE11342).withValues(alpha: 0.45),
-                        blurRadius: 18,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.movie_filter_rounded,
-                    color: Color(0xFFF5DEB3),
-                    size: 32,
+                SizedBox(
+                  width: 70,
+                  child: Living25DAnimatedPropRig(
+                    propType: Living25DPropCardType.luxuryHollywoodClapperboard,
+                    externalPhase: phase,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -983,18 +914,12 @@ class BespokePremiereDoorsList {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Builder(
-                  builder: (ctx) => GestureDetector(
-                    onTap: () => showBoondocksCharacterSpotlightModal(
-                      ctx,
-                      kFourteenAvatarArchetypes[0],
-                    ),
-                    child: BoondocksCharacterRig(
-                      archetype: kFourteenAvatarArchetypes[0],
-                      size: 56,
-                      isSelected: true,
-                      externalPhase: phase,
-                    ),
+                const SizedBox(
+                  width: 66,
+                  child: Living25DHeroCharacterRig(
+                    characterType:
+                        Living25DHeroCharacterType.ruthlessCastingDirector,
+                    showCaptionBadge: false,
                   ),
                 ),
               ],
@@ -1123,18 +1048,12 @@ class BespokePremiereDoorsList {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Builder(
-                  builder: (ctx) => GestureDetector(
-                    onTap: () => showBoondocksCharacterSpotlightModal(
-                      ctx,
-                      kFourteenAvatarArchetypes[1],
-                    ),
-                    child: BoondocksCharacterRig(
-                      archetype: kFourteenAvatarArchetypes[1],
-                      size: 56,
-                      isSelected: true,
-                      externalPhase: phase,
-                    ),
+                const SizedBox(
+                  width: 68,
+                  child: Living25DHeroCharacterRig(
+                    characterType:
+                        Living25DHeroCharacterType.screenTestRivalsDuel,
+                    showCaptionBadge: false,
                   ),
                 ),
               ],
@@ -1194,22 +1113,14 @@ class BespokePremiereDoorsList {
         ),
         child: Row(
           children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: const Color(0x44520002),
-                borderRadius: BorderRadius.circular(18),
-                border:
-                    Border.all(color: const Color(0xFFF5DEB3), width: 2.0),
-              ),
-              child: const Icon(
-                Icons.nightlife_rounded,
-                color: Color(0xFFF5DEB3),
-                size: 30,
+            SizedBox(
+              width: 68,
+              child: Living25DAnimatedPropRig(
+                propType: Living25DPropCardType.speakeasyDareWheel,
+                externalPhase: phase,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1250,18 +1161,12 @@ class BespokePremiereDoorsList {
               ),
             ),
             const SizedBox(width: 10),
-            Builder(
-              builder: (ctx) => GestureDetector(
-                onTap: () => showBoondocksCharacterSpotlightModal(
-                  ctx,
-                  kFourteenAvatarArchetypes[2],
-                ),
-                child: BoondocksCharacterRig(
-                  archetype: kFourteenAvatarArchetypes[2],
-                  size: 58,
-                  isSelected: true,
-                  externalPhase: phase,
-                ),
+            const SizedBox(
+              width: 66,
+              child: Living25DHeroCharacterRig(
+                characterType:
+                    Living25DHeroCharacterType.undercoverSpeakeasyImproviser,
+                showCaptionBadge: false,
               ),
             ),
           ],
@@ -1308,21 +1213,10 @@ class BespokePremiereDoorsList {
       child: Row(
         children: [
           SizedBox(
-            width: 68,
-            height: 68,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CustomPaint(
-                  size: const Size(68, 68),
-                  painter: _RotatingSunburstHaloPainter(phase: phase),
-                ),
-                const Icon(
-                  Icons.emoji_events_rounded,
-                  color: Color(0xFFF5DEB3),
-                  size: 36,
-                ),
-              ],
+            width: 70,
+            child: Living25DAnimatedPropRig(
+              propType: Living25DPropCardType.oscarTrophyVipBoxOffice,
+              externalPhase: phase,
             ),
           ),
           const SizedBox(width: 16),
@@ -1440,10 +1334,12 @@ class BespokePremiereDoorsList {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(
-                  Icons.center_focus_strong_rounded,
-                  color: Color(0xFF0CB6D4),
-                  size: 32,
+                SizedBox(
+                  width: 68,
+                  child: Living25DAnimatedPropRig(
+                    propType: Living25DPropCardType.writersRoomTypewriter,
+                    externalPhase: phase,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -1521,27 +1417,14 @@ class BespokePremiereDoorsList {
         ),
         child: Row(
           children: [
-            Transform.rotate(
-              angle: phase,
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0x33520002),
-                  border: Border.all(
-                    color: const Color(0xFFF5DEB3),
-                    width: 2.2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.album_rounded,
-                  color: Color(0xFFF5DEB3),
-                  size: 34,
-                ),
+            SizedBox(
+              width: 68,
+              child: Living25DAnimatedPropRig(
+                propType: Living25DPropCardType.writersRoomTypewriter,
+                externalPhase: phase,
               ),
             ),
-            const SizedBox(width: 18),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
