@@ -12,6 +12,7 @@ import 'ui/intro_cinematic.dart';
 import 'offline_manager.dart';
 import 'qa/qa_overlay.dart';
 import 'qa/qa_web_portal.dart';
+import 'auth/nda_tester_gate.dart';
 
 /// Captures startup, plugin, and widget build exceptions in Release APKs so the
 /// app never fails silently with a blank white screen on Android devices.
@@ -742,7 +743,9 @@ class ActLikeItApp extends StatelessWidget {
       builder: (BuildContext context, Widget? child) {
         return QaBugReporterOverlay(
           navigatorKey: navigatorKey,
-          child: child ?? const SizedBox.shrink(),
+          child: OfficialClosedAlphaNdaGateWrapper(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       theme: ThemeData(

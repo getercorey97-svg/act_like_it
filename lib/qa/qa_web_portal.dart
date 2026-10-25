@@ -185,10 +185,13 @@ class _QaWebPortalDashboardScreenState
 
   Color _badgeColorForBugType(String type) {
     switch (type) {
+      case 'NDA_BREACH':
       case 'Crash':
         return const Color(0xFFE11D48);
+      case 'NDA_SIGNED':
       case 'AI Score':
         return const Color(0xFFFFD700);
+      case 'PASSCODE_VERIFIED':
       case 'Audio':
         return const Color(0xFF0CB6D4);
       case 'UI':
@@ -375,7 +378,16 @@ class _QaWebPortalDashboardScreenState
                       color: Color(0xFF94A3B8),
                     ),
                   ),
-                  ...<String>['ALL', 'UI', 'Audio', 'AI Score', 'Crash'].map(
+                  ...<String>[
+                    'ALL',
+                    'NDA_SIGNED',
+                    'NDA_BREACH',
+                    'PASSCODE_VERIFIED',
+                    'UI',
+                    'Audio',
+                    'AI Score',
+                    'Crash',
+                  ].map(
                     (filter) {
                       final active = _selectedBugFilter == filter;
                       return ChoiceChip(

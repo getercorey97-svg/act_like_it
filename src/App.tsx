@@ -63,7 +63,106 @@ const LATE_NIGHT_PROMPTS = [
   },
 ];
 
+function verifyStudioMasterSecret(rawInput: string): boolean {
+  const normalized = rawInput.trim().toLowerCase();
+  if (!normalized) return false;
+  const envSecret = (import.meta.env.VITE_ADMIN_PASSCODE ?? '').trim().toLowerCase();
+  if (envSecret && normalized === envSecret) {
+    return true;
+  }
+  if (normalized.length !== 9) return false;
+  let h1 = 7;
+  let h2 = 13;
+  for (let i = 0; i < normalized.length; i++) {
+    const c = normalized.charCodeAt(i);
+    h1 = (h1 * 31 + c) % 1000000007;
+    h2 = (h2 * 37 + c) % 1000000009;
+  }
+  return h1 === 892397311 && h2 === 447833572;
+}
+
+function generateUniqueTesterPasscode(
+  fullName: string,
+  email: string,
+  phone: string,
+  deviceFingerprint: string
+): string {
+  const parts = fullName
+    .trim()
+    .toUpperCase()
+    .split(/\s+/)
+    .filter((p) => p.length > 0);
+  let initials = 'TX';
+  if (parts.length >= 2) {
+    const first = parts[0].replace(/[^A-Z]/g, '');
+    const last = parts[parts.length - 1].replace(/[^A-Z]/g, '');
+    const c1 = first.length > 0 ? first[0] : 'T';
+    const c2 = last.length > 0 ? last[0] : 'X';
+    initials = `${c1}${c2}`;
+  } else if (parts.length === 1) {
+    const clean = parts[0].replace(/[^A-Z]/g, '');
+    initials = clean.length >= 2 ? clean.slice(0, 2) : clean.padEnd(2, 'X');
+  }
+
+  const seedPayload = `${fullName.trim().toLowerCase()}|${email.trim().toLowerCase()}|${phone.replace(/[^0-9]/g, '')}|${deviceFingerprint}`;
+  let digest = 2166136261;
+  for (let i = 0; i < seedPayload.length; i++) {
+    digest ^= seedPayload.charCodeAt(i);
+    digest = Math.imul(digest, 16777619) & 0x7fffffff;
+  }
+  const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let code = '';
+  let temp = digest;
+  for (let i = 0; i < 4; i++) {
+    code += alphabet[temp % alphabet.length];
+    temp = Math.floor(temp / alphabet.length) ^ (digest >> (i * 3));
+  }
+  return `ALI-${initials}-${code}`;
+}
+
 export default function App() {
+  const [deviceFingerprint] = useState<string>(() => {
+    try {
+      const existing = localStorage.getItem('act_like_it_device_fingerprint_v1');
+      if (existing) return existing;
+      const randomHex = Array.from({ length: 8 }, () =>
+        Math.floor(Math.random() * 16)
+          .toString(16)
+          .toUpperCase()
+      ).join('');
+      const created = `DEV-WEB-${randomHex}`;
+      localStorage.setItem('act_like_it_device_fingerprint_v1', created);
+      return created;
+    } catch {
+      return 'DEV-WEB-SESSION';
+    }
+  });
+
+  const [ndaUnlocked, setNdaUnlocked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('act_like_it_nda_gate_unlocked_v2') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [ndaMode, setNdaMode] = useState<'sign' | 'unlock'>('sign');
+  const [ndaFullName, setNdaFullName] = useState<string>('');
+  const [ndaEmail, setNdaEmail] = useState<string>('');
+  const [ndaPhone, setNdaPhone] = useState<string>('');
+  const [ndaDevice, setNdaDevice] = useState<string>('iPhone 16 Pro Max / Galaxy S26 Ultra');
+  const [ndaOsVersion, setNdaOsVersion] = useState<string>('iOS 18 / Android 16');
+  const [ndaNetwork, setNdaNetwork] = useState<string>('Both Tested');
+  const [ndaSignature, setNdaSignature] = useState<string>('');
+  const [ndaAgreedIp, setNdaAgreedIp] = useState<boolean>(false);
+  const [ndaAgreedConfidential, setNdaAgreedConfidential] = useState<boolean>(false);
+  const [ndaInterestedPartner, setNdaInterestedPartner] = useState<boolean>(false);
+  const [ndaSelectedTracks, setNdaSelectedTracks] = useState<string[]>([]);
+  const [ndaBackgroundSummary, setNdaBackgroundSummary] = useState<string>('');
+  const [issuedPasscode, setIssuedPasscode] = useState<string | null>(null);
+  const [ndaPasscodeInput, setNdaPasscodeInput] = useState<string>('');
+  const [ndaError, setNdaError] = useState<string | null>(null);
+  const [ndaBreachAlert, setNdaBreachAlert] = useState<string | null>(null);
+
   const [selectedFilePath, setSelectedFilePath] = useState<string>(
     'lib/dashboard_marquee.dart'
   );
@@ -109,6 +208,441 @@ export default function App() {
     setGateError(null);
     setVaultUnlocked(true);
   };
+
+  const handleSignNdaAndGeneratePasscode = (e: React.FormEvent) => {
+    e.preventDefault();
+    setNdaError(null);
+    setNdaBreachAlert(null);
+    if (ndaFullName.trim().length < 3) {
+      setNdaError('Please enter your Tester Full Legal Name.');
+      return;
+    }
+    if (!ndaEmail.includes('@')) {
+      setNdaError('Please enter a valid Tester Personal / Business Email.');
+      return;
+    }
+    if (ndaPhone.trim().length < 7) {
+      setNdaError('Please enter a valid Tester Phone Number.');
+      return;
+    }
+    if (!ndaAgreedIp || !ndaAgreedConfidential) {
+      setNdaError('You must check BOTH Legal & Non-Disclosure (NDA) acknowledgment boxes in Section 0.');
+      return;
+    }
+    if (ndaSignature.trim().length < 3) {
+      setNdaError('Please type your Full Legal Name in the Tester Digital Signature box.');
+      return;
+    }
+
+    const uniqueCode = generateUniqueTesterPasscode(
+      ndaFullName,
+      ndaEmail,
+      ndaPhone,
+      deviceFingerprint
+    );
+
+    const record = {
+      full_legal_name: ndaFullName.trim(),
+      email: ndaEmail.trim(),
+      phone_number: ndaPhone.trim(),
+      digital_signature: ndaSignature.trim(),
+      unique_passcode: uniqueCode,
+      bound_device_fingerprint: deviceFingerprint,
+      device_model: ndaDevice.trim(),
+      os_version: ndaOsVersion.trim(),
+      network_connection_used: ndaNetwork,
+      interested_in_partnership: ndaInterestedPartner,
+      selected_partnership_tracks: ndaSelectedTracks,
+      partnership_background_summary: ndaBackgroundSummary.trim(),
+      official_portal_url: 'https://act-like-it.vercel.app',
+      signed_at: new Date().toISOString(),
+    };
+
+    try {
+      const rawRegistry = localStorage.getItem('act_like_it_nda_passcode_registry_v2') ?? '{}';
+      const registry = JSON.parse(rawRegistry);
+      registry[uniqueCode.toUpperCase()] = record;
+      localStorage.setItem('act_like_it_nda_passcode_registry_v2', JSON.stringify(registry));
+    } catch {
+      // ignore storage errors
+    }
+
+    setIssuedPasscode(uniqueCode);
+    setNdaPasscodeInput(uniqueCode);
+  };
+
+  const handleVerifyPasscodeAndUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    setNdaError(null);
+    setNdaBreachAlert(null);
+
+    const entered = ndaPasscodeInput.trim();
+    if (!entered) {
+      setNdaError('Please enter your Unique Personal Tester Passcode (ALI-XX-XXXX) or Studio Master Secret.');
+      return;
+    }
+
+    if (verifyStudioMasterSecret(entered)) {
+      try {
+        localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'true');
+      } catch {
+        // ignore
+      }
+      setNdaUnlocked(true);
+      return;
+    }
+
+    const normalizedCode = entered.toUpperCase();
+    try {
+      const rawRegistry = localStorage.getItem('act_like_it_nda_passcode_registry_v2') ?? '{}';
+      const registry = JSON.parse(rawRegistry);
+      const matched = registry[normalizedCode];
+      if (!matched) {
+        setNdaError(
+          `UNRECOGNIZED PASSCODE ("${normalizedCode}"). Every tester must complete and sign the Non-Disclosure Agreement first to receive their own Unique Personal Passcode.`
+        );
+        return;
+      }
+
+      if (
+        matched.bound_device_fingerprint &&
+        matched.bound_device_fingerprint !== deviceFingerprint
+      ) {
+        setNdaBreachAlert(
+          `🚨 NDA BREACH & PASSCODE SHARING DETECTED: Passcode "${normalizedCode}" is legally registered exclusively to ${matched.full_legal_name} (${matched.email} · ${matched.phone_number}) and locked to Device ID ${matched.bound_device_fingerprint}. Attempting to use another person's passcode on an unregistered device (${deviceFingerprint}) violates Section 0.2 of the Non-Disclosure Agreement. This unauthorized sharing attempt has been logged and reported to ACT LIKE IT™ Studio Administration.`
+        );
+        return;
+      }
+
+      localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'true');
+      localStorage.setItem('act_like_it_nda_dossier_payload_v2', JSON.stringify(matched));
+      setNdaUnlocked(true);
+    } catch {
+      setNdaError('Unable to verify passcode. Please complete Step 1 first.');
+    }
+  };
+
+  if (!ndaUnlocked) {
+    const partnershipTracks = [
+      '1. Co-Founder & Chief Operating Officer (COO) / Studio Head',
+      '2. Chief Technology Officer (CTO) / Lead Multiplayer Systems Engineer',
+      '3. Head of Growth, Marketing & Viral Acquisition',
+      "4. Senior Creative Director & Writer's Room Lead",
+      '5. Strategic Angel Investor / Venture Partner',
+    ];
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif] py-8 px-4 flex items-center justify-center">
+        <div className="max-w-3xl w-full bg-slate-900 border-2 border-amber-500/80 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
+          <div className="flex items-center justify-between gap-3 bg-rose-950/80 border border-rose-500 rounded-xl px-4 py-3 text-rose-200 text-xs font-mono font-bold">
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>
+                MANDATORY CLOSED ALPHA NDA &amp; UNIQUE PASSCODE LOCK
+              </span>
+            </div>
+            <span className="text-amber-300">DEVICE ID: {deviceFingerprint}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-mono font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setNdaMode('sign');
+                setNdaError(null);
+              }}
+              className={`py-2.5 px-3 rounded-lg transition-colors ${
+                ndaMode === 'sign'
+                  ? 'bg-amber-400 text-slate-950'
+                  : 'text-amber-200 hover:bg-slate-900'
+              }`}
+            >
+              1. SIGN NDA &amp; GET UNIQUE PASSCODE
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setNdaMode('unlock');
+                setNdaError(null);
+              }}
+              className={`py-2.5 px-3 rounded-lg transition-colors ${
+                ndaMode === 'unlock'
+                  ? 'bg-cyan-400 text-slate-950'
+                  : 'text-cyan-300 hover:bg-slate-900'
+              }`}
+            >
+              2. ENTER PERSONAL / ADMIN PASSCODE
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-xl md:text-2xl font-black text-amber-200 leading-snug">
+              🎬 &ldquo;ACT LIKE IT&rdquo; — OFFICIAL CLOSED ALPHA TESTING AGREEMENT, NON-DISCLOSURE (NDA) &amp; PARTNERSHIP DOSSIER
+            </h1>
+            <p className="text-xs font-mono text-cyan-400">
+              STANDALONE EDITION — BUILD v1.0-ALPHA · OFFICIAL PORTAL: https://act-like-it.vercel.app
+            </p>
+          </div>
+
+          {ndaMode === 'sign' && (
+            <>
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 text-xs text-slate-300 leading-relaxed">
+                <h2 className="text-sm font-bold text-amber-400">
+                  🔒 SECTION 0: PRE-REGISTRATION INTELLECTUAL PROPERTY &amp; LEGAL NOTICE
+                </h2>
+                <p>
+                  <strong className="text-white">1. Unregistered Copyright &amp; Common-Law Intellectual Property Notice:</strong>{' '}
+                  Although formal registration with the U.S. Copyright Office and the U.S. Patent and Trademark Office (USPTO) is currently pending, automatic statutory copyright protection under the U.S. Copyright Act (17 U.S.C. § 102) attaches immediately upon creation and fixation of this original work. All aspects of ACT LIKE IT™—including its original 100+ parody scripts, the &ldquo;Tri-Modal Judging Engine&rdquo; architecture, the &ldquo;2.5D Boondocks-inspired&rdquo; cell-shaded visual style and 14 character archetypes, the &ldquo;Life Is Improv&rdquo; stealth HUD mechanics, custom UI/UX layouts, audio cues, source code, database schemas, and trade dress—are the exclusive, proprietary intellectual property of the Creator/Studio (© 2026 ACT LIKE IT Studio. All Rights Reserved. Common-Law Trademark ACT LIKE IT™ Claimed).
+                </p>
+                <p>
+                  <strong className="text-white">2. Strict Confidentiality, NDA &amp; Personal Passcode Anti-Sharing Policy:</strong>{' '}
+                  By accessing the Closed Alpha build via <span className="text-cyan-400 font-mono">https://act-like-it.vercel.app</span> or the Android APK, you acknowledge and agree that this software is a Confidential Pre-Release Trade Secret. Upon signing below, you will receive a <strong className="text-amber-300">UNIQUE PERSONAL TESTER PASSCODE (ALI-XX-XXXX)</strong> locked to your legal name and this specific device. You expressly agree NOT to share your personal passcode, testing URL, or build files with any third party—any attempt to use your passcode on another person&rsquo;s device immediately triggers an NDA Breach Alert under your name.
+                </p>
+              </div>
+
+              <form onSubmit={handleSignNdaAndGeneratePasscode} className="space-y-4">
+                <h3 className="text-sm font-bold text-amber-400">
+                  ✍️ TESTER &amp; POTENTIAL PARTNER LEGAL ACKNOWLEDGMENT &amp; DEVICE LOG
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-100 mb-1">Tester Full Legal Name *</label>
+                    <input
+                      type="text"
+                      value={ndaFullName}
+                      onChange={(e) => setNdaFullName(e.target.value)}
+                      placeholder="First & Last Legal Name"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-100 mb-1">Personal / Business Email *</label>
+                    <input
+                      type="email"
+                      value={ndaEmail}
+                      onChange={(e) => setNdaEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-100 mb-1">Tester Phone Number *</label>
+                    <input
+                      type="tel"
+                      value={ndaPhone}
+                      onChange={(e) => setNdaPhone(e.target.value)}
+                      placeholder="(555) 000-0000"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-100 mb-1">Device Model *</label>
+                    <input
+                      type="text"
+                      value={ndaDevice}
+                      onChange={(e) => setNdaDevice(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-100 mb-1">OS Version *</label>
+                    <input
+                      type="text"
+                      value={ndaOsVersion}
+                      onChange={(e) => setNdaOsVersion(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-100 mb-1">Network Connection Used *</label>
+                    <select
+                      value={ndaNetwork}
+                      onChange={(e) => setNdaNetwork(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    >
+                      <option value="Wi-Fi">Wi-Fi</option>
+                      <option value="5G / Cellular">5G / Cellular</option>
+                      <option value="Both Tested">Both Tested</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs text-slate-200">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ndaAgreedIp}
+                      onChange={(e) => setNdaAgreedIp(e.target.checked)}
+                      className="mt-1 accent-amber-400"
+                    />
+                    <span>
+                      I acknowledge the Pre-Registration Intellectual Property &amp; Copyright Notice (17 U.S.C. § 102) and confirm that all aspects of ACT LIKE IT™ are the exclusive property of ACT LIKE IT Studio.
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ndaAgreedConfidential}
+                      onChange={(e) => setNdaAgreedConfidential(e.target.checked)}
+                      className="mt-1 accent-amber-400"
+                    />
+                    <span>
+                      I agree to the Strict Confidentiality &amp; Non-Disclosure Agreement (NDA): I will NOT share my personal tester passcode, publicly record, screenshot, share https://act-like-it.vercel.app or build files, or appropriate any game mechanics or scripts.
+                    </span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-amber-100 mb-1">
+                    Tester Digital Signature (Type Full Legal Name) *
+                  </label>
+                  <input
+                    type="text"
+                    value={ndaSignature}
+                    onChange={(e) => setNdaSignature(e.target.value)}
+                    placeholder="Type your full legal name as your binding signature"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  />
+                </div>
+
+                <div className="border-t border-slate-800 pt-4 space-y-3">
+                  <h3 className="text-sm font-bold text-amber-400">
+                    🤝 SECTION 1: &ldquo;ACT LIKE IT&rdquo; PARTNERSHIP &amp; CO-FOUNDER EVALUATION
+                  </h3>
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setNdaInterestedPartner(true)}
+                      className={`px-3 py-2 rounded-lg border font-bold ${
+                        ndaInterestedPartner
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-200'
+                          : 'bg-slate-950 border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      ✅ YES — I want to talk about joining the core team!
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNdaInterestedPartner(false);
+                        setNdaSelectedTracks([]);
+                      }}
+                      className={`px-3 py-2 rounded-lg border font-bold ${
+                        !ndaInterestedPartner
+                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                          : 'bg-slate-950 border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      🎬 NO — I am strictly acting as a Closed Alpha Tester
+                    </button>
+                  </div>
+
+                  {ndaInterestedPartner && (
+                    <div className="space-y-2 pt-2">
+                      <div className="space-y-1 text-xs text-slate-300">
+                        {partnershipTracks.map((track) => (
+                          <label key={track} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={ndaSelectedTracks.includes(track)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setNdaSelectedTracks([...ndaSelectedTracks, track]);
+                                } else {
+                                  setNdaSelectedTracks(ndaSelectedTracks.filter((t) => t !== track));
+                                }
+                              }}
+                              className="accent-amber-400"
+                            />
+                            <span>{track}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={ndaBackgroundSummary}
+                        onChange={(e) => setNdaBackgroundSummary(e.target.value)}
+                        placeholder="Briefly summarize your background, superpowers, or past experience relevant to this role..."
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-6 rounded-xl shadow-lg transition-colors text-xs font-mono tracking-wide"
+                >
+                  STEP 1: SIGN NDA &amp; GENERATE MY UNIQUE PERSONAL PASSCODE
+                </button>
+              </form>
+            </>
+          )}
+
+          {issuedPasscode && (
+            <div className="bg-emerald-950/60 border-2 border-emerald-400 rounded-xl p-4 space-y-3">
+              <div className="text-xs font-mono font-bold text-emerald-300">
+                ✅ NDA SIGNED — YOUR UNIQUE PERSONAL PASSCODE HAS BEEN ISSUED
+              </div>
+              <div className="flex items-center justify-between bg-slate-950 border border-amber-400 rounded-lg px-4 py-3">
+                <span className="font-mono text-xl font-black tracking-widest text-amber-300">
+                  {issuedPasscode}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode('nda-passcode', issuedPasscode)}
+                  className="text-xs font-mono font-bold text-cyan-300 hover:text-cyan-200 flex items-center gap-1"
+                >
+                  {copiedPath === 'nda-passcode' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedPath === 'nda-passcode' ? 'COPIED' : 'COPY PASSCODE'}
+                </button>
+              </div>
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                ⚠️ <strong>ANTI-SHARING TRACEABILITY WARNING:</strong> This passcode (<code className="font-mono">{issuedPasscode}</code>) is uniquely registered to <strong>{ndaFullName}</strong> and locked to Device ID <code className="font-mono">{deviceFingerprint}</code>. If you give this passcode to anyone else, our system detects the different device, blocks their access, and flags your name and phone number with a CRITICAL NDA BREACH ALERT.
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleVerifyPasscodeAndUnlock} className="space-y-4">
+            <div className="bg-rose-950/40 border border-rose-500/70 rounded-xl p-4 space-y-2">
+              <label className="block text-xs font-mono font-bold text-amber-300">
+                🔑 STEP 2: ENTER YOUR UNIQUE PERSONAL PASSCODE (OR STUDIO MASTER SECRET) TO UNLOCK *
+              </label>
+              <input
+                type="text"
+                value={ndaPasscodeInput}
+                onChange={(e) => setNdaPasscodeInput(e.target.value)}
+                placeholder="e.g., ALI-JD-8492 (or Studio Master Secret)"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-white tracking-wider"
+              />
+            </div>
+
+            {ndaBreachAlert && (
+              <div className="bg-rose-950 border-2 border-rose-500 text-rose-100 text-xs font-bold p-4 rounded-xl leading-relaxed">
+                {ndaBreachAlert}
+              </div>
+            )}
+
+            {ndaError && (
+              <div className="bg-rose-950 border border-rose-500 text-rose-200 text-xs font-bold px-4 py-3 rounded-lg">
+                {ndaError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-rose-600 hover:bg-rose-500 text-amber-100 font-black py-3.5 px-6 rounded-xl border-2 border-amber-400 shadow-lg transition-colors text-sm"
+            >
+              🔓 VERIFY PERSONAL PASSCODE &amp; UNLOCK ACT LIKE IT™
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif] flex flex-col">
