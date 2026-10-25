@@ -64,6 +64,43 @@ export const BATCH_STAGES: BatchStage[] = [
 
 export const WORKSPACE_FILES: GeneratedFileRecord[] = [
   {
+    path: 'lib/auth/nda_tester_gate.dart',
+    language: 'dart',
+    part: 1,
+    description:
+      'Mandatory Closed Alpha NDA, Partnership Dossier, Manual Founder Approval Queue (getercorey97@gmail.com), Pending Status Screen with Check Approval Status button, and Device-Bound Unique Passcode Gate (ALI-XX-XXXX).',
+    lineCount: 1595,
+    content: `// OfficialClosedAlphaNdaGateWrapper (lib/auth/nda_tester_gate.dart)
+// 1. Step 1: Submits NDA & Partnership Dossier with approval_status = 'pending' to public.nda_tester_approvals
+// 2. Hides personal ALI-XX-XXXX passcode until Founder Corey Geter (getercorey97@gmail.com) approves
+// 3. Pending screen includes "🔄 CHECK APPROVAL STATUS" button querying Supabase & local registry
+// 4. Tab 3 "🛡️ 3. FOUNDER ADMIN QUEUE" lets Founder approve/reject testers & copy ALI-XX-XXXX codes`,
+  },
+  {
+    path: 'supabase/migrations/20261025000003_nda_tester_approvals.sql',
+    language: 'sql',
+    part: 2,
+    description:
+      'Supabase migration creating public.nda_tester_approvals with approval_status (pending, approved, rejected), device fingerprint binding, and RLS policies for manual Founder approval.',
+    lineCount: 98,
+    content: `-- ACT LIKE IT — Manual Founder NDA Approval Queue & Device-Bound Passcode Table
+create table if not exists public.nda_tester_approvals (
+  id uuid primary key default gen_random_uuid(),
+  full_legal_name text not null,
+  email text not null,
+  phone_number text not null,
+  digital_signature text not null,
+  unique_passcode text not null unique,
+  bound_device_fingerprint text not null,
+  approval_status text not null default 'pending'
+    check (approval_status in ('pending', 'approved', 'rejected')),
+  approved_by text,
+  approved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.nda_tester_approvals enable row level security;`,
+  },
+  {
     path: 'supabase/migrations/20261024000002_qa_feedback.sql',
     language: 'sql',
     part: 4,

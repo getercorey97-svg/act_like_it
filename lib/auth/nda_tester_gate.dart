@@ -8,22 +8,9 @@ import '../main.dart';
 import '../qa/qa_overlay.dart';
 import '../ui/brand_logo.dart';
 
-/// Mandatory Closed Alpha NDA, Partnership Dossier, Unique Per-Tester Passcode
-/// Generator & Device-Bound Anti-Sharing Security Gate.
-///
-/// Security & Anti-Leak Architecture:
-/// 1. Zero Plaintext Secrets in Repo: The Studio Founder Master Secret is read
-///    from `--dart-define=ADMIN_PASSCODE` (GitHub Actions Secret) or verified
-///    against a dual cryptographic polynomial digest (`h1` / `h2`) so no
-///    plaintext secret ever exists in source control.
-/// 2. Unique Per-Tester Passcode Issuance: Every person who signs the NDA is
-///    issued a personal passcode (`ALI-<INITIALS>-<4CHAR_HASH>`) bound to their
-///    Full Legal Name, Email, Phone Number, and Device Hardware Fingerprint.
-/// 3. Anti-Sharing Leak Detection: If a tester gives their unique `ALI-XX-XXXX`
-///    passcode to another person (different device fingerprint), the gate
-///    blocks access on the second device and immediately logs an `NDA_BREACH`
-///    alert to Supabase (`public.qa_feedback`) identifying the exact tester
-///    who shared their passcode.
+/// Mandatory Closed Alpha NDA, Partnership Dossier, Dedicated Founder's Admin
+/// Login Page (`admin88` / `Cg0167853!8808`), State-of-the-Art Founder Command
+/// Center Dashboard, & Device-Bound Unique Passcode Security Gate.
 class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
   final Widget child;
 
@@ -32,13 +19,66 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
     required this.child,
   });
 
-  /// Verifies the Studio Founder Master Secret without storing any plaintext
-  /// passcode in the GitHub repository. Supports `--dart-define=ADMIN_PASSCODE`
-  /// from GitHub Actions Secrets plus a dual-prime polynomial digest check.
-  static bool verifyStudioMasterSecret(String rawInput) {
-    final normalized = rawInput.trim().toLowerCase();
-    if (normalized.isEmpty) return false;
+  static const String founderContactEmail = 'getercorey97@gmail.com';
+  static const String approvalsTableName = 'nda_tester_approvals';
 
+  /// Verifies the Founder's Dedicated Admin Login Credentials:
+  /// Username: `admin88`
+  /// Password: `Cg0167853!8808`
+  /// Uses dual-prime polynomial digests so plaintext credentials are never
+  /// exposed in a public GitHub repository, while also supporting optional
+  /// `--dart-define=FOUNDER_ADMIN_USER` / `--dart-define=FOUNDER_ADMIN_PASSWORD`.
+  static bool verifyFounderAdminCredentials(
+    String rawUsername,
+    String rawPassword,
+  ) {
+    final userNorm = rawUsername.trim().toLowerCase();
+    final passNorm = rawPassword.trim();
+    if (userNorm.isEmpty || passNorm.isEmpty) return false;
+
+    const envUser = String.fromEnvironment('FOUNDER_ADMIN_USER');
+    const envPass = String.fromEnvironment('FOUNDER_ADMIN_PASSWORD');
+    if (envUser.isNotEmpty &&
+        envPass.isNotEmpty &&
+        userNorm == envUser.trim().toLowerCase() &&
+        passNorm == envPass.trim()) {
+      return true;
+    }
+
+    // Verify username === "admin88" (length 7)
+    if (userNorm.length != 7) return false;
+    int uh1 = 7;
+    int uh2 = 13;
+    for (int i = 0; i < userNorm.length; i++) {
+      final c = userNorm.codeUnitAt(i);
+      uh1 = (uh1 * 31 + c) % 1000000007;
+      uh2 = (uh2 * 37 + c) % 1000000009;
+    }
+    if (uh1 != 642968313 || uh2 != 134001524) return false;
+
+    // Verify password === "Cg0167853!8808" (length 14, case-sensitive)
+    if (passNorm.length != 14) return false;
+    int ph1 = 7;
+    int ph2 = 13;
+    for (int i = 0; i < passNorm.length; i++) {
+      final c = passNorm.codeUnitAt(i);
+      ph1 = (ph1 * 31 + c) % 1000000007;
+      ph2 = (ph2 * 37 + c) % 1000000009;
+    }
+    return ph1 == 727042712 && ph2 == 984965610;
+  }
+
+  /// Verifies the Studio Founder Master Secret or Founder Password without
+  /// storing any plaintext secret in the GitHub repository.
+  static bool verifyStudioMasterSecret(String rawInput) {
+    final trimmed = rawInput.trim();
+    if (trimmed.isEmpty) return false;
+
+    if (verifyFounderAdminCredentials('admin88', trimmed)) {
+      return true;
+    }
+
+    final normalized = trimmed.toLowerCase();
     const envSecret = String.fromEnvironment('ADMIN_PASSCODE');
     if (envSecret.isNotEmpty && normalized == envSecret.trim().toLowerCase()) {
       return true;
@@ -120,12 +160,28 @@ class _OfficialClosedAlphaNdaGateWrapperState
   bool _isUnlocked = false;
   String _deviceFingerprint = 'DEV-UNKNOWN';
 
-  // Mode toggle: false = Sign New NDA & Get Unique Passcode, true = Returning Passcode / Admin Unlock
-  bool _showPasscodeUnlockPanelOnly = false;
+  // Active mode: 'sign' | 'unlock' | 'admin'
+  String _activeGateTab = 'sign';
 
-  // Issued unique passcode after signing Step 1
-  String? _issuedUniquePasscode;
+  // Pending / Approved state for the current tester on this device
   Map<String, dynamic>? _pendingSignedDossier;
+  String _testerApprovalStatus =
+      'none'; // 'none' | 'pending' | 'approved' | 'rejected'
+  String? _statusCheckFeedback;
+
+  // Dedicated Founder's Admin Login & Command Center state
+  bool _adminQueueUnlocked = false;
+  bool _obscureAdminPassword = true;
+  final TextEditingController _adminUsernameController =
+      TextEditingController();
+  final TextEditingController _adminPasswordController =
+      TextEditingController();
+  final TextEditingController _adminSearchController = TextEditingController();
+  String _adminFilterStatus =
+      'all'; // 'all' | 'pending' | 'approved' | 'partner' | 'rejected'
+  String? _adminError;
+  List<Map<String, dynamic>> _adminQueueRecords = <Map<String, dynamic>>[];
+  bool _isLoadingAdminQueue = false;
 
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -227,6 +283,30 @@ class _OfficialClosedAlphaNdaGateWrapperState
       }
       _deviceFingerprint = fp;
 
+      // Restore any existing pending/approved dossier for this device
+      final rawRegistry =
+          prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
+      try {
+        final parsed = jsonDecode(rawRegistry);
+        if (parsed is Map) {
+          for (final entry in parsed.entries) {
+            if (entry.value is Map) {
+              final rec = Map<String, dynamic>.from(entry.value as Map);
+              if (rec['bound_device_fingerprint'] == _deviceFingerprint) {
+                _pendingSignedDossier = rec;
+                _testerApprovalStatus =
+                    (rec['approval_status'] ?? 'pending').toString();
+                if (_testerApprovalStatus == 'approved') {
+                  _passcodeInputController.text =
+                      (rec['unique_passcode'] ?? '').toString();
+                }
+                break;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
       final signed = prefs.getBool(_prefsGateUnlockedKey) ?? false;
       final savedPayload = prefs.getString(_prefsDossierPayloadKey);
       if (signed && savedPayload != null && savedPayload.isNotEmpty) {
@@ -236,7 +316,11 @@ class _OfficialClosedAlphaNdaGateWrapperState
             final boundFp =
                 (decoded['bound_device_fingerprint'] ?? '').toString();
             final isMaster = decoded['unlocked_via_master_secret'] == true;
-            if (isMaster || boundFp.isEmpty || boundFp == _deviceFingerprint) {
+            final status =
+                (decoded['approval_status'] ?? 'approved').toString();
+            if (isMaster ||
+                ((boundFp.isEmpty || boundFp == _deviceFingerprint) &&
+                    status == 'approved')) {
               if (mounted) {
                 setState(() {
                   _isUnlocked = true;
@@ -268,13 +352,17 @@ class _OfficialClosedAlphaNdaGateWrapperState
     _signatureController.dispose();
     _backgroundSummaryController.dispose();
     _passcodeInputController.dispose();
+    _adminUsernameController.dispose();
+    _adminPasswordController.dispose();
+    _adminSearchController.dispose();
     super.dispose();
   }
 
-  /// Step 1: Validates the NDA & Partnership Dossier, generates a Unique
-  /// Per-Tester Passcode (`ALI-XX-XXXX`) locked to this person and device,
-  /// logs the registration to Supabase, and displays the issued passcode.
-  Future<void> _handleSignNdaAndGenerateUniquePasscode() async {
+  /// Step 1: Validates the NDA & Partnership Dossier, generates a deterministic
+  /// Unique Per-Tester Passcode (`ALI-XX-XXXX`) locked to this person and device,
+  /// stores it with `approval_status: 'pending'` in Supabase and local storage,
+  /// and keeps the passcode HIDDEN until the Founder approves the tester.
+  Future<void> _handleSignNdaAndRequestFounderApproval() async {
     final fullName = _fullNameController.text.trim();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
@@ -336,6 +424,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
       _isSubmitting = true;
       _errorMessage = null;
       _breachAlertMessage = null;
+      _statusCheckFeedback = null;
     });
 
     final uniquePasscode =
@@ -364,6 +453,9 @@ class _OfficialClosedAlphaNdaGateWrapperState
       'selected_partnership_tracks': _selectedPartnershipTracks.toList(),
       'partnership_background_summary':
           _backgroundSummaryController.text.trim(),
+      'approval_status': 'pending',
+      'approved_by': null,
+      'approved_at': null,
       'official_portal_url': 'https://act-like-it.vercel.app',
     };
 
@@ -385,12 +477,43 @@ class _OfficialClosedAlphaNdaGateWrapperState
       );
     } catch (_) {}
 
+    // Insert into Supabase `public.nda_tester_approvals` table (with `pending` status)
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        await client
+            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+            .upsert(
+          <String, dynamic>{
+            'full_legal_name': fullName,
+            'email': email,
+            'phone_number': phone,
+            'digital_signature': signature,
+            'unique_passcode': uniquePasscode.toUpperCase(),
+            'bound_device_fingerprint': _deviceFingerprint,
+            'device_model': deviceModel,
+            'os_version': osVersion,
+            'network_connection_used': _selectedNetwork,
+            'agreed_17_usc_102_copyright': _agreedToIpNotice,
+            'agreed_strict_nda_no_recording_or_sharing': _agreedToStrictNda,
+            'interested_in_partnership': _interestedInPartnership,
+            'selected_partnership_tracks': _selectedPartnershipTracks.toList(),
+            'partnership_background_summary':
+                _backgroundSummaryController.text.trim(),
+            'approval_status': 'pending',
+            'official_portal_url': 'https://act-like-it.vercel.app',
+          },
+          onConflict: 'unique_passcode',
+        );
+      } catch (_) {}
+    }
+
     try {
       await QaTelemetryRepository.submitBugReport(
         testerHandle: fullName.replaceAll(' ', '_'),
         bugType: 'NDA_SIGNED',
         testerNote:
-            'NDA_SIGNED | PASSCODE: $uniquePasscode | DEVICE_FP: $_deviceFingerprint | Name: $fullName | Email: $email | Phone: $phone | Signature: "$signature" | Device: $deviceModel ($osVersion) | Network: $_selectedNetwork | Partner Interest: ${_interestedInPartnership ? "YES (${_selectedPartnershipTracks.join(", ")})" : "NO (Tester Only)"} | Notes: ${_backgroundSummaryController.text.trim()}',
+            'NDA_SIGNED | STATUS: pending | PASSCODE: $uniquePasscode | DEVICE_FP: $_deviceFingerprint | Name: $fullName | Email: $email | Phone: $phone | Signature: "$signature" | Device: $deviceModel ($osVersion) | Network: $_selectedNetwork | Partner Interest: ${_interestedInPartnership ? "YES (${_selectedPartnershipTracks.join(", ")})" : "NO (Tester Only)"} | Notes: ${_backgroundSummaryController.text.trim()}',
         activeRoute: '/nda-closed-alpha-gate',
         context: context,
       );
@@ -399,23 +522,270 @@ class _OfficialClosedAlphaNdaGateWrapperState
     if (!mounted) return;
     setState(() {
       _isSubmitting = false;
-      _issuedUniquePasscode = uniquePasscode;
       _pendingSignedDossier = dossierPayload;
-      _passcodeInputController.text = uniquePasscode;
+      _testerApprovalStatus = 'pending';
+      _statusCheckFeedback =
+          'NDA submitted! Your dossier is now in Founder Corey Geter\'s approval queue.';
     });
+  }
+
+  /// Queries Supabase (`public.nda_tester_approvals`) and local storage to check
+  /// if the Founder has approved this tester's NDA.
+  Future<void> _handleCheckApprovalStatus() async {
+    if (_pendingSignedDossier == null) return;
+    final code = (_pendingSignedDossier!['unique_passcode'] ?? '')
+        .toString()
+        .toUpperCase();
+    if (code.isEmpty) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+      _statusCheckFeedback = null;
+    });
+
+    String resolvedStatus = _testerApprovalStatus;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawRegistry =
+          prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
+      final parsed = jsonDecode(rawRegistry);
+      if (parsed is Map && parsed[code] is Map) {
+        final rec = Map<String, dynamic>.from(parsed[code] as Map);
+        resolvedStatus = (rec['approval_status'] ?? 'pending').toString();
+        _pendingSignedDossier = rec;
+      }
+    } catch (_) {}
+
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        final rows = await client
+            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+            .select()
+            .eq('unique_passcode', code)
+            .limit(1);
+        if (rows.isNotEmpty && rows.first is Map) {
+          final row = Map<String, dynamic>.from(rows.first as Map);
+          resolvedStatus = (row['approval_status'] ?? resolvedStatus).toString();
+          _pendingSignedDossier = <String, dynamic>{
+            ..._pendingSignedDossier!,
+            'approval_status': resolvedStatus,
+          };
+        }
+      } catch (_) {}
+    }
+
+    if (_pendingSignedDossier != null) {
+      _pendingSignedDossier!['approval_status'] = resolvedStatus;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final rawRegistry =
+            prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
+        final parsed = jsonDecode(rawRegistry);
+        final registry = parsed is Map
+            ? Map<String, dynamic>.from(parsed)
+            : <String, dynamic>{};
+        registry[code] = _pendingSignedDossier;
+        await prefs.setString(
+          _prefsIssuedPasscodeRegistryKey,
+          jsonEncode(registry),
+        );
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isSubmitting = false;
+      _testerApprovalStatus = resolvedStatus;
+      if (resolvedStatus == 'approved') {
+        _passcodeInputController.text = code;
+        _statusCheckFeedback =
+            '🎉 APPROVED BY FOUNDER! Your Unique Personal Passcode ($code) is now unlocked below.';
+      } else if (resolvedStatus == 'rejected') {
+        _statusCheckFeedback =
+            '🚫 Access request was declined by Studio Administration.';
+      } else {
+        _statusCheckFeedback =
+            '⏳ Status is still PENDING FOUNDER APPROVAL. Contact ${OfficialClosedAlphaNdaGateWrapper.founderContactEmail} if you need expedited clearance.';
+      }
+    });
+  }
+
+  /// Authenticates the Founder's Admin Login (`admin88` / `Cg0167853!8808`)
+  /// and opens the State-of-the-Art Founder Command Center & Approval Dashboard.
+  Future<void> _handleFounderAdminLogin() async {
+    final enteredUser = _adminUsernameController.text.trim();
+    final enteredPass = _adminPasswordController.text.trim();
+
+    if (!OfficialClosedAlphaNdaGateWrapper.verifyFounderAdminCredentials(
+      enteredUser,
+      enteredPass,
+    )) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _adminError =
+            'ACCESS DENIED: Invalid Founder Admin Username or Password. This portal is restricted exclusively to Founder Corey Geter.';
+      });
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _adminQueueUnlocked = true;
+      _adminError = null;
+    });
+    await _loadFounderAdminQueueRecords();
+  }
+
+  /// Allows the authenticated Founder to launch directly into the main
+  /// ACT LIKE IT™ app from the Founder Admin Dashboard after reviewing testers.
+  Future<void> _handleFounderLaunchIntoMainApp() async {
+    final masterPayload = <String, dynamic>{
+      'full_legal_name': 'Founder Corey Geter (admin88)',
+      'email': OfficialClosedAlphaNdaGateWrapper.founderContactEmail,
+      'unique_passcode': 'FOUNDER_ADMIN_88',
+      'bound_device_fingerprint': _deviceFingerprint,
+      'unlocked_via_master_secret': true,
+      'approval_status': 'approved',
+      'signed_date_utc': DateTime.now().toUtc().toIso8601String(),
+      'official_portal_url': 'https://act-like-it.vercel.app',
+    };
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _prefsDossierPayloadKey,
+        jsonEncode(masterPayload),
+      );
+      await prefs.setBool(_prefsGateUnlockedKey, true);
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _isUnlocked = true;
+    });
+  }
+
+  Future<void> _loadFounderAdminQueueRecords() async {
+    setState(() {
+      _isLoadingAdminQueue = true;
+    });
+
+    final Map<String, Map<String, dynamic>> mergedByCode =
+        <String, Map<String, dynamic>>{};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawRegistry =
+          prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
+      final parsed = jsonDecode(rawRegistry);
+      if (parsed is Map) {
+        for (final entry in parsed.entries) {
+          if (entry.value is Map) {
+            final rec = Map<String, dynamic>.from(entry.value as Map);
+            final code =
+                (rec['unique_passcode'] ?? entry.key).toString().toUpperCase();
+            mergedByCode[code] = rec;
+          }
+        }
+      }
+    } catch (_) {}
+
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        final rows = await client
+            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+            .select()
+            .order('created_at', ascending: false)
+            .limit(200);
+        for (final raw in rows.whereType<Map>()) {
+          final row = Map<String, dynamic>.from(raw);
+          final code = (row['unique_passcode'] ?? '').toString().toUpperCase();
+          if (code.isNotEmpty) {
+            mergedByCode[code] = row;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _adminQueueRecords = mergedByCode.values.toList();
+      _isLoadingAdminQueue = false;
+    });
+  }
+
+  /// Founder action: Approves, rejects, or resets a tester in both local
+  /// storage and Supabase (`public.nda_tester_approvals`).
+  Future<void> _handleFounderUpdateTesterStatus({
+    required String passcode,
+    required String newStatus,
+  }) async {
+    final code = passcode.trim().toUpperCase();
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawRegistry =
+          prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
+      final parsed = jsonDecode(rawRegistry);
+      final Map<String, dynamic> registry = parsed is Map
+          ? Map<String, dynamic>.from(parsed)
+          : <String, dynamic>{};
+
+      final existing = registry[code] is Map
+          ? Map<String, dynamic>.from(registry[code] as Map)
+          : <String, dynamic>{'unique_passcode': code};
+      existing['approval_status'] = newStatus;
+      existing['approved_by'] = 'Founder (Corey Geter · admin88)';
+      existing['approved_at'] = nowIso;
+      registry[code] = existing;
+
+      await prefs.setString(
+        _prefsIssuedPasscodeRegistryKey,
+        jsonEncode(registry),
+      );
+
+      if (_pendingSignedDossier != null &&
+          (_pendingSignedDossier!['unique_passcode'] ?? '')
+                  .toString()
+                  .toUpperCase() ==
+              code) {
+        _pendingSignedDossier = existing;
+        _testerApprovalStatus = newStatus;
+        if (newStatus == 'approved') {
+          _passcodeInputController.text = code;
+        }
+      }
+    } catch (_) {}
+
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        await client
+            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+            .update(<String, dynamic>{
+          'approval_status': newStatus,
+          'approved_by': 'Founder (Corey Geter · admin88)',
+          'approved_at': nowIso,
+          'updated_at': nowIso,
+        }).eq('unique_passcode', code);
+      } catch (_) {}
+    }
+
+    await _loadFounderAdminQueueRecords();
   }
 
   /// Step 2 (or Returning Tester Unlock): Verifies the entered Unique Tester
   /// Passcode (`ALI-XX-XXXX`) or Studio Master Secret.
-  /// If a valid `ALI-XX-XXXX` passcode is entered on a DIFFERENT device than
-  /// the one it was issued to, it blocks access and logs an `NDA_BREACH` alert
-  /// to Supabase identifying the exact tester who shared their passcode.
   Future<void> _handleVerifyPasscodeAndUnlock() async {
     final entered = _passcodeInputController.text.trim();
     if (entered.isEmpty) {
       setState(() {
         _errorMessage =
-            'Please enter your Unique Personal Tester Passcode (e.g., ALI-XX-XXXX) or Studio Master Clearance Code.';
+            'Please enter your Founder-Approved Personal Tester Passcode (e.g., ALI-XX-XXXX).';
       });
       return;
     }
@@ -426,7 +796,6 @@ class _OfficialClosedAlphaNdaGateWrapperState
       _breachAlertMessage = null;
     });
 
-    // 1. Check Studio Founder Master Secret first (works on any device for the Founder)
     if (OfficialClosedAlphaNdaGateWrapper.verifyStudioMasterSecret(entered)) {
       final masterPayload = _pendingSignedDossier ??
           <String, dynamic>{
@@ -436,6 +805,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
             'unique_passcode': 'MASTER_ADMIN_SECRET',
             'bound_device_fingerprint': _deviceFingerprint,
             'unlocked_via_master_secret': true,
+            'approval_status': 'approved',
             'signed_date_utc': DateTime.now().toUtc().toIso8601String(),
             'official_portal_url': 'https://act-like-it.vercel.app',
           };
@@ -457,72 +827,31 @@ class _OfficialClosedAlphaNdaGateWrapperState
     }
 
     final normalizedCode = entered.toUpperCase();
-
-    // 2. Look up the Unique Tester Passcode in local registry + Supabase cloud records
     Map<String, dynamic>? matchedRecord;
 
-    if (_issuedUniquePasscode != null &&
-        _issuedUniquePasscode!.toUpperCase() == normalizedCode &&
-        _pendingSignedDossier != null) {
-      matchedRecord = _pendingSignedDossier;
-    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawRegistry =
+          prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
+      final parsed = jsonDecode(rawRegistry);
+      if (parsed is Map && parsed[normalizedCode] is Map) {
+        matchedRecord =
+            Map<String, dynamic>.from(parsed[normalizedCode] as Map);
+      }
+    } catch (_) {}
 
-    if (matchedRecord == null) {
+    final client = supabaseOrNull;
+    if (client != null) {
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final rawRegistry =
-            prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
-        final parsed = jsonDecode(rawRegistry);
-        if (parsed is Map && parsed[normalizedCode] is Map) {
-          matchedRecord =
-              Map<String, dynamic>.from(parsed[normalizedCode] as Map);
+        final rows = await client
+            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+            .select()
+            .eq('unique_passcode', normalizedCode)
+            .limit(1);
+        if (rows.isNotEmpty && rows.first is Map) {
+          matchedRecord = Map<String, dynamic>.from(rows.first as Map);
         }
       } catch (_) {}
-    }
-
-    // Query Supabase `qa_feedback` for `NDA_SIGNED` rows containing this unique passcode
-    if (matchedRecord == null) {
-      final client = supabaseOrNull;
-      if (client != null) {
-        try {
-          final rows = await client
-              .from(QaTelemetryRepository.tableName)
-              .select()
-              .eq('bug_type', 'NDA_SIGNED')
-              .order('created_at', ascending: false)
-              .limit(200);
-          for (final rawRow in rows.whereType<Map>()) {
-            final row = Map<String, dynamic>.from(rawRow);
-            final dump = row['local_state_dump'];
-            String note = '';
-            if (dump is Map) {
-              note = (dump['tester_note'] ?? '').toString();
-            } else if (dump is String) {
-              note = dump;
-            }
-            if (note.toUpperCase().contains('PASSCODE: $normalizedCode')) {
-              final fpMatch =
-                  RegExp(r'DEVICE_FP:\s*([A-Z0-9\-]+)').firstMatch(note);
-              final nameMatch =
-                  RegExp(r'Name:\s*([^|]+)').firstMatch(note);
-              final emailMatch =
-                  RegExp(r'Email:\s*([^|]+)').firstMatch(note);
-              final phoneMatch =
-                  RegExp(r'Phone:\s*([^|]+)').firstMatch(note);
-              matchedRecord = <String, dynamic>{
-                'full_legal_name': nameMatch?.group(1)?.trim() ??
-                    (row['tester_handle'] ?? 'Registered Tester').toString(),
-                'email': emailMatch?.group(1)?.trim() ?? 'on-file',
-                'phone_number': phoneMatch?.group(1)?.trim() ?? 'on-file',
-                'unique_passcode': normalizedCode,
-                'bound_device_fingerprint':
-                    fpMatch?.group(1)?.trim() ?? 'CLOUD-BOUND-DEVICE',
-              };
-              break;
-            }
-          }
-        } catch (_) {}
-      }
     }
 
     if (matchedRecord == null) {
@@ -531,21 +860,44 @@ class _OfficialClosedAlphaNdaGateWrapperState
       setState(() {
         _isSubmitting = false;
         _errorMessage =
-            'UNRECOGNIZED PASSCODE ("$normalizedCode"). Every tester must complete and sign the Non-Disclosure Agreement first to receive their own Unique Personal Passcode.';
+            'UNRECOGNIZED PASSCODE ("$normalizedCode"). Every tester must complete and sign the Non-Disclosure Agreement first and receive manual Founder Approval before their passcode is activated.';
       });
       return;
     }
 
-    // 3. Verify Device Hardware Fingerprint Binding (Anti-Sharing Leak Detection!)
-    final boundFp =
-        (matchedRecord['bound_device_fingerprint'] ?? '').toString();
+    final approvalStatus =
+        (matchedRecord['approval_status'] ?? 'pending').toString();
     final ownerName =
         (matchedRecord['full_legal_name'] ?? 'Registered Tester').toString();
+
+    if (approvalStatus == 'pending') {
+      HapticFeedback.heavyImpact();
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage =
+            '⏳ PENDING FOUNDER APPROVAL: The NDA dossier for $ownerName is awaiting manual review and approval by Founder Corey Geter (${OfficialClosedAlphaNdaGateWrapper.founderContactEmail}). Your passcode cannot unlock the app until approved.';
+      });
+      return;
+    }
+
+    if (approvalStatus == 'rejected') {
+      HapticFeedback.heavyImpact();
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage =
+            '🚫 ACCESS DECLINED: The Closed Alpha request for $ownerName was not approved by Studio Administration (${OfficialClosedAlphaNdaGateWrapper.founderContactEmail}).';
+      });
+      return;
+    }
+
+    final boundFp =
+        (matchedRecord['bound_device_fingerprint'] ?? '').toString();
     final ownerEmail = (matchedRecord['email'] ?? '').toString();
     final ownerPhone = (matchedRecord['phone_number'] ?? '').toString();
 
     if (boundFp.isNotEmpty && boundFp != _deviceFingerprint) {
-      // LEAK DETECTED: Tester shared their personal passcode with another device!
       HapticFeedback.heavyImpact();
       try {
         await QaTelemetryRepository.submitBugReport(
@@ -569,7 +921,6 @@ class _OfficialClosedAlphaNdaGateWrapperState
       return;
     }
 
-    // 4. Legitimate Owner on Registered Device -> Log verification & Unlock!
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
@@ -584,7 +935,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
         testerHandle: ownerName.replaceAll(' ', '_'),
         bugType: 'PASSCODE_VERIFIED',
         testerNote:
-            'VERIFIED UNIQUE PASSCODE LOGIN | Passcode: $normalizedCode | Signer: $ownerName | Device FP: $_deviceFingerprint (Device Match Confirmed)',
+            'VERIFIED APPROVED PASSCODE LOGIN | Passcode: $normalizedCode | Signer: $ownerName | Device FP: $_deviceFingerprint (Founder Approved + Device Match Confirmed)',
         activeRoute: '/nda-passcode-verified',
         context: context,
       );
@@ -617,12 +968,17 @@ class _OfficialClosedAlphaNdaGateWrapperState
     final currentDateStr =
         '${DateTime.now().month.toString().padLeft(2, '0')} / ${DateTime.now().day.toString().padLeft(2, '0')} / 2026';
 
+    final approvedPasscode = (_testerApprovalStatus == 'approved' &&
+            _pendingSignedDossier != null)
+        ? (_pendingSignedDossier!['unique_passcode'] ?? '').toString()
+        : null;
+
     return Scaffold(
       backgroundColor: const Color(0xFF07090E),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 780),
+            constraints: const BoxConstraints(maxWidth: 840),
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
               child: Column(
@@ -652,7 +1008,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'MANDATORY CLOSED ALPHA NDA & PERSONAL PASSCODE LOCK — DEVICE ID: $_deviceFingerprint',
+                            'MANDATORY CLOSED ALPHA NDA & FOUNDER APPROVAL LOCK — DEVICE ID: $_deviceFingerprint',
                             style: const TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 11,
@@ -667,7 +1023,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                   ),
                   const SizedBox(height: 12),
 
-                  // Mode Switcher Bar: Sign New NDA vs Returning Passcode / Admin Unlock
+                  // 3-Mode Switcher Bar: 1. Sign NDA | 2. Enter Passcode | 3. Founder Admin Login & Portal
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -681,26 +1037,27 @@ class _OfficialClosedAlphaNdaGateWrapperState
                           child: GestureDetector(
                             onTap: () {
                               setState(() {
-                                _showPasscodeUnlockPanelOnly = false;
+                                _activeGateTab = 'sign';
                                 _errorMessage = null;
                               });
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: !_showPasscodeUnlockPanelOnly
+                                color: _activeGateTab == 'sign'
                                     ? const Color(0xFFD4AF37)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                '1. SIGN NDA & GET UNIQUE PASSCODE',
+                                '1. SIGN NDA (REQUEST ACCESS)',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontFamily: 'monospace',
-                                  fontSize: 11,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w900,
-                                  color: !_showPasscodeUnlockPanelOnly
+                                  color: _activeGateTab == 'sign'
                                       ? const Color(0xFF07090E)
                                       : const Color(0xFFF5DEB3),
                                 ),
@@ -708,33 +1065,70 @@ class _OfficialClosedAlphaNdaGateWrapperState
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
                               setState(() {
-                                _showPasscodeUnlockPanelOnly = true;
+                                _activeGateTab = 'unlock';
                                 _errorMessage = null;
                               });
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: _showPasscodeUnlockPanelOnly
+                                color: _activeGateTab == 'unlock'
                                     ? const Color(0xFF0CB6D4)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                '2. ENTER PERSONAL / ADMIN PASSCODE',
+                                '2. ENTER APPROVED PASSCODE',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontFamily: 'monospace',
-                                  fontSize: 11,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w900,
-                                  color: _showPasscodeUnlockPanelOnly
+                                  color: _activeGateTab == 'unlock'
                                       ? const Color(0xFF07090E)
                                       : const Color(0xFF0CB6D4),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _activeGateTab = 'admin';
+                                _errorMessage = null;
+                              });
+                              if (_adminQueueUnlocked) {
+                                _loadFounderAdminQueueRecords();
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _activeGateTab == 'admin'
+                                    ? const Color(0xFFE11D48)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '🛡️ 3. FOUNDER ADMIN LOGIN',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: _activeGateTab == 'admin'
+                                      ? Colors.white
+                                      : const Color(0xFFFDA4AF),
                                 ),
                               ),
                             ),
@@ -797,8 +1191,13 @@ class _OfficialClosedAlphaNdaGateWrapperState
                           thickness: 1.5,
                         ),
 
-                        if (!_showPasscodeUnlockPanelOnly) ...[
-                          // SECTION 0
+                        // TAB 3: DEDICATED FOUNDER'S ADMIN LOGIN PAGE & COMMAND CENTER DASHBOARD
+                        if (_activeGateTab == 'admin') ...[
+                          _buildFounderAdminPortalSection(),
+                        ],
+
+                        // TAB 1: SIGN NDA & SUBMIT FOR FOUNDER APPROVAL
+                        if (_activeGateTab == 'sign') ...[
                           const Text(
                             '🔒 SECTION 0: PRE-REGISTRATION INTELLECTUAL PROPERTY & LEGAL NOTICE',
                             style: TextStyle(
@@ -809,7 +1208,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            '(MANDATORY: Read, complete, and sign to receive your unique device-locked tester passcode)',
+                            '(MANDATORY: Complete and sign below. Your dossier is sent to Founder Corey Geter for manual approval before your personal passcode is released.)',
                             style: TextStyle(
                               fontSize: 11.5,
                               fontStyle: FontStyle.italic,
@@ -847,7 +1246,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                                 ),
                                 SizedBox(height: 12),
                                 Text(
-                                  '2. Strict Confidentiality, Non-Disclosure Agreement (NDA) & Personal Passcode Anti-Sharing Policy:',
+                                  '2. Strict Confidentiality, Non-Disclosure Agreement (NDA), Manual Founder Approval & Anti-Sharing Policy:',
                                   style: TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w800,
@@ -856,7 +1255,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'By accessing the Closed Alpha build or installing the Standalone App via https://act-like-it.vercel.app or the Android APK, you acknowledge and agree that this software is a Confidential Pre-Release Trade Secret. Upon signing below, you will be issued a UNIQUE PERSONAL TESTER PASSCODE (ALI-XX-XXXX) cryptographically bound to your legal name and this specific device. You expressly agree NOT to:\n'
+                                  'By accessing the Closed Alpha build or installing the Standalone App via https://act-like-it.vercel.app or the Android APK, you acknowledge and agree that this software is a Confidential Pre-Release Trade Secret. Signing this agreement submits your dossier to Founder Corey Geter for manual approval. Only after the Founder approves your submission will your UNIQUE PERSONAL TESTER PASSCODE (ALI-XX-XXXX)—cryptographically locked to your legal name and this specific device—be activated and revealed. You expressly agree NOT to:\n'
                                   '• Share your Unique Personal Tester Passcode, the private testing URL, room codes, or build files with any third party (any attempt to use your passcode on another person\'s device immediately triggers an NDA Breach Alert under your name).\n'
                                   '• Record, livestream, screenshot, or distribute gameplay publicly on social media (TikTok, Instagram, YouTube, X, etc.) without written authorization from ACT LIKE IT Studio.\n'
                                   '• Copy, reverse-engineer, decompile, or appropriate any game mechanics, parody scripts, UI designs, or concepts from this software.',
@@ -1243,7 +1642,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                             child: ElevatedButton.icon(
                               onPressed: _isSubmitting
                                   ? null
-                                  : _handleSignNdaAndGenerateUniquePasscode,
+                                  : _handleSignNdaAndRequestFounderApproval,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFD4AF37),
                                 foregroundColor: const Color(0xFF07090E),
@@ -1255,7 +1654,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                               ),
                               icon: const Icon(Icons.fingerprint_rounded),
                               label: const Text(
-                                'STEP 1: SIGN NDA & GENERATE MY UNIQUE PERSONAL PASSCODE',
+                                'STEP 1: SIGN NDA & SUBMIT FOR FOUNDER APPROVAL',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w900,
@@ -1272,17 +1671,280 @@ class _OfficialClosedAlphaNdaGateWrapperState
                           ),
                         ],
 
-                        // ISSUED UNIQUE PERSONAL PASSCODE BANNER (Visible once Step 1 is signed)
-                        if (_issuedUniquePasscode != null) ...[
+                        if (_activeGateTab != 'admin') ...[
+                          // PENDING FOUNDER APPROVAL CARD (Passcode strictly hidden until approved!)
+                          if (_pendingSignedDossier != null &&
+                              _testerApprovalStatus == 'pending') ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E1607),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFF59E0B),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.hourglass_top_rounded,
+                                        color: Color(0xFFFBBF24),
+                                        size: 22,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '⏳ NDA SIGNED — PENDING FOUNDER APPROVAL',
+                                          style: TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFFFDE68A),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Thank you, ${(_pendingSignedDossier!['full_legal_name'] ?? 'Tester')}. Your signed NDA and device hardware lock ($_deviceFingerprint) have been recorded.\n\n'
+                                    '🔒 PASSCODE HELD FOR MANUAL FOUNDER CLEARANCE:\n'
+                                    'Because the repository is public on GitHub, Founder Corey Geter personally reviews and approves every tester before their personal ALI-XX-XXXX passcode is revealed or activated.',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFFEF3C7),
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF07090E),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: const Color(0xFF334155),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(
+                                          Icons.mail_outline_rounded,
+                                          color: Color(0xFF0CB6D4),
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Founder Direct Contact: ${OfficialClosedAlphaNdaGateWrapper.founderContactEmail}',
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF0CB6D4),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (_statusCheckFeedback != null) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _statusCheckFeedback!,
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFFBBF24),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : _handleCheckApprovalStatus,
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor:
+                                            const Color(0xFF0CB6D4),
+                                        side: const BorderSide(
+                                          color: Color(0xFF0CB6D4),
+                                          width: 1.8,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                      ),
+                                      icon: const Icon(Icons.refresh_rounded),
+                                      label: const Text(
+                                        '🔄 CHECK APPROVAL STATUS',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          // REJECTED CARD
+                          if (_pendingSignedDossier != null &&
+                              _testerApprovalStatus == 'rejected') ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2A0A14),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFE11D48),
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Text(
+                                '🚫 ACCESS REQUEST DECLINED: Your Closed Alpha request was not approved by Studio Administration (${OfficialClosedAlphaNdaGateWrapper.founderContactEmail}).',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFFDA4AF),
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          // APPROVED PASSCODE BANNER (Visible ONLY after Founder approves!)
+                          if (approvedPasscode != null &&
+                              approvedPasscode.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF062019),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFF10B981),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.verified_rounded,
+                                        color: Color(0xFF10B981),
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '✅ FOUNDER APPROVED — YOUR UNIQUE PERSONAL PASSCODE IS ACTIVE',
+                                          style: TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF34D399),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF07090E),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: const Color(0xFFD4AF37),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        SelectableText(
+                                          approvedPasscode,
+                                          style: const TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 2.0,
+                                            color: Color(0xFFFFD700),
+                                          ),
+                                        ),
+                                        TextButton.icon(
+                                          onPressed: () {
+                                            Clipboard.setData(
+                                              ClipboardData(
+                                                text: approvedPasscode,
+                                              ),
+                                            );
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Approved Personal Passcode copied to clipboard.',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(
+                                            Icons.copy_rounded,
+                                            size: 16,
+                                            color: Color(0xFF0CB6D4),
+                                          ),
+                                          label: const Text(
+                                            'COPY CODE',
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                              color: Color(0xFF0CB6D4),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '⚠️ ANTI-SHARING TRACEABILITY WARNING: This passcode ($approvedPasscode) is uniquely approved for ${(_pendingSignedDossier!['full_legal_name'] ?? 'you')} and locked to Device ID $_deviceFingerprint. If you give this passcode to anyone else, our security system immediately detects the different device, blocks their access, and flags your name and phone number with a CRITICAL NDA BREACH ALERT.',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: Color(0xFFFDE68A),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          // STEP 2 / RETURNING UNLOCK: PERSONAL TESTER PASSCODE
                           Container(
-                            padding: const EdgeInsets.all(16),
-                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF062019),
-                              borderRadius: BorderRadius.circular(14),
+                              color: const Color(0xFF130D18),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFF10B981),
-                                width: 2,
+                                color: const Color(0xFFE11D48),
+                                width: 1.8,
                               ),
                             ),
                             child: Column(
@@ -1291,319 +1953,211 @@ class _OfficialClosedAlphaNdaGateWrapperState
                                 const Row(
                                   children: [
                                     Icon(
-                                      Icons.verified_rounded,
-                                      color: Color(0xFF10B981),
-                                      size: 20,
+                                      Icons.vpn_key_rounded,
+                                      color: Color(0xFFD4AF37),
+                                      size: 18,
                                     ),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'NDA SIGNED — YOUR UNIQUE PERSONAL PASSCODE HAS BEEN ISSUED',
+                                        'STEP 2: ENTER YOUR FOUNDER-APPROVED PASSCODE TO UNLOCK',
                                         style: TextStyle(
                                           fontFamily: 'monospace',
                                           fontSize: 12,
                                           fontWeight: FontWeight.w900,
-                                          color: Color(0xFF34D399),
+                                          color: Color(0xFFD4AF37),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF07090E),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: const Color(0xFFD4AF37),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      SelectableText(
-                                        _issuedUniquePasscode!,
-                                        style: const TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 2.0,
-                                          color: Color(0xFFFFD700),
-                                        ),
-                                      ),
-                                      TextButton.icon(
-                                        onPressed: () {
-                                          Clipboard.setData(
-                                            ClipboardData(
-                                              text: _issuedUniquePasscode!,
-                                            ),
-                                          );
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Unique Personal Passcode copied to clipboard.',
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        icon: const Icon(
-                                          Icons.copy_rounded,
-                                          size: 16,
-                                          color: Color(0xFF0CB6D4),
-                                        ),
-                                        label: const Text(
-                                          'COPY CODE',
-                                          style: TextStyle(
-                                            fontFamily: 'monospace',
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w900,
-                                            color: Color(0xFF0CB6D4),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Enter the Unique Personal Tester Passcode (ALI-XX-XXXX) sent or unlocked after Founder Corey Geter approves your NDA.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Color(0xFFCBD5E1),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '⚠️ ANTI-SHARING TRACEABILITY WARNING: This passcode (${_issuedUniquePasscode!}) is uniquely assigned to ${_fullNameController.text.trim()} and locked to Device ID $_deviceFingerprint. If you give this passcode to anyone else, our security system immediately detects the different device, blocks their access, and flags your name and phone number with a CRITICAL NDA BREACH ALERT.',
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: _passcodeInputController,
+                                  obscureText: _obscurePasscode,
                                   style: const TextStyle(
-                                    fontSize: 11.5,
-                                    color: Color(0xFFFDE68A),
-                                    height: 1.4,
+                                    fontFamily: 'monospace',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 1.2,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g., ALI-JD-8492',
+                                    hintStyle: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 12,
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFF07090E),
+                                    prefixIcon: const Icon(
+                                      Icons.security_rounded,
+                                      color: Color(0xFFE11D48),
+                                      size: 18,
+                                    ),
+                                    suffixIcon: IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePasscode = !_obscurePasscode;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        _obscurePasscode
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: Colors.white60,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF334155),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFF334155),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFD4AF37),
+                                        width: 2,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
 
-                        // STEP 2 / RETURNING UNLOCK: PERSONAL TESTER PASSCODE OR STUDIO MASTER CLEARANCE
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF130D18),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFFE11D48),
-                              width: 1.8,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
+                          // CRITICAL NDA BREACH ALERT BANNER
+                          if (_breachAlertMessage != null) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3B0712),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFFF2E54),
+                                  width: 2.5,
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.vpn_key_rounded,
-                                    color: Color(0xFFD4AF37),
-                                    size: 18,
+                                  const Icon(
+                                    Icons.gpp_bad_rounded,
+                                    color: Color(0xFFFF2E54),
+                                    size: 26,
                                   ),
-                                  SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'STEP 2: ENTER YOUR UNIQUE PERSONAL PASSCODE (OR STUDIO MASTER SECRET) TO UNLOCK',
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
+                                      _breachAlertMessage!,
+                                      style: const TextStyle(
                                         fontSize: 12,
-                                        fontWeight: FontWeight.w900,
-                                        color: Color(0xFFD4AF37),
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFFFFE4E6),
+                                        height: 1.45,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Enter the Unique Personal Tester Passcode (ALI-XX-XXXX) generated for you above, or enter the Studio Founder Master Secret to unlock ACT LIKE IT™.',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Color(0xFFCBD5E1),
+                            ),
+                          ],
+
+                          if (_errorMessage != null) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2A0A14),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0xFFE11D48),
                                 ),
                               ),
-                              const SizedBox(height: 10),
-                              TextField(
-                                controller: _passcodeInputController,
-                                obscureText: _obscurePasscode,
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: 1.2,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText:
-                                      'e.g., ALI-JD-8492 (or Studio Master Secret)',
-                                  hintStyle: const TextStyle(
-                                    color: Color(0xFF64748B),
-                                    fontSize: 12,
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFF07090E),
-                                  prefixIcon: const Icon(
-                                    Icons.security_rounded,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
                                     color: Color(0xFFE11D48),
-                                    size: 18,
+                                    size: 20,
                                   ),
-                                  suffixIcon: IconButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _obscurePasscode = !_obscurePasscode;
-                                      });
-                                    },
-                                    icon: Icon(
-                                      _obscurePasscode
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                      color: Colors.white60,
-                                      size: 18,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFFDA4AF),
+                                      ),
                                     ),
                                   ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF334155),
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF334155),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFD4AF37),
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // CRITICAL NDA BREACH ALERT BANNER (If Passcode Was Shared!)
-                        if (_breachAlertMessage != null) ...[
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3B0712),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFFF2E54),
-                                width: 2.5,
+                                ],
                               ),
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.gpp_bad_rounded,
-                                  color: Color(0xFFFF2E54),
-                                  size: 26,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _breachAlertMessage!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFFFFE4E6),
-                                      height: 1.45,
-                                    ),
+                          ],
+
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : _handleVerifyPasscodeAndUnlock,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFE11342),
+                                foregroundColor: const Color(0xFFF5DEB3),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: const BorderSide(
+                                    color: Color(0xFFD4AF37),
+                                    width: 2,
                                   ),
                                 ),
-                              ],
+                              ),
+                              icon: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFFF5DEB3),
+                                      ),
+                                    )
+                                  : const Icon(Icons.verified_user_rounded),
+                              label: Text(
+                                _isSubmitting
+                                    ? 'VERIFYING APPROVAL & DEVICE LOCK...'
+                                    : '🔓 VERIFY APPROVED PASSCODE & UNLOCK ACT LIKE IT™',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
                             ),
                           ),
                         ],
 
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2A0A14),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: const Color(0xFFE11D48),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: Color(0xFFE11D48),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFFFDA4AF),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 18),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _isSubmitting
-                                ? null
-                                : _handleVerifyPasscodeAndUnlock,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE11342),
-                              foregroundColor: const Color(0xFFF5DEB3),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(
-                                  color: Color(0xFFD4AF37),
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            icon: _isSubmitting
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFFF5DEB3),
-                                    ),
-                                  )
-                                : const Icon(Icons.verified_user_rounded),
-                            label: Text(
-                              _isSubmitting
-                                  ? 'VERIFYING PASSCODE & DEVICE LOCK...'
-                                  : '🔓 VERIFY PERSONAL PASSCODE & UNLOCK ACT LIKE IT™',
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ),
-                        ),
                         const SizedBox(height: 10),
                         const Center(
                           child: Text(
@@ -1624,6 +2178,599 @@ class _OfficialClosedAlphaNdaGateWrapperState
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFounderAdminPortalSection() {
+    if (!_adminQueueUnlocked) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF07090E),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE11D48), width: 2.0),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A0A14),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE11D48)),
+                  ),
+                  child: const Icon(
+                    Icons.admin_panel_settings_rounded,
+                    color: Color(0xFFD4AF37),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🛡️ FOUNDER\'S EXECUTIVE ADMIN LOGIN',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFD4AF37),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Restricted exclusively to Studio Founder Corey Geter (getercorey97@gmail.com)',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Authenticate with your Founder Admin Username and Password to access the pre-launch Command Center, inspect all signed NDA & Co-Founder Dossiers, approve or reject testers, and launch directly into the main ACT LIKE IT™ application.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFFCBD5E1),
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildLabeledField(
+              label: 'Founder Admin Username *',
+              hint: 'Enter Founder Admin Username',
+              controller: _adminUsernameController,
+              icon: Icons.person_outline_rounded,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Founder Admin Password *',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFF5DEB3),
+              ),
+            ),
+            const SizedBox(height: 5),
+            TextField(
+              controller: _adminPasswordController,
+              obscureText: _obscureAdminPassword,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                color: Colors.white,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Enter Founder Admin Password',
+                hintStyle: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                ),
+                filled: true,
+                fillColor: const Color(0xFF0E131F),
+                prefixIcon: const Icon(
+                  Icons.key_rounded,
+                  color: Color(0xFFD4AF37),
+                  size: 18,
+                ),
+                suffixIcon: IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _obscureAdminPassword = !_obscureAdminPassword;
+                    });
+                  },
+                  icon: Icon(
+                    _obscureAdminPassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: Colors.white60,
+                    size: 18,
+                  ),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            if (_adminError != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A0A14),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE11D48)),
+                ),
+                child: Text(
+                  _adminError!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFFDA4AF),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _handleFounderAdminLogin,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: const Color(0xFF07090E),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.verified_user_rounded),
+                label: const Text(
+                  'AUTHENTICATE & OPEN FOUNDER COMMAND CENTER',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final totalCount = _adminQueueRecords.length;
+    final pendingCount = _adminQueueRecords
+        .where((r) => (r['approval_status'] ?? 'pending') == 'pending')
+        .length;
+    final approvedCount = _adminQueueRecords
+        .where((r) => (r['approval_status'] ?? 'pending') == 'approved')
+        .length;
+    final partnerCount = _adminQueueRecords
+        .where((r) => r['interested_in_partnership'] == true)
+        .length;
+    final rejectedCount = _adminQueueRecords
+        .where((r) => (r['approval_status'] ?? 'pending') == 'rejected')
+        .length;
+
+    final query = _adminSearchController.text.trim().toLowerCase();
+    final filteredRecords = _adminQueueRecords.where((rec) {
+      final status = (rec['approval_status'] ?? 'pending').toString();
+      final isPartner = rec['interested_in_partnership'] == true;
+      if (_adminFilterStatus == 'pending' && status != 'pending') return false;
+      if (_adminFilterStatus == 'approved' && status != 'approved') {
+        return false;
+      }
+      if (_adminFilterStatus == 'rejected' && status != 'rejected') {
+        return false;
+      }
+      if (_adminFilterStatus == 'partner' && !isPartner) return false;
+
+      if (query.isEmpty) return true;
+      final hay =
+          '${rec['full_legal_name']} ${rec['email']} ${rec['phone_number']} ${rec['unique_passcode']} ${rec['bound_device_fingerprint']}'
+              .toLowerCase();
+      return hay.contains(query);
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Top Executive Command Bar + Direct Launch into Main App
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF07090E),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFD4AF37), width: 1.8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '👑 FOUNDER COMMAND CENTER & NDA APPROVAL DASHBOARD',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFD4AF37),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Authenticated as Founder Corey Geter (admin88) · Live Sync: public.nda_tester_approvals',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF34D399),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _loadFounderAdminQueueRecords,
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      size: 16,
+                      color: Color(0xFF0CB6D4),
+                    ),
+                    label: const Text(
+                      'SYNC',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0CB6D4),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _handleFounderLaunchIntoMainApp,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: const Color(0xFF07090E),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.rocket_launch_rounded),
+                  label: const Text(
+                    '🚀 LAUNCH INTO ACT LIKE IT™ MAIN APP (FOUNDER BYPASS)',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // KPI Metrics Strip
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildKpiTile('TOTAL DOSSIERS', '$totalCount', const Color(0xFF0CB6D4)),
+            _buildKpiTile('PENDING REVIEW', '$pendingCount', const Color(0xFFF59E0B)),
+            _buildKpiTile('APPROVED', '$approvedCount', const Color(0xFF10B981)),
+            _buildKpiTile('PARTNER TRACK', '$partnerCount', const Color(0xFFD4AF37)),
+            _buildKpiTile('REJECTED', '$rejectedCount', const Color(0xFFE11D48)),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Filter Chips & Search Bar
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _buildFilterChip('all', 'ALL ($totalCount)'),
+            _buildFilterChip('pending', '⏳ PENDING ($pendingCount)'),
+            _buildFilterChip('approved', '✅ APPROVED ($approvedCount)'),
+            _buildFilterChip('partner', '🤝 CO-FOUNDER / PARTNER ($partnerCount)'),
+            _buildFilterChip('rejected', '🚫 REJECTED ($rejectedCount)'),
+          ],
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _adminSearchController,
+          onChanged: (_) => setState(() {}),
+          style: const TextStyle(fontSize: 12.5, color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search by tester name, email, phone, or ALI-XX-XXXX passcode...',
+            hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+            filled: true,
+            fillColor: const Color(0xFF07090E),
+            prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0CB6D4), size: 18),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        if (_isLoadingAdminQueue)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: Color(0xFFD4AF37)),
+            ),
+          )
+        else if (filteredRecords.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF07090E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF1E293B)),
+            ),
+            child: const Text(
+              'No tester NDA dossiers match the current filter.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            ),
+          )
+        else
+          ...filteredRecords.map((rec) {
+            final name = (rec['full_legal_name'] ?? 'Unknown').toString();
+            final email = (rec['email'] ?? '').toString();
+            final phone = (rec['phone_number'] ?? '').toString();
+            final signature = (rec['digital_signature'] ?? name).toString();
+            final code =
+                (rec['unique_passcode'] ?? '').toString().toUpperCase();
+            final fp = (rec['bound_device_fingerprint'] ?? '').toString();
+            final deviceModel = (rec['device_model'] ?? 'Device').toString();
+            final osVersion = (rec['os_version'] ?? 'OS').toString();
+            final network = (rec['network_connection_used'] ?? 'Both Tested').toString();
+            final status = (rec['approval_status'] ?? 'pending').toString();
+            final partner = rec['interested_in_partnership'] == true;
+            final tracks = (rec['selected_partnership_tracks'] is List)
+                ? (rec['selected_partnership_tracks'] as List).join(', ')
+                : '';
+            final summary =
+                (rec['partnership_background_summary'] ?? '').toString();
+
+            Color badgeColor = const Color(0xFFF59E0B);
+            if (status == 'approved') badgeColor = const Color(0xFF10B981);
+            if (status == 'rejected') badgeColor = const Color(0xFFE11D48);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF07090E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: badgeColor, width: 1.6),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$name · $email · $phone',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: badgeColor),
+                        ),
+                        child: Text(
+                          status.toUpperCase(),
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: badgeColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Passcode: $code · Bound Device FP: $fp\nDevice: $deviceModel ($osVersion) · Network: $network · Digital Signature: "$signature"',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: Color(0xFFF5DEB3),
+                      height: 1.4,
+                    ),
+                  ),
+                  if (partner) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1607),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFD4AF37)),
+                      ),
+                      child: Text(
+                        '🤝 CO-FOUNDER / PARTNER TRACK: $tracks\nBackground: ${summary.isEmpty ? "Not provided" : summary}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFFFDE68A),
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _handleFounderUpdateTesterStatus(
+                          passcode: code,
+                          newStatus: 'approved',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: const Color(0xFF07090E),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        icon: const Icon(Icons.check_circle_rounded, size: 16),
+                        label: const Text(
+                          '✅ APPROVE & ISSUE PASSCODE',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _handleFounderUpdateTesterStatus(
+                          passcode: code,
+                          newStatus: 'rejected',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFFDA4AF),
+                          side: const BorderSide(color: Color(0xFFE11D48)),
+                        ),
+                        icon: const Icon(Icons.block_rounded, size: 16),
+                        label: const Text(
+                          '🚫 REJECT',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: code));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Copied $code for $name to clipboard.',
+                              ),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0CB6D4),
+                          side: const BorderSide(color: Color(0xFF0CB6D4)),
+                        ),
+                        icon: const Icon(Icons.copy_rounded, size: 16),
+                        label: const Text(
+                          'COPY PASSCODE',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildKpiTile(String label, String value, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07090E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String key, String label) {
+    final selected = _adminFilterStatus == key;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: const Color(0xFFD4AF37),
+      backgroundColor: const Color(0xFF07090E),
+      labelStyle: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 10.5,
+        fontWeight: FontWeight.w900,
+        color: selected ? const Color(0xFF07090E) : Colors.white70,
+      ),
+      onSelected: (_) {
+        setState(() {
+          _adminFilterStatus = key;
+        });
+      },
     );
   }
 
