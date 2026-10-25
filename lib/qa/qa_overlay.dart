@@ -402,6 +402,8 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
   bool _isTester = true;
   bool _isSheetOpen = false;
   bool _isCapturingScreenshot = false;
+  double _fabRightOffset = 12.0;
+  double _fabBottomOffset = 92.0;
 
   @override
   void initState() {
@@ -518,6 +520,14 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
   Widget build(BuildContext context) {
     final hideForBroadcast =
         GameSettingsModal.latestConfig.cleanBroadcastScreenShareMode;
+    final screenSize = MediaQuery.sizeOf(context);
+    final maxRight =
+        (screenSize.width - 110.0).clamp(8.0, 2000.0).toDouble();
+    final maxBottom =
+        (screenSize.height - 80.0).clamp(16.0, 2000.0).toDouble();
+    final clampedRight = _fabRightOffset.clamp(8.0, maxRight).toDouble();
+    final clampedBottom = _fabBottomOffset.clamp(16.0, maxBottom).toDouble();
+
     return RepaintBoundary(
       key: _repaintBoundaryKey,
       child: Stack(
@@ -526,56 +536,69 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
           widget.child,
           if (_isTester && !hideForBroadcast)
             Positioned(
-              right: 12,
-              bottom: 92,
+              right: clampedRight,
+              bottom: clampedBottom,
               child: SafeArea(
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: () => _triggerBugReportCapture(
-                      triggerSource: 'FLOATING_QA_FAB',
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanUpdate: (DragUpdateDetails details) {
+                    setState(() {
+                      _fabRightOffset = (_fabRightOffset - details.delta.dx)
+                          .clamp(8.0, maxRight)
+                          .toDouble();
+                      _fabBottomOffset = (_fabBottomOffset - details.delta.dy)
+                          .clamp(16.0, maxBottom)
+                          .toDouble();
+                    });
+                  },
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: () => _triggerBugReportCapture(
+                        triggerSource: 'FLOATING_QA_FAB',
                       ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xEE140C1C),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: const Color(0xFFFFD700),
-                          width: 2.0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0xCC05070B),
-                            offset: Offset(0, 3),
-                            blurRadius: 0,
+                        decoration: BoxDecoration(
+                          color: const Color(0xEE140C1C),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: const Color(0xFFFFD700),
+                            width: 2.0,
                           ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.bug_report_rounded,
-                            size: 16,
-                            color: Color(0xFFFFD700),
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'QA BUG',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.8,
-                              color: Color(0xFFF5DEB3),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0xCC05070B),
+                              offset: Offset(0, 3),
+                              blurRadius: 0,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.bug_report_rounded,
+                              size: 16,
+                              color: Color(0xFFFFD700),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'QA BUG',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                                color: Color(0xFFF5DEB3),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

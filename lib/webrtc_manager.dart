@@ -1891,6 +1891,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         ? lobbyPlayers
         : <LobbyPlayer>[
             LobbyPlayer(
+              id: 'local_${widget.localUserId}',
+              lobbyId: widget.lobbySession.id,
               userId: widget.localUserId,
               displayName: widget.localDisplayName,
               isHost: true,
