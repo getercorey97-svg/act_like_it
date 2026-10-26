@@ -203,7 +203,7 @@ test('S.O.A. Alpha QA Systems (Gemini AI Calibration, qa_feedback SQL, Shake-to-
   // 4. Surgical injection into lib/main.dart without touching SafeBootErrorBoundary
   assert.ok(mainDart.includes('SafeBootErrorBoundary(child: ActLikeItApp())'));
   assert.ok(mainDart.includes('QaBugReporterOverlay'));
-  assert.ok(mainDart.includes("'/qa-dashboard': (_) => const QaWebPortalDashboardScreen()"));
+  assert.ok(mainDart.includes("settings.name == '/qa-dashboard'") && mainDart.includes('QaWebPortalDashboardScreen()'));
 });
 
 test('All 17 Viral, Gameplay, Progression & LiveOps Fixtures (#1-#5, #7-#18, skipping #6) + LIFE IS IMPROV mode pass verification', () => {

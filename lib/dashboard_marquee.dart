@@ -19,6 +19,7 @@ import 'ui/intro_cinematic.dart';
 import 'ui/brand_logo.dart';
 import 'ui/living_25d_animation_engine.dart';
 import 'ui/parody_scenes_catalog.dart';
+import 'ui/soundstage_audio_controller.dart';
 import 'social/cutting_room_feed.dart';
 import 'auth/auth_service.dart';
 import 'auth/nda_tester_gate.dart';
@@ -281,56 +282,40 @@ class _LivingMarqueeDashboardScreenState
 
   void _triggerPaparazziFrenzy() {
     HapticFeedback.heavyImpact();
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.paparazziShutterFlash,
+      ),
+    );
     _frenzyBurstController.forward(from: 0.0);
   }
 
   Future<void> _initGameShowMusicLoop() async {
-    try {
-      await _audioPlayer.setReleaseMode(ReleaseMode.stop);
-      await _audioPlayer.setVolume(GameSettingsModal.masterAudioVolume);
-      final wavBytes = OpeningPremiereMusicSynthesizer.buildOpeningFanfareWav();
-      await _audioPlayer.play(BytesSource(wavBytes));
-      if (mounted) {
-        setState(() {
-          _isMusicPlaying = true;
-        });
+    SoundstageAudioController.instance.onPaparazziFlashVisual = () {
+      if (mounted && !_frenzyBurstController.isAnimating) {
+        _frenzyBurstController.forward(from: 0.0);
       }
-    } catch (_) {
-      try {
-        await _audioPlayer.play(UrlSource(_gameShowSoundtrackUrl));
-        if (mounted) {
-          setState(() {
-            _isMusicPlaying = true;
-          });
-        }
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _isMusicPlaying = false;
-          });
-        }
-      }
+    };
+    await SoundstageAudioController.instance.enterZone(
+      SoundstageZone.redCarpetDashboard,
+    );
+    if (mounted) {
+      setState(() {
+        _isMusicPlaying = SoundstageAudioController.instance.masterEnabled &&
+            SoundstageAudioController.instance.musicEnabled;
+      });
     }
   }
 
   Future<void> _toggleBackgroundMusic() async {
     try {
-      if (_isMusicPlaying) {
-        _userManuallyMutedMusic = true;
-        await _audioPlayer.pause();
-        if (mounted) {
-          setState(() {
-            _isMusicPlaying = false;
-          });
-        }
-      } else {
-        _userManuallyMutedMusic = false;
-        await _audioPlayer.resume();
-        if (mounted) {
-          setState(() {
-            _isMusicPlaying = true;
-          });
-        }
+      await SoundstageAudioController.instance.toggleMusicEnabled();
+      if (mounted) {
+        setState(() {
+          _isMusicPlaying = SoundstageAudioController.instance.masterEnabled &&
+              SoundstageAudioController.instance.musicEnabled;
+          _userManuallyMutedMusic = !_isMusicPlaying;
+        });
       }
     } catch (_) {}
   }
@@ -685,6 +670,11 @@ class _LivingMarqueeDashboardScreenState
                                           ),
                                         ),
                                       ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const SoundstageAudioConsoleBar(
+                                      zone: SoundstageZone.redCarpetDashboard,
+                                      compact: true,
                                     ),
                                     const SizedBox(height: 10),
                                     if (_detectedClipboardCode != null &&

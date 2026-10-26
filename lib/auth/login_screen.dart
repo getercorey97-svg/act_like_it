@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../dashboard_marquee.dart';
 import '../ui/brand_logo.dart';
 import '../ui/intro_cinematic.dart';
+import '../ui/soundstage_audio_controller.dart';
 import 'auth_service.dart';
 import 'nda_tester_gate.dart';
 import 'onboarding_questionnaire.dart';
@@ -66,6 +68,11 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     ).animate(cardCurve);
 
     _restoreExistingSessionIfAvailable();
+    unawaited(
+      SoundstageAudioController.instance.enterZone(
+        SoundstageZone.castingSignUpSet,
+      ),
+    );
   }
 
   Future<void> _restoreExistingSessionIfAvailable() async {
@@ -109,6 +116,11 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     }
 
     HapticFeedback.mediumImpact();
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.clapperSnap,
+      ),
+    );
     setState(() {
       _isSubmitting = true;
       _statusMessage = null;
@@ -244,7 +256,12 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildMarqueeCrest(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+                      const SoundstageAudioConsoleBar(
+                        zone: SoundstageZone.castingSignUpSet,
+                        compact: true,
+                      ),
+                      const SizedBox(height: 14),
                       FadeTransition(
                         opacity: _cardFadeAnimation,
                         child: SlideTransition(
@@ -275,6 +292,11 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
   Future<void> _handleTrackBSneakBackstage() async {
     if (_isSubmitting) return;
     HapticFeedback.heavyImpact();
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.dressingRoomVanity,
+      ),
+    );
     setState(() {
       _isSubmitting = true;
       _statusMessage = null;

@@ -31,6 +31,19 @@ import {
   verifyFounderAdminCredentials,
   verifySessionSeal,
 } from './utils/ndaApprovalLogic';
+import {
+  AudioChannelKey,
+  DEFAULT_SOUNDSTAGE_AUDIO_SETTINGS,
+  SoundstageAudioSettings,
+  SoundstageSfxId,
+  SoundstageZoneId,
+  resolveZoneForScreen,
+  setMasterVolumeLevel,
+  toggleAudioChannel,
+} from './utils/soundstageAudioLogic';
+import { soundstageWebAudio } from './utils/soundstageWebAudioEngine';
+import { SoundstageAudioConsole } from './components/SoundstageAudioConsole';
+import { StarDressingRoomPanel } from './components/StarDressingRoomPanel';
 
 const LATE_NIGHT_PROMPTS = [
   {
@@ -327,8 +340,98 @@ export default function App() {
   );
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'files' | 'late-night' | 'sync-guide'
+    'files' | 'dressing-room' | 'late-night' | 'sync-guide'
   >('files');
+
+  // Soundstage Multi-Zone Music, Paparazzi Flashes & Prop SFX State
+  const [audioSettings, setAudioSettings] = useState<SoundstageAudioSettings>(
+    () => {
+      try {
+        const raw = localStorage.getItem('act_like_it_soundstage_audio_v2');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return { ...DEFAULT_SOUNDSTAGE_AUDIO_SETTINGS, ...parsed };
+        }
+      } catch {
+        // ignore
+      }
+      return DEFAULT_SOUNDSTAGE_AUDIO_SETTINGS;
+    }
+  );
+  const [manualZoneOverride, setManualZoneOverride] =
+    useState<SoundstageZoneId | null>(null);
+  const [paparazziFlashActive, setPaparazziFlashActive] =
+    useState<boolean>(false);
+  const [lastTriggeredSfx, setLastTriggeredSfx] =
+    useState<SoundstageSfxId | null>(null);
+
+  const activeSoundstageZone: SoundstageZoneId =
+    manualZoneOverride ??
+    resolveZoneForScreen({
+      ndaUnlocked,
+      ndaMode,
+      activeTab,
+    });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'act_like_it_soundstage_audio_v2',
+        JSON.stringify(audioSettings)
+      );
+    } catch {
+      // ignore
+    }
+    soundstageWebAudio.syncState(activeSoundstageZone, audioSettings);
+  }, [activeSoundstageZone, audioSettings]);
+
+  useEffect(() => {
+    soundstageWebAudio.setPaparazziFlashListener(() => {
+      setPaparazziFlashActive(true);
+      window.setTimeout(() => setPaparazziFlashActive(false), 260);
+    });
+    const unlockAudioOnFirstGesture = () => {
+      soundstageWebAudio.syncState(activeSoundstageZone, audioSettings);
+    };
+    window.addEventListener('pointerdown', unlockAudioOnFirstGesture, {
+      once: true,
+    });
+    return () => {
+      soundstageWebAudio.setPaparazziFlashListener(null);
+      window.removeEventListener('pointerdown', unlockAudioOnFirstGesture);
+    };
+  }, [activeSoundstageZone, audioSettings]);
+
+  const handleTriggerSfx = (sfxId: SoundstageSfxId) => {
+    setLastTriggeredSfx(sfxId);
+    soundstageWebAudio.playSfx(sfxId);
+    if (sfxId === 'paparazzi_shutter_flash') {
+      setPaparazziFlashActive(true);
+      window.setTimeout(() => setPaparazziFlashActive(false), 260);
+    }
+  };
+
+  const handleToggleAudioChannel = (channel: AudioChannelKey) => {
+    const next = toggleAudioChannel(audioSettings, channel);
+    setAudioSettings(next);
+    setLastTriggeredSfx('velvet_rope_hook');
+    soundstageWebAudio.playSfx('velvet_rope_hook');
+  };
+
+  const handleVolumeChange = (volume: number) => {
+    setAudioSettings((prev) => setMasterVolumeLevel(prev, volume));
+  };
+
+  const handleSelectZone = (zone: SoundstageZoneId) => {
+    setManualZoneOverride(zone);
+    handleTriggerSfx(
+      zone === 'star_dressing_room'
+        ? 'dressing_room_vanity'
+        : zone === 'red_carpet_dashboard'
+        ? 'paparazzi_shutter_flash'
+        : 'film_reel_click'
+    );
+  };
 
   // Part 5 Late-Night 18+ Gate Simulator State
   const [birthYearInput, setBirthYearInput] = useState<string>('1997');
@@ -346,6 +449,7 @@ export default function App() {
   const progress = getBatchCompletionRatio(BATCH_STAGES);
 
   const handleCopyCode = async (path: string, content: string) => {
+    handleTriggerSfx('call_sheet_stamp');
     try {
       await navigator.clipboard.writeText(content);
       setCopiedPath(path);
@@ -661,12 +765,27 @@ export default function App() {
             </span>
           </div>
 
+          {/* Sign-In / Sign-Up On-Set Soundstage Audio & Music Controls */}
+          <SoundstageAudioConsole
+            activeZone={activeSoundstageZone}
+            settings={audioSettings}
+            paparazziFlashActive={paparazziFlashActive}
+            lastTriggeredSfx={lastTriggeredSfx}
+            onToggleChannel={handleToggleAudioChannel}
+            onVolumeChange={handleVolumeChange}
+            onSelectZone={handleSelectZone}
+            onTriggerSfx={handleTriggerSfx}
+            contextLabel="SIGN-IN & ON-SET CASTING AUDIO CONTROLS"
+          />
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-mono font-bold">
             <button
               type="button"
               onClick={() => {
+                setManualZoneOverride(null);
                 setNdaMode('sign');
                 setNdaError(null);
+                handleTriggerSfx('film_reel_click');
               }}
               className={`py-2.5 px-3 rounded-lg transition-colors ${
                 ndaMode === 'sign'
@@ -679,8 +798,10 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
+                setManualZoneOverride(null);
                 setNdaMode('unlock');
                 setNdaError(null);
+                handleTriggerSfx('film_reel_click');
               }}
               className={`py-2.5 px-3 rounded-lg transition-colors ${
                 ndaMode === 'unlock'
@@ -693,9 +814,11 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
+                setManualZoneOverride(null);
                 setNdaMode('admin');
                 setNdaError(null);
                 setRegistryState(loadRegistryFromStorage());
+                handleTriggerSfx('soundstage_door_thud');
               }}
               className={`py-2.5 px-3 rounded-lg transition-colors ${
                 ndaMode === 'admin'
@@ -1488,18 +1611,41 @@ export default function App() {
         >
           <button
             type="button"
-            onClick={() => setActiveTab('files')}
+            onClick={() => {
+              setManualZoneOverride(null);
+              setActiveTab('files');
+              handleTriggerSfx('paparazzi_shutter_flash');
+            }}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'files'
                 ? 'text-white underline underline-offset-8'
                 : ''
             }`}
           >
-            All 5 Batches &amp; 100 Scenes
+            Red Carpet &amp; 100 Scenes
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('late-night')}
+            onClick={() => {
+              setManualZoneOverride(null);
+              setActiveTab('dressing-room');
+              handleTriggerSfx('dressing_room_vanity');
+            }}
+            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
+              activeTab === 'dressing-room'
+                ? 'text-white underline underline-offset-8'
+                : ''
+            }`}
+          >
+            Star Dressing Room &amp; Audio
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setManualZoneOverride(null);
+              setActiveTab('late-night');
+              handleTriggerSfx('soundstage_door_thud');
+            }}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'late-night'
                 ? 'text-white underline underline-offset-8'
@@ -1510,7 +1656,11 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('sync-guide')}
+            onClick={() => {
+              setManualZoneOverride(null);
+              setActiveTab('sync-guide');
+              handleTriggerSfx('film_reel_click');
+            }}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'sync-guide'
                 ? 'text-white underline underline-offset-8'
@@ -1525,6 +1675,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
+              handleTriggerSfx('soundstage_door_thud');
               setNdaMode('admin');
               setNdaUnlocked(false);
             }}
@@ -1534,7 +1685,10 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('sync-guide')}
+            onClick={() => {
+              handleTriggerSfx('clapper_snap');
+              setActiveTab('sync-guide');
+            }}
             className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-500 transition-colors whitespace-nowrap shrink-0"
           >
             Push 100 Scenes &amp; Logo to GitHub
@@ -1559,7 +1713,20 @@ export default function App() {
       )}
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+        {/* Main Red Carpet / Dressing Room Soundstage Audio & Paparazzi Console */}
+        <SoundstageAudioConsole
+          activeZone={activeSoundstageZone}
+          settings={audioSettings}
+          paparazziFlashActive={paparazziFlashActive}
+          lastTriggeredSfx={lastTriggeredSfx}
+          onToggleChannel={handleToggleAudioChannel}
+          onVolumeChange={handleVolumeChange}
+          onSelectZone={handleSelectZone}
+          onTriggerSfx={handleTriggerSfx}
+          contextLabel="MAIN DASHBOARD · RED CARPET ANTHEM, PAPARAZZI & DRESSING ROOM AUDIO CONTROLS"
+        />
+
         {/* Batch Status Banner */}
         <section className="p-6 rounded-xl bg-slate-900 border border-slate-800">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -1573,15 +1740,15 @@ export default function App() {
                 <div className="text-xs text-slate-400">
                   <span>100 Original Parody Scenes</span>
                   <span aria-hidden="true"> · </span>
-                  <span>Founder Executive Admin Portal</span>
+                  <span>Multi-Zone Soundstage Audio &amp; Paparazzi</span>
                   <span aria-hidden="true"> · </span>
                   <span>Official Brand Logo Integrated</span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                  Founder Executive Admin Portal &amp; Manual Tester Approval Ready
+                  Red Carpet Premiere Dashboard &amp; Multi-Zone Soundstage Studio
                 </h1>
                 <p className="text-sm text-slate-300 leading-relaxed">
-                  Configured <code className="font-mono text-amber-400">lib/auth/nda_tester_gate.dart</code> and <code className="font-mono text-amber-400">supabase/migrations/20261025000003_nda_tester_approvals.sql</code> with your dedicated Founder Admin Login (<code className="font-mono text-amber-300">admin88</code>), Executive Command Center Dashboard, KPI telemetry, and manual tester approval queue.
+                  Featuring state-of-the-art Entrance Overture, On-Set Casting &amp; Sign-Up Groove, Red Carpet Inspiring Anthem with live Paparazzi camera flashes &amp; DSLR shutter bursts, Star Dressing Room vanity lounge, and independent on/off toggles for every audio layer.
                 </p>
               </div>
             </div>
@@ -1603,19 +1770,42 @@ export default function App() {
           <div className="flex items-center gap-1 p-1 mt-6 bg-slate-950 rounded-lg border border-slate-800 md:hidden">
             <button
               type="button"
-              onClick={() => setActiveTab('files')}
-              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              onClick={() => {
+                setManualZoneOverride(null);
+                setActiveTab('files');
+                handleTriggerSfx('paparazzi_shutter_flash');
+              }}
+              className={`flex-1 px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'files'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Part 5 Files
+              Red Carpet
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('late-night')}
-              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              onClick={() => {
+                setManualZoneOverride(null);
+                setActiveTab('dressing-room');
+                handleTriggerSfx('dressing_room_vanity');
+              }}
+              className={`flex-1 px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+                activeTab === 'dressing-room'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Dressing Room
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setManualZoneOverride(null);
+                setActiveTab('late-night');
+                handleTriggerSfx('soundstage_door_thud');
+              }}
+              className={`flex-1 px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'late-night'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-400 hover:text-white'
@@ -1625,8 +1815,12 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('sync-guide')}
-              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              onClick={() => {
+                setManualZoneOverride(null);
+                setActiveTab('sync-guide');
+                handleTriggerSfx('film_reel_click');
+              }}
+              className={`flex-1 px-2.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'sync-guide'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-400 hover:text-white'
@@ -1636,6 +1830,15 @@ export default function App() {
             </button>
           </div>
         </section>
+
+        {/* Tab: Star Dressing Room & Red Carpet Audio Showcase */}
+        {activeTab === 'dressing-room' && (
+          <StarDressingRoomPanel
+            activeZone={activeSoundstageZone}
+            onSelectZone={handleSelectZone}
+            onTriggerSfx={handleTriggerSfx}
+          />
+        )}
 
         {/* Tab 1: Workspace File Inspector */}
         {activeTab === 'files' && (

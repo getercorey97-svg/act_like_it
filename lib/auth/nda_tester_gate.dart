@@ -9,6 +9,7 @@ import '../dashboard_marquee.dart';
 import '../main.dart';
 import '../qa/qa_overlay.dart';
 import '../ui/brand_logo.dart';
+import '../ui/soundstage_audio_controller.dart';
 
 /// Mandatory Closed Alpha NDA, Partnership Dossier, Dedicated Founder's Admin
 /// Login Page (`admin88` / `Cg0167853!8808`), State-of-the-Art Founder Command
@@ -353,6 +354,13 @@ class _OfficialClosedAlphaNdaGateWrapperState
         OfficialClosedAlphaNdaGateWrapper.preloadedDeviceFingerprint;
     _prefillPlatformDefaults();
     _initializeDeviceFingerprintAndCheckSession();
+    if (!_isUnlocked) {
+      unawaited(
+        SoundstageAudioController.instance.enterZone(
+          SoundstageZone.castingSignUpSet,
+        ),
+      );
+    }
   }
 
   void _prefillPlatformDefaults() {
@@ -629,6 +637,11 @@ class _OfficialClosedAlphaNdaGateWrapperState
     }
 
     HapticFeedback.mediumImpact();
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.callSheetStamp,
+      ),
+    );
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
@@ -1289,6 +1302,14 @@ class _OfficialClosedAlphaNdaGateWrapperState
                   ),
                   const SizedBox(height: 12),
 
+                  // Interactive Soundstage Audio & Set Ambience Controls on Sign-Up / Sign-In Gate
+                  SoundstageAudioConsoleBar(
+                    zone: _activeGateTab == 'unlock'
+                        ? SoundstageZone.premiereEntrance
+                        : SoundstageZone.castingSignUpSet,
+                  ),
+                  const SizedBox(height: 12),
+
                   // 3-Mode Switcher Bar: 1. Sign NDA | 2. Enter Passcode | 3. Founder Admin Login & Portal
                   Container(
                     padding: const EdgeInsets.all(6),
@@ -1302,6 +1323,16 @@ class _OfficialClosedAlphaNdaGateWrapperState
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
+                              unawaited(
+                                SoundstageAudioController.instance.playSfx(
+                                  SoundstageSfx.filmReelClick,
+                                ),
+                              );
+                              unawaited(
+                                SoundstageAudioController.instance.enterZone(
+                                  SoundstageZone.castingSignUpSet,
+                                ),
+                              );
                               setState(() {
                                 _activeGateTab = 'sign';
                                 _errorMessage = null;
@@ -1335,6 +1366,16 @@ class _OfficialClosedAlphaNdaGateWrapperState
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
+                              unawaited(
+                                SoundstageAudioController.instance.playSfx(
+                                  SoundstageSfx.filmReelClick,
+                                ),
+                              );
+                              unawaited(
+                                SoundstageAudioController.instance.enterZone(
+                                  SoundstageZone.premiereEntrance,
+                                ),
+                              );
                               setState(() {
                                 _activeGateTab = 'unlock';
                                 _errorMessage = null;
@@ -1368,6 +1409,11 @@ class _OfficialClosedAlphaNdaGateWrapperState
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
+                              unawaited(
+                                SoundstageAudioController.instance.playSfx(
+                                  SoundstageSfx.soundstageDoorThud,
+                                ),
+                              );
                               setState(() {
                                 _activeGateTab = 'admin';
                                 _errorMessage = null;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import '../monetization/payment_dashboard_screen.dart';
 import '../offline_manager.dart';
 import '../ui/boondocks_character_rig.dart';
 import '../ui/game_app_bar.dart';
+import '../ui/soundstage_audio_controller.dart';
 
 /// PART 2: Actor Profile Page & Multi-Profile Account Switcher
 /// (`lib/profile/actor_profile_screen.dart`).
@@ -65,6 +67,16 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
     _birthYearCtrl =
         TextEditingController(text: '${profile?.birthYear ?? 1998}');
     AuthService.instance.addListener(_onProfileChanged);
+    unawaited(
+      SoundstageAudioController.instance.enterZone(
+        SoundstageZone.starDressingRoom,
+      ),
+    );
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.dressingRoomVanity,
+      ),
+    );
   }
 
   void _onProfileChanged() {
@@ -82,11 +94,21 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
     AuthService.instance.removeListener(_onProfileChanged);
     _handleCtrl.dispose();
     _birthYearCtrl.dispose();
+    unawaited(
+      SoundstageAudioController.instance.enterZone(
+        SoundstageZone.redCarpetDashboard,
+      ),
+    );
     super.dispose();
   }
 
   Future<void> _openAvatarArchetypePicker(ActorProfileState profile) async {
     HapticFeedback.mediumImpact();
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.dressingRoomVanity,
+      ),
+    );
     final selectedId = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -189,6 +211,11 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
 
     if (selectedId != null && mounted) {
       HapticFeedback.heavyImpact();
+      unawaited(
+        SoundstageAudioController.instance.playSfx(
+          SoundstageSfx.dressingRoomVanity,
+        ),
+      );
       await AuthService.instance.updateAvatarArchetype(selectedId);
     }
   }
@@ -413,6 +440,10 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
+          const SoundstageAudioConsoleBar(
+            zone: SoundstageZone.starDressingRoom,
+          ),
+          const SizedBox(height: 12),
           // 1. Hero Avatar & Identity Showcase
           Container(
             padding: const EdgeInsets.all(18),

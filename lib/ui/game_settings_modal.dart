@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
+import 'soundstage_audio_controller.dart';
 
 /// Immutable configuration returned when the player taps "ROLL CAMERA"
 /// inside `GameSettingsModal`.
@@ -985,7 +986,13 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
                   setState(() => _audioVolume = v);
                   GameSettingsModal.masterAudioVolume = v;
                   GameSettingsModal.volumeNotifier.value = v;
+                  SoundstageAudioController.instance.setMasterVolume(v);
                 },
+              ),
+              const SizedBox(height: 8),
+              SoundstageAudioConsoleBar(
+                zone: SoundstageAudioController.instance.activeZone,
+                compact: true,
               ),
               const Divider(color: Color(0xFF1E293B), height: 20),
               Row(

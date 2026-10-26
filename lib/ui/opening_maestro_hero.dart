@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'soundstage_audio_controller.dart';
+
+export 'soundstage_audio_controller.dart';
 
 /// Synthesizes a real 16-bit PCM WAV Hollywood Premiere Opening Soundtrack and
 /// 1.5-second Award Verdict Fanfare Sting in memory with zero low-frequency buzzy drone.
@@ -71,83 +74,9 @@ class OpeningPremiereMusicSynthesizer {
   }
 
   static Uint8List buildOpeningFanfareWav() {
-    if (_cachedWavBytes != null) return _cachedWavBytes!;
-
-    const int sampleRate = 22050;
-    const int durationSeconds = 6;
-    const int numSamples = sampleRate * durationSeconds;
-    final int dataSize = numSamples * 2; // 16-bit mono PCM
-    final ByteData buffer = ByteData(44 + dataSize);
-
-    void writeAscii(int offset, String text) {
-      for (int i = 0; i < text.length; i++) {
-        buffer.setUint8(offset + i, text.codeUnitAt(i));
-      }
-    }
-
-    writeAscii(0, 'RIFF');
-    buffer.setUint32(4, 36 + dataSize, Endian.little);
-    writeAscii(8, 'WAVE');
-    writeAscii(12, 'fmt ');
-    buffer.setUint32(16, 16, Endian.little);
-    buffer.setUint16(20, 1, Endian.little);
-    buffer.setUint16(22, 1, Endian.little);
-    buffer.setUint32(24, sampleRate, Endian.little);
-    buffer.setUint32(28, sampleRate * 2, Endian.little);
-    buffer.setUint16(32, 2, Endian.little);
-    buffer.setUint16(34, 16, Endian.little);
-    writeAscii(36, 'data');
-    buffer.setUint32(40, dataSize, Endian.little);
-
-    final math.Random rng = math.Random(42);
-
-    for (int i = 0; i < numSamples; i++) {
-      final double t = i / sampleRate;
-      double sample = 0.0;
-
-      if (t < 1.35) {
-        final double swellProgress = (t / 1.35).clamp(0.0, 1.0);
-        final double freq1 = 261.63 + swellProgress * 68.0;
-        final double freq2 = 392.00 + swellProgress * 131.25;
-        sample = (math.sin(2.0 * math.pi * freq1 * t) * 0.22 +
-                math.sin(2.0 * math.pi * freq2 * t) * 0.16) *
-            swellProgress *
-            math.exp(-t * 0.3);
-      } else {
-        if (t >= 1.35 && t < 1.52) {
-          final double snapEnv = math.exp(-(t - 1.35) * 38.0);
-          final double noise = (rng.nextDouble() * 2.0 - 1.0) * 0.38 * snapEnv;
-          final double woodClick =
-              math.sin(2.0 * math.pi * 880.0 * t) * 0.30 * snapEnv;
-          sample += noise + woodClick;
-        }
-
-        // Clean mid-high orchestral chime chords with natural exponential decay (no low bass drone)
-        const List<double> chordNotes = <double>[
-          261.63,
-          329.63,
-          392.00,
-          523.25,
-          659.25,
-        ];
-        final double chordTime = t - 1.35;
-        final double chordEnv = math.exp(-chordTime * 0.85);
-        double chordSum = 0.0;
-        for (int n = 0; n < chordNotes.length; n++) {
-          final double f = chordNotes[n];
-          chordSum += math.sin(2.0 * math.pi * f * t) * 0.10;
-        }
-
-        final double loopFade =
-            t > 4.8 ? ((6.0 - t) / 1.2).clamp(0.0, 1.0) : 1.0;
-        sample += chordSum * chordEnv * loopFade;
-      }
-
-      final int pcm16 = (sample.clamp(-0.85, 0.85) * 32767.0).round();
-      buffer.setInt16(44 + i * 2, pcm16, Endian.little);
-    }
-
-    _cachedWavBytes = buffer.buffer.asUint8List();
+    _cachedWavBytes ??= SoundstageWaveSynthesizer.buildZoneMusicWav(
+      SoundstageZone.premiereEntrance,
+    );
     return _cachedWavBytes!;
   }
 }
