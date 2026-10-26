@@ -22,6 +22,14 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
   static const String founderContactEmail = 'getercorey97@gmail.com';
   static const String approvalsTableName = 'nda_tester_approvals';
 
+  static bool _globalIsSessionUnlocked = false;
+
+  /// Returns whether the root NDA & Tester Gate has been verified and unlocked.
+  static bool isSessionUnlockedSync() => _globalIsSessionUnlocked;
+
+  /// Preserved deep-link room code (e.g., from ?room=XXXXXX) across the gate lock.
+  static String? pendingDeepLinkRoomCode;
+
   /// Verifies the Founder's Dedicated Admin Login Credentials:
   /// Username: `admin88`
   /// Password: `Cg0167853!8808`
@@ -146,7 +154,8 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
 }
 
 class _OfficialClosedAlphaNdaGateWrapperState
-    extends State<OfficialClosedAlphaNdaGateWrapper> {
+    extends State<OfficialClosedAlphaNdaGateWrapper>
+    with WidgetsBindingObserver {
   static const String _prefsGateUnlockedKey =
       'act_like_it_nda_gate_unlocked_v2';
   static const String _prefsDossierPayloadKey =
@@ -244,6 +253,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _prefillPlatformDefaults();
     _initializeDeviceFingerprintAndCheckSession();
   }
@@ -318,9 +328,48 @@ class _OfficialClosedAlphaNdaGateWrapperState
             final isMaster = decoded['unlocked_via_master_secret'] == true;
             final status =
                 (decoded['approval_status'] ?? 'approved').toString();
+            final code =
+                (decoded['unique_passcode'] ?? '').toString().toUpperCase();
+
+            // Re-verify that tester was not revoked in Supabase
+            if (!isMaster && code.isNotEmpty) {
+              final client = supabaseOrNull;
+              if (client != null) {
+                try {
+                  final rows = await client
+                      .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+                      .select()
+                      .eq('unique_passcode', code)
+                      .limit(1);
+                  if (rows.isNotEmpty && rows.first is Map) {
+                    final row = Map<String, dynamic>.from(rows.first as Map);
+                    final liveStatus =
+                        (row['approval_status'] ?? 'pending').toString();
+                    if (liveStatus == 'rejected' || liveStatus == 'pending') {
+                      await prefs.setBool(_prefsGateUnlockedKey, false);
+                      OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked =
+                          false;
+                      if (mounted) {
+                        setState(() {
+                          _isUnlocked = false;
+                          _testerApprovalStatus = liveStatus;
+                          _isCheckingStorage = false;
+                          _errorMessage = liveStatus == 'rejected'
+                              ? '🚫 ACCESS REVOKED: Founder Corey Geter has revoked Closed Alpha access for this tester.'
+                              : '⏳ ACCESS PENDING: Dossier is awaiting Founder review.';
+                        });
+                      }
+                      return;
+                    }
+                  }
+                } catch (_) {}
+              }
+            }
+
             if (isMaster ||
                 ((boundFp.isEmpty || boundFp == _deviceFingerprint) &&
                     status == 'approved')) {
+              OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
               if (mounted) {
                 setState(() {
                   _isUnlocked = true;
@@ -334,6 +383,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
       }
     } catch (_) {}
 
+    OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = false;
     if (mounted) {
       setState(() {
         _isUnlocked = false;
@@ -343,7 +393,64 @@ class _OfficialClosedAlphaNdaGateWrapperState
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reverifySessionOnResume();
+    }
+  }
+
+  Future<void> _reverifySessionOnResume() async {
+    if (!_isUnlocked) {
+      if (_pendingSignedDossier != null) {
+        await _handleCheckApprovalStatus();
+      }
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedPayload = prefs.getString(_prefsDossierPayloadKey);
+      if (savedPayload == null || savedPayload.isEmpty) return;
+      final decoded = jsonDecode(savedPayload);
+      if (decoded is! Map) return;
+
+      final isMaster = decoded['unlocked_via_master_secret'] == true;
+      if (isMaster) return;
+
+      final code = (decoded['unique_passcode'] ?? '').toString().toUpperCase();
+      if (code.isEmpty) return;
+
+      final client = supabaseOrNull;
+      if (client != null) {
+        final rows = await client
+            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+            .select()
+            .eq('unique_passcode', code)
+            .limit(1);
+        if (rows.isNotEmpty && rows.first is Map) {
+          final row = Map<String, dynamic>.from(rows.first as Map);
+          final currentStatus =
+              (row['approval_status'] ?? 'pending').toString();
+          if (currentStatus == 'rejected') {
+            await prefs.setBool(_prefsGateUnlockedKey, false);
+            OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = false;
+            if (mounted) {
+              setState(() {
+                _isUnlocked = false;
+                _testerApprovalStatus = 'rejected';
+                _errorMessage =
+                    '🚫 SESSION REVOKED: Founder Corey Geter has revoked Closed Alpha access for this tester. (${OfficialClosedAlphaNdaGateWrapper.founderContactEmail})';
+              });
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -662,6 +769,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
     } catch (_) {}
 
     if (!mounted) return;
+    OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
     setState(() {
       _isUnlocked = true;
     });
@@ -819,6 +927,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
       } catch (_) {}
 
       if (!mounted) return;
+      OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
       setState(() {
         _isSubmitting = false;
         _isUnlocked = true;
@@ -942,6 +1051,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
     } catch (_) {}
 
     if (!mounted) return;
+    OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
     setState(() {
       _isSubmitting = false;
       _isUnlocked = true;
@@ -951,12 +1061,21 @@ class _OfficialClosedAlphaNdaGateWrapperState
   @override
   Widget build(BuildContext context) {
     if (_isCheckingStorage) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF07090E),
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFFD4AF37),
-          ),
+      return PopScope(
+        canPop: false,
+        child: Overlay(
+          initialEntries: <OverlayEntry>[
+            OverlayEntry(
+              builder: (BuildContext overlayContext) => const Scaffold(
+                backgroundColor: Color(0xFF07090E),
+                body: Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFFD4AF37),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -973,11 +1092,17 @@ class _OfficialClosedAlphaNdaGateWrapperState
         ? (_pendingSignedDossier!['unique_passcode'] ?? '').toString()
         : null;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF07090E),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
+    return PopScope(
+      canPop: false,
+      child: Overlay(
+        initialEntries: <OverlayEntry>[
+          OverlayEntry(
+            builder: (BuildContext overlayContext) {
+              return Scaffold(
+                backgroundColor: const Color(0xFF07090E),
+                body: SafeArea(
+                  child: Center(
+                    child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 840),
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -2177,6 +2302,11 @@ class _OfficialClosedAlphaNdaGateWrapperState
             ),
           ),
         ),
+      ),
+    );
+            },
+          ),
+        ],
       ),
     );
   }

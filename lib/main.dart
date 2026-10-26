@@ -423,6 +423,15 @@ class _SafeBootErrorBoundaryState extends State<SafeBootErrorBoundary> {
   @override
   Widget build(BuildContext context) {
     if (_useSafeModeFallbackShell) {
+      if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+        return const MaterialApp(
+          title: 'Act Like It · Gate Locked',
+          debugShowCheckedModeBanner: false,
+          home: OfficialClosedAlphaNdaGateWrapper(
+            child: SoundstageShellScreen(),
+          ),
+        );
+      }
       return MaterialApp(
         title: 'Act Like It (Safe Mode)',
         debugShowCheckedModeBanner: false,
@@ -566,13 +575,22 @@ class _SafeBootErrorBoundaryState extends State<SafeBootErrorBoundary> {
                                   child: ElevatedButton(
                                     onPressed: () {
                                       SafeBootDiagnostics.clearErrors();
-                                      setState(() {
-                                        _useSafeModeFallbackShell = true;
-                                      });
+                                      if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+                                        setState(() {
+                                          _dismissedDiagnosticBanner = true;
+                                          _useSafeModeFallbackShell = false;
+                                        });
+                                      } else {
+                                        setState(() {
+                                          _useSafeModeFallbackShell = true;
+                                        });
+                                      }
                                     },
-                                    child: const Text(
-                                      'BOOT SAFE SHELL',
-                                      style: TextStyle(
+                                    child: Text(
+                                      OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()
+                                          ? 'BOOT SAFE SHELL'
+                                          : 'RELOAD SECURITY GATE',
+                                      style: const TextStyle(
                                         fontFamily: 'monospace',
                                         fontSize: 10,
                                       ),
@@ -698,16 +716,24 @@ class SafeBootEmergencyApp extends StatelessWidget {
                       ),
                       onPressed: () {
                         SafeBootDiagnostics.clearErrors();
+                        final isUnlocked =
+                            OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync();
                         Navigator.of(ctx).pushReplacement(
                           MaterialPageRoute(
-                            builder: (_) => const LivingMarqueeDashboardScreen(),
+                            builder: (_) => isUnlocked
+                                ? const LivingMarqueeDashboardScreen()
+                                : const OfficialClosedAlphaNdaGateWrapper(
+                                    child: LivingMarqueeDashboardScreen(),
+                                  ),
                           ),
                         );
                       },
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text(
-                        'CONTINUE TO LIVING MARQUEE DASHBOARD',
-                        style: TextStyle(
+                      icon: const Icon(Icons.security_rounded),
+                      label: Text(
+                        OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()
+                            ? 'CONTINUE TO LIVING MARQUEE DASHBOARD'
+                            : 'RETURN TO MANDATORY SECURITY GATE',
+                        style: const TextStyle(
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.w900,
                         ),
@@ -737,6 +763,28 @@ class ActLikeItApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       navigatorObservers: <NavigatorObserver>[QaRouteObserver.instance],
+      onGenerateRoute: (RouteSettings settings) {
+        final uri = Uri.tryParse(settings.name ?? '');
+        if (uri != null && uri.queryParameters.containsKey('room')) {
+          final room = uri.queryParameters['room'];
+          if (room != null && room.trim().isNotEmpty) {
+            OfficialClosedAlphaNdaGateWrapper.pendingDeepLinkRoomCode = room.trim();
+          }
+        }
+        if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+          return MaterialPageRoute<void>(
+            settings: const RouteSettings(name: '/'),
+            builder: (_) => const CellShadedIntroCinematicScreen(),
+          );
+        }
+        if (settings.name == '/qa-dashboard') {
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const QaWebPortalDashboardScreen(),
+          );
+        }
+        return null;
+      },
       routes: <String, WidgetBuilder>{
         '/qa-dashboard': (_) => const QaWebPortalDashboardScreen(),
       },

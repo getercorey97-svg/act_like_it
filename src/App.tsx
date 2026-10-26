@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Copy,
   Check,
@@ -185,6 +185,75 @@ export default function App() {
   const [ndaPasscodeInput, setNdaPasscodeInput] = useState<string>('');
   const [ndaError, setNdaError] = useState<string | null>(null);
   const [ndaBreachAlert, setNdaBreachAlert] = useState<string | null>(null);
+
+  // Deep Link interception (?room=XXXXXX) across the gate lock
+  const [pendingDeepLinkRoom, setPendingDeepLinkRoom] = useState<string | null>(
+    () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('room');
+      } catch {
+        return null;
+      }
+    }
+  );
+
+  useEffect(() => {
+    // Intercept and store deep link if present in URL
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const room = params.get('room');
+      if (room) {
+        setPendingDeepLinkRoom(room.trim());
+      }
+    } catch {
+      // ignore
+    }
+
+    // Block browser back/forward buttons from popping or escaping the NDA gate
+    const handlePopState = () => {
+      if (!ndaUnlocked) {
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+    if (!ndaUnlocked) {
+      window.history.pushState(null, '', window.location.href);
+      window.addEventListener('popstate', handlePopState);
+    }
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [ndaUnlocked]);
+
+  // Live session revocation verification on boot & storage change
+  useEffect(() => {
+    const verifySessionIntegrity = () => {
+      try {
+        const unlocked =
+          localStorage.getItem('act_like_it_nda_gate_unlocked_v2') === 'true';
+        if (unlocked) {
+          const raw = localStorage.getItem('act_like_it_nda_dossier_payload_v2');
+          if (raw) {
+            const payload = JSON.parse(raw);
+            const reg = loadRegistryFromStorage();
+            const code = payload.unique_passcode;
+            if (code && reg[code] && reg[code].approval_status === 'rejected') {
+              localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'false');
+              setNdaUnlocked(false);
+              setNdaError(
+                '🚫 SESSION REVOKED: Founder Corey Geter has revoked Closed Alpha access for this tester.'
+              );
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    verifySessionIntegrity();
+    window.addEventListener('storage', verifySessionIntegrity);
+    return () => window.removeEventListener('storage', verifySessionIntegrity);
+  }, []);
 
   const [selectedFilePath, setSelectedFilePath] = useState<string>(
     'lib/auth/nda_tester_gate.dart'
@@ -465,7 +534,7 @@ export default function App() {
         return false;
       if (!searchLower) return true;
       const hay = `${rec.full_legal_name} ${rec.email} ${rec.phone_number} ${rec.unique_passcode} ${rec.bound_device_fingerprint}`.toLowerCase();
-      return hay.contains(searchLower);
+      return hay.includes(searchLower);
     });
 
     return (
@@ -1363,6 +1432,22 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {pendingDeepLinkRoom && (
+        <div className="bg-cyan-950/90 border-b border-cyan-400/80 px-6 py-2.5 flex items-center justify-between text-xs font-mono font-bold text-cyan-200">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span>🔗 DEEP-LINK ROOM INVITE PRESERVED: Room #{pendingDeepLinkRoom} is verified and ready to join!</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPendingDeepLinkRoom(null)}
+            className="text-cyan-400 hover:text-white text-xs"
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
 
       {/* Main Content Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
