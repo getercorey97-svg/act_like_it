@@ -559,6 +559,18 @@ export default function App() {
         );
         localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'true');
         localStorage.setItem('act_like_it_session_seal_v2', seal);
+        localStorage.setItem(
+          'act_like_it_nda_dossier_payload_v2',
+          JSON.stringify({
+            full_legal_name: 'Studio Founder / Master Admin',
+            unique_passcode: 'ADMIN3888',
+            bound_device_fingerprint: deviceFingerprint,
+            unlocked_via_master_secret: true,
+            approval_status: 'approved',
+            signed_date_utc: new Date().toISOString(),
+            official_portal_url: 'https://act-like-it.vercel.app',
+          })
+        );
       } catch {
         // ignore
       }

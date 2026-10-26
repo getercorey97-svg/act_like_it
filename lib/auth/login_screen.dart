@@ -207,7 +207,9 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
   @override
   Widget build(BuildContext context) {
     if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
-      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+      return const OfficialClosedAlphaNdaGateWrapper(
+        child: LivingMarqueeLoginScreen(),
+      );
     }
 
     final existingProfile = AuthService.instance.currentProfile;

@@ -193,6 +193,7 @@ class _CellShadedIntroCinematicScreenState
   }
 
   Future<void> _handleFastSkipToRedCarpet() async {
+    if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) return;
     if (_isTransitioningToAuth) return;
     _climaxTriggerTimer?.cancel();
     _autoAuthTransitionTimer?.cancel();
@@ -217,6 +218,7 @@ class _CellShadedIntroCinematicScreenState
   }
 
   Future<void> _triggerChoreographedGlideToAuth() async {
+    if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) return;
     if (_isTransitioningToAuth || !mounted) return;
     _climaxTriggerTimer?.cancel();
     _autoAuthTransitionTimer?.cancel();
@@ -248,7 +250,9 @@ class _CellShadedIntroCinematicScreenState
   @override
   Widget build(BuildContext context) {
     if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
-      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+      return const OfficialClosedAlphaNdaGateWrapper(
+        child: CellShadedIntroCinematicScreen(),
+      );
     }
 
     final activeArchetype =

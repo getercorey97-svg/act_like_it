@@ -485,7 +485,11 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
     final navContext = widget.navigatorKey?.currentState?.overlay?.context ??
         widget.navigatorKey?.currentContext ??
         (mounted ? context : null);
-    if (navContext == null || !mounted) return;
+    if (navContext == null ||
+        !mounted ||
+        Navigator.maybeOf(navContext) == null) {
+      return;
+    }
 
     _isSheetOpen = true;
     try {
@@ -511,6 +515,8 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
           );
         },
       );
+    } catch (_) {
+      // Prevent unhandled exception if Navigator/Overlay is unavailable
     } finally {
       _isSheetOpen = false;
     }

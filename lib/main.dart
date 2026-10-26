@@ -156,6 +156,7 @@ class AppConfig {
         _runtimeLiveKitUrl = (prefs.getString('cfg_livekit_url') ?? '').trim();
         _runtimeGeminiApiKey =
             (prefs.getString('cfg_gemini_api_key') ?? '').trim();
+        await OfficialClosedAlphaNdaGateWrapper.preloadSessionFromPrefs(prefs);
         SafeBootDiagnostics.log('SharedPreferences loaded successfully.');
       } catch (e) {
         SafeBootDiagnostics.log('SharedPreferences read notice: $e');
@@ -251,6 +252,7 @@ class AppConfig {
 }
 
 Future<void> main() async {
+  bool hasMountedRootApp = false;
   await runZonedGuarded<Future<void>>(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
@@ -373,6 +375,7 @@ Future<void> main() async {
       }
 
       // 6. Mount the root application wrapped in the SafeBootErrorBoundary
+      hasMountedRootApp = true;
       runApp(const SafeBootErrorBoundary(child: ActLikeItApp()));
     },
     (Object error, StackTrace stackTrace) {
@@ -381,12 +384,15 @@ Future<void> main() async {
         stackTrace,
         phase: 'RUN_ZONED_GUARDED',
       );
-      runApp(
-        SafeBootEmergencyApp(
-          error: error,
-          stackTrace: stackTrace,
-        ),
-      );
+      if (!hasMountedRootApp) {
+        hasMountedRootApp = true;
+        runApp(
+          SafeBootEmergencyApp(
+            error: error,
+            stackTrace: stackTrace,
+          ),
+        );
+      }
     },
   );
 }
@@ -768,32 +774,37 @@ class ActLikeItApp extends StatelessWidget {
         if (uri != null && uri.queryParameters.containsKey('room')) {
           final room = uri.queryParameters['room'];
           if (room != null && room.trim().isNotEmpty) {
-            OfficialClosedAlphaNdaGateWrapper.pendingDeepLinkRoomCode = room.trim();
+            OfficialClosedAlphaNdaGateWrapper.pendingDeepLinkRoomCode =
+                room.trim();
           }
         }
         if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
           return MaterialPageRoute<void>(
             settings: const RouteSettings(name: '/'),
-            builder: (_) => const CellShadedIntroCinematicScreen(),
+            builder: (_) => const OfficialClosedAlphaNdaGateWrapper(
+              child: CellShadedIntroCinematicScreen(),
+            ),
           );
         }
         if (settings.name == '/qa-dashboard') {
           return MaterialPageRoute<void>(
             settings: settings,
-            builder: (_) => const QaWebPortalDashboardScreen(),
+            builder: (_) => const OfficialClosedAlphaNdaGateWrapper(
+              child: QaWebPortalDashboardScreen(),
+            ),
           );
         }
-        return null;
-      },
-      routes: <String, WidgetBuilder>{
-        '/qa-dashboard': (_) => const QaWebPortalDashboardScreen(),
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const OfficialClosedAlphaNdaGateWrapper(
+            child: CellShadedIntroCinematicScreen(),
+          ),
+        );
       },
       builder: (BuildContext context, Widget? child) {
         return QaBugReporterOverlay(
           navigatorKey: navigatorKey,
-          child: OfficialClosedAlphaNdaGateWrapper(
-            child: child ?? const SizedBox.shrink(),
-          ),
+          child: child ?? const SizedBox.shrink(),
         );
       },
       theme: ThemeData(
@@ -836,7 +847,9 @@ class ActLikeItApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const CellShadedIntroCinematicScreen(),
+      home: const OfficialClosedAlphaNdaGateWrapper(
+        child: CellShadedIntroCinematicScreen(),
+      ),
     );
   }
 }
@@ -998,7 +1011,9 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
   @override
   Widget build(BuildContext context) {
     if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
-      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+      return const OfficialClosedAlphaNdaGateWrapper(
+        child: SoundstageShellScreen(),
+      );
     }
 
     return Scaffold(

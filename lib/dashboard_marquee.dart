@@ -515,7 +515,9 @@ class _LivingMarqueeDashboardScreenState
   @override
   Widget build(BuildContext context) {
     if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
-      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+      return const OfficialClosedAlphaNdaGateWrapper(
+        child: LivingMarqueeDashboardScreen(),
+      );
     }
 
     return Scaffold(

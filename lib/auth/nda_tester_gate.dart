@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../dashboard_marquee.dart';
 import '../main.dart';
 import '../qa/qa_overlay.dart';
 import '../ui/brand_logo.dart';
@@ -23,9 +25,66 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
   static const String approvalsTableName = 'nda_tester_approvals';
 
   static bool _globalIsSessionUnlocked = false;
+  static String preloadedDeviceFingerprint = 'DEV-ANDROID-INIT';
 
   /// Returns whether the root NDA & Tester Gate has been verified and unlocked.
   static bool isSessionUnlockedSync() => _globalIsSessionUnlocked;
+
+  /// Preloads the device fingerprint and verifies any stored cryptographic
+  /// session seal before `runApp()` so Frame 1 already has the exact state.
+  static Future<void> preloadSessionFromPrefs(SharedPreferences prefs) async {
+    try {
+      String? fp = prefs.getString('act_like_it_device_fingerprint_v1');
+      if (fp == null || fp.isEmpty) {
+        final rng = math.Random.secure();
+        final hex = List<String>.generate(
+          8,
+          (_) => rng.nextInt(16).toRadixString(16).toUpperCase(),
+        ).join();
+        final platformTag = kIsWeb
+            ? 'WEB'
+            : defaultTargetPlatform.name.toUpperCase().substring(0, 3);
+        fp = 'DEV-$platformTag-$hex';
+        await prefs.setString('act_like_it_device_fingerprint_v1', fp);
+      }
+      preloadedDeviceFingerprint = fp;
+
+      final signed =
+          prefs.getBool('act_like_it_nda_gate_unlocked_v2') ?? false;
+      final savedPayload =
+          prefs.getString('act_like_it_nda_dossier_payload_v2');
+      if (signed && savedPayload != null && savedPayload.isNotEmpty) {
+        final decoded = jsonDecode(savedPayload);
+        if (decoded is Map) {
+          final boundFp =
+              (decoded['bound_device_fingerprint'] ?? '').toString();
+          final isMaster = decoded['unlocked_via_master_secret'] == true;
+          final status =
+              (decoded['approval_status'] ?? 'approved').toString();
+          final code =
+              (decoded['unique_passcode'] ?? '').toString().toUpperCase();
+          final seal = (decoded['session_seal'] ?? '').toString();
+          final sealPasscode = isMaster
+              ? (code.isNotEmpty ? code : 'MASTER_ADMIN_SECRET')
+              : code;
+          final isSealValid = verifySessionSeal(
+            seal: seal,
+            passcode: sealPasscode,
+            deviceFingerprint: fp,
+            status: status,
+          );
+          if (isSealValid &&
+              (isMaster ||
+                  ((boundFp.isEmpty || boundFp == fp) &&
+                      status == 'approved'))) {
+            _globalIsSessionUnlocked = true;
+            return;
+          }
+        }
+      }
+    } catch (_) {}
+    _globalIsSessionUnlocked = false;
+  }
 
   /// Preserved deep-link room code (e.g., from ?room=XXXXXX) across the gate lock.
   static String? pendingDeepLinkRoomCode;
@@ -200,9 +259,9 @@ class _OfficialClosedAlphaNdaGateWrapperState
   static const String _prefsIssuedPasscodeRegistryKey =
       'act_like_it_nda_passcode_registry_v2';
 
-  bool _isCheckingStorage = true;
+  bool _isCheckingStorage = false;
   bool _isUnlocked = false;
-  String _deviceFingerprint = 'DEV-UNKNOWN';
+  String _deviceFingerprint = 'DEV-ANDROID-INIT';
 
   // Active mode: 'sign' | 'unlock' | 'admin'
   String _activeGateTab = 'sign';
@@ -289,6 +348,9 @@ class _OfficialClosedAlphaNdaGateWrapperState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _isUnlocked = OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync();
+    _deviceFingerprint =
+        OfficialClosedAlphaNdaGateWrapper.preloadedDeviceFingerprint;
     _prefillPlatformDefaults();
     _initializeDeviceFingerprintAndCheckSession();
   }
@@ -312,7 +374,9 @@ class _OfficialClosedAlphaNdaGateWrapperState
 
   Future<void> _initializeDeviceFingerprintAndCheckSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(seconds: 2),
+      );
       String? fp = prefs.getString(_prefsDeviceFingerprintKey);
       if (fp == null || fp.isEmpty) {
         final rng = math.Random.secure();
@@ -326,7 +390,13 @@ class _OfficialClosedAlphaNdaGateWrapperState
         fp = 'DEV-$platformTag-$hex';
         await prefs.setString(_prefsDeviceFingerprintKey, fp);
       }
-      _deviceFingerprint = fp;
+      if (mounted) {
+        setState(() {
+          _deviceFingerprint = fp!;
+        });
+      } else {
+        _deviceFingerprint = fp;
+      }
 
       // Restore any existing pending/approved dossier for this device
       final rawRegistry =
@@ -366,41 +436,6 @@ class _OfficialClosedAlphaNdaGateWrapperState
             final code =
                 (decoded['unique_passcode'] ?? '').toString().toUpperCase();
 
-            // Re-verify that tester was not revoked in Supabase
-            if (!isMaster && code.isNotEmpty) {
-              final client = supabaseOrNull;
-              if (client != null) {
-                try {
-                  final rows = await client
-                      .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
-                      .select()
-                      .eq('unique_passcode', code)
-                      .limit(1);
-                  if (rows.isNotEmpty && rows.first is Map) {
-                    final row = Map<String, dynamic>.from(rows.first as Map);
-                    final liveStatus =
-                        (row['approval_status'] ?? 'pending').toString();
-                    if (liveStatus == 'rejected' || liveStatus == 'pending') {
-                      await prefs.setBool(_prefsGateUnlockedKey, false);
-                      OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked =
-                          false;
-                      if (mounted) {
-                        setState(() {
-                          _isUnlocked = false;
-                          _testerApprovalStatus = liveStatus;
-                          _isCheckingStorage = false;
-                          _errorMessage = liveStatus == 'rejected'
-                              ? '🚫 ACCESS REVOKED: Founder Corey Geter has revoked Closed Alpha access for this tester.'
-                              : '⏳ ACCESS PENDING: Dossier is awaiting Founder review.';
-                        });
-                      }
-                      return;
-                    }
-                  }
-                } catch (_) {}
-              }
-            }
-
             final seal = (decoded['session_seal'] ?? '').toString();
             final sealPasscode = isMaster
                 ? (code.isNotEmpty ? code : 'MASTER_ADMIN_SECRET')
@@ -438,6 +473,10 @@ class _OfficialClosedAlphaNdaGateWrapperState
                   _isUnlocked = true;
                   _isCheckingStorage = false;
                 });
+              }
+              // Non-blocking background check to verify Founder hasn't revoked access in Supabase
+              if (!isMaster && code.isNotEmpty) {
+                unawaited(_reverifySessionOnResume());
               }
               return;
             }
@@ -1183,27 +1222,10 @@ class _OfficialClosedAlphaNdaGateWrapperState
 
   @override
   Widget build(BuildContext context) {
-    if (_isCheckingStorage) {
-      return PopScope(
-        canPop: false,
-        child: Overlay(
-          initialEntries: <OverlayEntry>[
-            OverlayEntry(
-              builder: (BuildContext overlayContext) => const Scaffold(
-                backgroundColor: Color(0xFF07090E),
-                body: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFFD4AF37),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     if (_isUnlocked) {
+      if (widget.child is SizedBox) {
+        return const LivingMarqueeDashboardScreen();
+      }
       return widget.child;
     }
 
@@ -1217,17 +1239,13 @@ class _OfficialClosedAlphaNdaGateWrapperState
 
     return PopScope(
       canPop: false,
-      child: Overlay(
-        initialEntries: <OverlayEntry>[
-          OverlayEntry(
-            builder: (BuildContext overlayContext) {
-              return Scaffold(
-                backgroundColor: const Color(0xFF07090E),
-                body: SafeArea(
-                  child: Center(
-                    child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 840),
-            child: SingleChildScrollView(
+      child: Scaffold(
+        backgroundColor: const Color(0xFF07090E),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 840),
+              child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2425,11 +2443,6 @@ class _OfficialClosedAlphaNdaGateWrapperState
             ),
           ),
         ),
-      ),
-    );
-            },
-          ),
-        ],
       ),
     );
   }
