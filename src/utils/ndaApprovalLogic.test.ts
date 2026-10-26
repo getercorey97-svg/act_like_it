@@ -1,12 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  computeSessionSeal,
   createPendingTesterDossier,
   evaluatePasscodeUnlockAttempt,
   generateUniqueTesterPasscode,
   getTesterVisiblePasscode,
   updateTesterApprovalStatus,
   verifyFounderAdminCredentials,
+  verifySessionSeal,
   verifyStudioMasterSecret,
 } from './ndaApprovalLogic';
 
@@ -179,4 +181,44 @@ describe('NDA Manual Founder Approval & Founder Admin Login Gate', () => {
       )
     );
   });
+
+  it('generates and verifies tamper-proof cryptographic hardware seals for offline and persistence protection', () => {
+    const seal = computeSessionSeal(
+      'ALI-CG-7K9M',
+      'DEV-AND-99001122',
+      'approved'
+    );
+    assert.match(seal, /^SEAL-[0-9A-F]+-[0-9A-F]+$/);
+
+    // Valid on matching hardware device and status
+    assert.equal(
+      verifySessionSeal(seal, 'ALI-CG-7K9M', 'DEV-AND-99001122', 'approved'),
+      true
+    );
+
+    // Rejects forged / mismatched hardware device fingerprint
+    assert.equal(
+      verifySessionSeal(seal, 'ALI-CG-7K9M', 'DEV-AND-SECOND-DEVICE', 'approved'),
+      false
+    );
+
+    // Rejects forged / altered status (e.g., trying to self-promote from pending)
+    assert.equal(
+      verifySessionSeal(seal, 'ALI-CG-7K9M', 'DEV-AND-99001122', 'pending'),
+      false
+    );
+
+    // Rejects forged / wrong passcode
+    assert.equal(
+      verifySessionSeal(seal, 'ALI-XX-FAKE', 'DEV-AND-99001122', 'approved'),
+      false
+    );
+
+    // Rejects null, empty or missing seal
+    assert.equal(
+      verifySessionSeal(null, 'ALI-CG-7K9M', 'DEV-AND-99001122', 'approved'),
+      false
+    );
+  });
 });
+

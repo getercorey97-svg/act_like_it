@@ -5,6 +5,7 @@ import '../dashboard_marquee.dart';
 import '../ui/brand_logo.dart';
 import '../ui/intro_cinematic.dart';
 import 'auth_service.dart';
+import 'nda_tester_gate.dart';
 import 'onboarding_questionnaire.dart';
 
 typedef AuthScreen = LivingMarqueeLoginScreen;
@@ -205,6 +206,10 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+    }
+
     final existingProfile = AuthService.instance.currentProfile;
 
     return Scaffold(

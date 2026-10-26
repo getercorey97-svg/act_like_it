@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../auth/nda_tester_gate.dart';
 import '../main.dart';
 import 'qa_overlay.dart';
 
@@ -310,6 +311,10 @@ class _QaWebPortalDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+    }
+
     final reports = _allMergedReports;
     final selectedReport = reports.firstWhere(
       (r) => r.id == _selectedReportId,

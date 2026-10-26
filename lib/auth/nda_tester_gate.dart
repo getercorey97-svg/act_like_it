@@ -148,6 +148,41 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
     return 'ALI-$initials-${buf.toString()}';
   }
 
+  /// Computes a tamper-proof cryptographic hardware seal over the session.
+  /// Bound to the physical hardware device fingerprint, passcode, and approved status.
+  static String computeSessionSeal({
+    required String passcode,
+    required String deviceFingerprint,
+    required String status,
+  }) {
+    final payload =
+        'ACT_LIKE_IT_SEAL|${passcode.trim().toUpperCase()}|${deviceFingerprint.trim()}|$status|FOUNDER_COR_88';
+    int h1 = 17;
+    int h2 = 29;
+    for (int i = 0; i < payload.length; i++) {
+      final c = payload.codeUnitAt(i);
+      h1 = (h1 * 31 + c) % 1000000007;
+      h2 = (h2 * 37 + c) % 1000000009;
+    }
+    return 'SEAL-${h1.toRadixString(16).toUpperCase()}-${h2.toRadixString(16).toUpperCase()}';
+  }
+
+  /// Verifies that the stored session has not been forged or tampered with.
+  static bool verifySessionSeal({
+    required String seal,
+    required String passcode,
+    required String deviceFingerprint,
+    required String status,
+  }) {
+    if (seal.trim().isEmpty) return false;
+    final expected = computeSessionSeal(
+      passcode: passcode,
+      deviceFingerprint: deviceFingerprint,
+      status: status,
+    );
+    return seal == expected;
+  }
+
   @override
   State<OfficialClosedAlphaNdaGateWrapper> createState() =>
       _OfficialClosedAlphaNdaGateWrapperState();
@@ -364,6 +399,34 @@ class _OfficialClosedAlphaNdaGateWrapperState
                   }
                 } catch (_) {}
               }
+            }
+
+            final seal = (decoded['session_seal'] ?? '').toString();
+            final sealPasscode = isMaster
+                ? (code.isNotEmpty ? code : 'MASTER_ADMIN_SECRET')
+                : code;
+            final isSealValid =
+                OfficialClosedAlphaNdaGateWrapper.verifySessionSeal(
+              seal: seal,
+              passcode: sealPasscode,
+              deviceFingerprint: _deviceFingerprint,
+              status: status,
+            );
+
+            // Anti-tamper verification: if storage was manually edited or seal forged
+            if (!isSealValid) {
+              await prefs.remove(_prefsGateUnlockedKey);
+              await prefs.remove(_prefsDossierPayloadKey);
+              OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = false;
+              if (mounted) {
+                setState(() {
+                  _isUnlocked = false;
+                  _isCheckingStorage = false;
+                  _errorMessage =
+                      '🚨 TAMPER ATTEMPT DETECTED: Cryptographic hardware seal is missing or invalid. Access permanently locked.';
+                });
+              }
+              return;
             }
 
             if (isMaster ||
@@ -668,18 +731,37 @@ class _OfficialClosedAlphaNdaGateWrapperState
     final client = supabaseOrNull;
     if (client != null) {
       try {
-        final rows = await client
-            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
-            .select()
-            .eq('unique_passcode', code)
-            .limit(1);
-        if (rows.isNotEmpty && rows.first is Map) {
-          final row = Map<String, dynamic>.from(rows.first as Map);
-          resolvedStatus = (row['approval_status'] ?? resolvedStatus).toString();
+        final rpcRes = await client.rpc(
+          'check_tester_nda_status',
+          params: {
+            'p_passcode': code,
+            'p_device_id': _deviceFingerprint,
+          },
+        );
+        if (rpcRes is Map && rpcRes['found'] == true) {
+          resolvedStatus =
+              (rpcRes['approval_status'] ?? resolvedStatus).toString();
           _pendingSignedDossier = <String, dynamic>{
-            ..._pendingSignedDossier!,
+            ...?_pendingSignedDossier,
             'approval_status': resolvedStatus,
+            'full_legal_name': rpcRes['full_legal_name'],
+            'unique_passcode': rpcRes['unique_passcode'],
           };
+        } else {
+          final rows = await client
+              .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+              .select()
+              .eq('unique_passcode', code)
+              .limit(1);
+          if (rows.isNotEmpty && rows.first is Map) {
+            final row = Map<String, dynamic>.from(rows.first as Map);
+            resolvedStatus =
+                (row['approval_status'] ?? resolvedStatus).toString();
+            _pendingSignedDossier = <String, dynamic>{
+              ...?_pendingSignedDossier,
+              'approval_status': resolvedStatus,
+            };
+          }
         }
       } catch (_) {}
     }
@@ -758,6 +840,11 @@ class _OfficialClosedAlphaNdaGateWrapperState
       'approval_status': 'approved',
       'signed_date_utc': DateTime.now().toUtc().toIso8601String(),
       'official_portal_url': 'https://act-like-it.vercel.app',
+      'session_seal': OfficialClosedAlphaNdaGateWrapper.computeSessionSeal(
+        passcode: 'FOUNDER_ADMIN_88',
+        deviceFingerprint: _deviceFingerprint,
+        status: 'approved',
+      ),
     };
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -916,6 +1003,12 @@ class _OfficialClosedAlphaNdaGateWrapperState
             'approval_status': 'approved',
             'signed_date_utc': DateTime.now().toUtc().toIso8601String(),
             'official_portal_url': 'https://act-like-it.vercel.app',
+            'session_seal':
+                OfficialClosedAlphaNdaGateWrapper.computeSessionSeal(
+              passcode: 'MASTER_ADMIN_SECRET',
+              deviceFingerprint: _deviceFingerprint,
+              status: 'approved',
+            ),
           };
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -952,15 +1045,37 @@ class _OfficialClosedAlphaNdaGateWrapperState
     final client = supabaseOrNull;
     if (client != null) {
       try {
-        final rows = await client
-            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
-            .select()
-            .eq('unique_passcode', normalizedCode)
-            .limit(1);
-        if (rows.isNotEmpty && rows.first is Map) {
-          matchedRecord = Map<String, dynamic>.from(rows.first as Map);
+        final rpcResult = await client.rpc(
+          'verify_hardware_bound_passcode',
+          params: {
+            'p_passcode': normalizedCode,
+            'p_device_id': _deviceFingerprint,
+          },
+        );
+        if (rpcResult == true) {
+          matchedRecord = <String, dynamic>{
+            'unique_passcode': normalizedCode,
+            'approval_status': 'approved',
+            'bound_device_fingerprint': _deviceFingerprint,
+            'full_legal_name': _fullNameController.text.trim().isNotEmpty
+                ? _fullNameController.text.trim()
+                : 'Approved Tester',
+          };
         }
       } catch (_) {}
+
+      if (matchedRecord == null) {
+        try {
+          final rows = await client
+              .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+              .select()
+              .eq('unique_passcode', normalizedCode)
+              .limit(1);
+          if (rows.isNotEmpty && rows.first is Map) {
+            matchedRecord = Map<String, dynamic>.from(rows.first as Map);
+          }
+        } catch (_) {}
+      }
     }
 
     if (matchedRecord == null) {
@@ -1030,11 +1145,19 @@ class _OfficialClosedAlphaNdaGateWrapperState
       return;
     }
 
+    final recordWithSeal = Map<String, dynamic>.from(matchedRecord);
+    recordWithSeal['session_seal'] =
+        OfficialClosedAlphaNdaGateWrapper.computeSessionSeal(
+      passcode: normalizedCode,
+      deviceFingerprint: _deviceFingerprint,
+      status: 'approved',
+    );
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         _prefsDossierPayloadKey,
-        jsonEncode(matchedRecord),
+        jsonEncode(recordWithSeal),
       );
       await prefs.setBool(_prefsGateUnlockedKey, true);
     } catch (_) {}

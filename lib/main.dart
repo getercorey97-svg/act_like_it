@@ -997,6 +997,10 @@ class _SoundstageShellScreenState extends State<SoundstageShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Act Like It'),

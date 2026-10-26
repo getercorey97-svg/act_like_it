@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 import '../auth/auth_screen.dart';
 import '../auth/auth_service.dart';
+import '../auth/nda_tester_gate.dart';
 import '../dashboard_marquee.dart';
 import 'boondocks_character_rig.dart';
 import 'brand_logo.dart';
@@ -246,6 +247,10 @@ class _CellShadedIntroCinematicScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+    }
+
     final activeArchetype =
         kFourteenAvatarArchetypes[_spotlightArchetypeIndex];
 

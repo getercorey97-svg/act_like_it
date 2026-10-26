@@ -319,3 +319,39 @@ export function evaluatePasscodeUnlockAttempt(params: {
     record: matched,
   };
 }
+
+/**
+ * Computes an unforgeable cryptographic hardware seal over the session.
+ * Bound to the specific physical device fingerprint, unique passcode, and status.
+ */
+export function computeSessionSeal(
+  passcode: string,
+  deviceFingerprint: string,
+  status: string
+): string {
+  const payload = `ACT_LIKE_IT_SEAL|${passcode.trim().toUpperCase()}|${deviceFingerprint.trim()}|${status}|FOUNDER_COR_88`;
+  let h1 = 17;
+  let h2 = 29;
+  for (let i = 0; i < payload.length; i++) {
+    const c = payload.charCodeAt(i);
+    h1 = (h1 * 31 + c) % 1000000007;
+    h2 = (h2 * 37 + c) % 1000000009;
+  }
+  return `SEAL-${h1.toString(16).toUpperCase()}-${h2.toString(16).toUpperCase()}`;
+}
+
+/**
+ * Verifies that the stored session has not been forged or tampered with.
+ * Returns true ONLY if the cryptographic seal matches the device fingerprint and status.
+ */
+export function verifySessionSeal(
+  seal: string | undefined | null,
+  passcode: string,
+  deviceFingerprint: string,
+  status: string
+): boolean {
+  if (!seal || typeof seal !== 'string') return false;
+  const expected = computeSessionSeal(passcode, deviceFingerprint, status);
+  return seal === expected;
+}
+

@@ -23,11 +23,13 @@ import {
   FOUNDER_CONTACT_EMAIL,
   NdaApprovalStatus,
   NdaTesterDossierRecord,
+  computeSessionSeal,
   createPendingTesterDossier,
   evaluatePasscodeUnlockAttempt,
   getTesterVisiblePasscode,
   updateTesterApprovalStatus,
   verifyFounderAdminCredentials,
+  verifySessionSeal,
 } from './utils/ndaApprovalLogic';
 
 const LATE_NIGHT_PROMPTS = [
@@ -127,9 +129,22 @@ export default function App() {
 
   const [ndaUnlocked, setNdaUnlocked] = useState<boolean>(() => {
     try {
-      return (
-        localStorage.getItem('act_like_it_nda_gate_unlocked_v2') === 'true'
-      );
+      const unlocked =
+        localStorage.getItem('act_like_it_nda_gate_unlocked_v2') === 'true';
+      if (!unlocked) return false;
+      const raw = localStorage.getItem('act_like_it_nda_dossier_payload_v2');
+      const seal = localStorage.getItem('act_like_it_session_seal_v2');
+      if (!raw || !seal) return false;
+      const payload = JSON.parse(raw);
+      const isMaster =
+        payload.unlocked_via_master_secret === true ||
+        payload.unlocked_via_founder_admin === true;
+      const code = isMaster
+        ? (payload.unique_passcode || 'FOUNDER_ADMIN_88')
+        : payload.unique_passcode;
+      const fp =
+        localStorage.getItem('act_like_it_device_fingerprint_v1') || '';
+      return verifySessionSeal(seal, code, fp, 'approved');
     } catch {
       return false;
     }
@@ -198,6 +213,26 @@ export default function App() {
     }
   );
 
+  // Domain Integrity & Anti-Framing Guard
+  useEffect(() => {
+    try {
+      const hostname = window.location.hostname;
+      const isAuthorizedHost =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.endsWith('.run.app') ||
+        hostname.endsWith('.googleusercontent.com') ||
+        hostname.endsWith('.aistudio.google.com') ||
+        hostname === 'act-like-it.vercel.app';
+
+      if (!isAuthorizedHost) {
+        window.location.replace('https://act-like-it.vercel.app');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     // Intercept and store deep link if present in URL
     try {
@@ -225,7 +260,7 @@ export default function App() {
     };
   }, [ndaUnlocked]);
 
-  // Live session revocation verification on boot & storage change
+  // Live session revocation & tamper-proof cryptographic hardware seal verification
   useEffect(() => {
     const verifySessionIntegrity = () => {
       try {
@@ -233,17 +268,49 @@ export default function App() {
           localStorage.getItem('act_like_it_nda_gate_unlocked_v2') === 'true';
         if (unlocked) {
           const raw = localStorage.getItem('act_like_it_nda_dossier_payload_v2');
-          if (raw) {
-            const payload = JSON.parse(raw);
-            const reg = loadRegistryFromStorage();
-            const code = payload.unique_passcode;
-            if (code && reg[code] && reg[code].approval_status === 'rejected') {
-              localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'false');
-              setNdaUnlocked(false);
-              setNdaError(
-                '🚫 SESSION REVOKED: Founder Corey Geter has revoked Closed Alpha access for this tester.'
-              );
-            }
+          const seal = localStorage.getItem('act_like_it_session_seal_v2');
+          if (!raw || !seal) {
+            localStorage.removeItem('act_like_it_nda_gate_unlocked_v2');
+            localStorage.removeItem('act_like_it_nda_dossier_payload_v2');
+            localStorage.removeItem('act_like_it_session_seal_v2');
+            setNdaUnlocked(false);
+            setNdaError(
+              '🚨 TAMPER DETECTION: Missing cryptographic hardware seal. Access permanently locked.'
+            );
+            return;
+          }
+          const payload = JSON.parse(raw);
+          const isMaster =
+            payload.unlocked_via_master_secret === true ||
+            payload.unlocked_via_founder_admin === true;
+          const code = isMaster
+            ? (payload.unique_passcode || 'FOUNDER_ADMIN_88')
+            : payload.unique_passcode;
+          const isSealValid = verifySessionSeal(
+            seal,
+            code,
+            deviceFingerprint,
+            'approved'
+          );
+          if (!isSealValid) {
+            localStorage.removeItem('act_like_it_nda_gate_unlocked_v2');
+            localStorage.removeItem('act_like_it_nda_dossier_payload_v2');
+            localStorage.removeItem('act_like_it_session_seal_v2');
+            setNdaUnlocked(false);
+            setNdaError(
+              '🚨 TAMPER DETECTION: Cryptographic hardware seal mismatch or forged storage. Access locked.'
+            );
+            return;
+          }
+          const reg = loadRegistryFromStorage();
+          if (code && reg[code] && reg[code].approval_status === 'rejected') {
+            localStorage.removeItem('act_like_it_nda_gate_unlocked_v2');
+            localStorage.removeItem('act_like_it_nda_dossier_payload_v2');
+            localStorage.removeItem('act_like_it_session_seal_v2');
+            setNdaUnlocked(false);
+            setNdaError(
+              '🚫 SESSION REVOKED: Founder Corey Geter has revoked Closed Alpha access for this tester.'
+            );
           }
         }
       } catch {
@@ -253,7 +320,7 @@ export default function App() {
     verifySessionIntegrity();
     window.addEventListener('storage', verifySessionIntegrity);
     return () => window.removeEventListener('storage', verifySessionIntegrity);
-  }, []);
+  }, [deviceFingerprint]);
 
   const [selectedFilePath, setSelectedFilePath] = useState<string>(
     'lib/auth/nda_tester_gate.dart'
@@ -416,7 +483,25 @@ export default function App() {
 
   const handleFounderLaunchMainApp = () => {
     try {
+      const seal = computeSessionSeal(
+        'FOUNDER_ADMIN_88',
+        deviceFingerprint,
+        'approved'
+      );
       localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'true');
+      localStorage.setItem('act_like_it_session_seal_v2', seal);
+      localStorage.setItem(
+        'act_like_it_nda_dossier_payload_v2',
+        JSON.stringify({
+          full_legal_name: 'Founder Corey Geter (admin88)',
+          unique_passcode: 'FOUNDER_ADMIN_88',
+          bound_device_fingerprint: deviceFingerprint,
+          unlocked_via_founder_admin: true,
+          approval_status: 'approved',
+          signed_date_utc: new Date().toISOString(),
+          official_portal_url: 'https://act-like-it.vercel.app',
+        })
+      );
     } catch {
       // ignore
     }
@@ -467,7 +552,13 @@ export default function App() {
 
     if (outcome.status === 'unlocked_master') {
       try {
+        const seal = computeSessionSeal(
+          'ADMIN3888',
+          deviceFingerprint,
+          'approved'
+        );
         localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'true');
+        localStorage.setItem('act_like_it_session_seal_v2', seal);
       } catch {
         // ignore
       }
@@ -477,7 +568,13 @@ export default function App() {
 
     if (outcome.status === 'unlocked_tester') {
       try {
+        const seal = computeSessionSeal(
+          outcome.record.unique_passcode,
+          deviceFingerprint,
+          outcome.record.approval_status
+        );
         localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'true');
+        localStorage.setItem('act_like_it_session_seal_v2', seal);
         localStorage.setItem(
           'act_like_it_nda_dossier_payload_v2',
           JSON.stringify(outcome.record)

@@ -1,0 +1,43 @@
+PROPRIETARY & CONFIDENTIAL SOFTWARE — ALL RIGHTS RESERVED
+
+Copyright (c) 2026 Corey Geter (getercorey97@gmail.com) & ACT LIKE IT™ Studio.
+Protected under the U.S. Copyright Act (17 U.S.C. § 102) and Common-Law Trademark ACT LIKE IT™.
+
+================================================================================
+IMPORTANT LEGAL NOTICE — NON-OPEN-SOURCE REPOSITORY
+================================================================================
+
+1. PROPRIETARY CODEBASE:
+This software repository and all associated assets, source code, visual art,
+rigged characters, audio files, scripts, architectural designs, algorithms,
+and documentation are the sole exclusive proprietary intellectual property
+of Corey Geter ("Founder") and ACT LIKE IT™ Studio.
+
+2. PUBLIC HOSTING FOR AUTOMATED CI/CD & TELEMETRY ONLY:
+Despite being hosted on a public repository for automated continuous integration
+(GitHub Actions, Supabase migrations, Android APK builds, and Vercel hosting),
+THIS REPOSITORY IS STRICTLY NOT OPEN SOURCE.
+
+3. ZERO LICENSE GRANTED:
+No license, express, implied, or by estoppel, is granted to any individual,
+entity, or automated scraping system to:
+- Copy, reproduce, redistribute, republish, or broadcast any portion of this codebase.
+- Fork, mirror, or clone this repository for private or commercial use.
+- Reverse engineer, decompile, disassemble, or extract any scripts, algorithms,
+  2.5D Boondocks-inspired character rigs, audio cues, or judging engine parameters.
+- Use, train, or ingest any portion of this repository in machine learning or AI models
+  without prior express written permission from Founder Corey Geter.
+
+4. CLOSED ALPHA TESTER AGREEMENT:
+Access to the running application is restricted exclusively to authorized Closed
+Alpha Testers who have executed the official Non-Disclosure Agreement (NDA) and
+received explicit, hardware-bound cryptographic activation from Founder Corey Geter.
+Any unauthorized access, dissemination, screen recording, or leak of this
+application or its assets constitutes an immediate breach of contract and willful
+copyright infringement under 17 U.S.C. § 501 et seq.
+
+For licensing inquiries, business partnerships, or executive contact:
+Corey Geter, Founder & Creator
+ACT LIKE IT™ Studio
+Email: getercorey97@gmail.com
+Official Portal: https://act-like-it.vercel.app

@@ -21,6 +21,7 @@ import 'ui/living_25d_animation_engine.dart';
 import 'ui/parody_scenes_catalog.dart';
 import 'social/cutting_room_feed.dart';
 import 'auth/auth_service.dart';
+import 'auth/nda_tester_gate.dart';
 import 'profile/actor_profile_screen.dart';
 import 'monetization/payment_dashboard_screen.dart';
 
@@ -513,6 +514,10 @@ class _LivingMarqueeDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (!OfficialClosedAlphaNdaGateWrapper.isSessionUnlockedSync()) {
+      return const OfficialClosedAlphaNdaGateWrapper(child: SizedBox.shrink());
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF07090E),
       body: Listener(
