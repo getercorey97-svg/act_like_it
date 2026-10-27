@@ -268,39 +268,34 @@ class SoundstageWaveSynthesizer {
 
     switch (sfx) {
       case SoundstageSfx.paparazziShutterFlash:
-        // Rapid triple DSLR mechanical shutter burst + vintage flashbulb POP + capacitor recharge WHINE
-        const double dur = 0.78;
+        // Soft 35ms mechanical DSLR shutter click + warm low-pass ambient lounge chords (zero high-pitched whine)
+        const double dur = 0.64;
         final int count = (sampleRate * dur).round();
         samples = Int16List(count);
-        double whinePhase = 0.0;
         for (int i = 0; i < count; i++) {
           final double t = i / sampleRate;
-          double sig = 0.0;
+          // Warm low-pass velvet lounge chord (A3 220Hz + C#4 277.18Hz + E4 329.63Hz)
+          double sig = (math.sin(2.0 * math.pi * 220.0 * t) * 0.14 +
+                  math.sin(2.0 * math.pi * 277.18 * t) * 0.11 +
+                  math.sin(2.0 * math.pi * 329.63 * t) * 0.09) *
+              math.exp(-t * 3.4);
 
-          // 3 rapid camera shutter clicks at 0.00s, 0.09s, 0.18s
-          for (final double offset in const <double>[0.0, 0.09, 0.18]) {
-            if (t >= offset && t < offset + 0.045) {
+          // 3 soft 35ms mechanical DSLR shutter clicks at 0.00s, 0.11s, 0.22s
+          for (final double offset in const <double>[0.0, 0.11, 0.22]) {
+            if (t >= offset && t < offset + 0.035) {
               final double dt = t - offset;
-              final double clickEnv = math.exp(-dt * 75.0);
-              final double mirrorSlap =
-                  math.sin(2.0 * math.pi * (1420.0 - dt * 9000.0) * dt) * 0.55;
+              final double clickEnv = math.exp(-dt * 95.0);
+              final double mirrorBody =
+                  math.sin(2.0 * math.pi * 168.0 * dt) * 0.46;
+              final double leafClick =
+                  math.sin(2.0 * math.pi * 590.0 * dt) * 0.22;
               final double shutterCurtain =
-                  (rng.nextDouble() * 2.0 - 1.0) * 0.65;
-              sig += (mirrorSlap + shutterCurtain) * clickEnv;
+                  (rng.nextDouble() * 2.0 - 1.0) * 0.20;
+              sig += (mirrorBody + leafClick + shutterCurtain) * clickEnv;
             }
           }
 
-          // Flashbulb capacitor recharge whine (1.65kHz -> 4.35kHz)
-          if (t >= 0.16) {
-            final double dt = ((t - 0.16) / 0.60).clamp(0.0, 1.0);
-            final double instFreq =
-                1650.0 + 2700.0 * Curves.easeOutQuad.transform(dt);
-            whinePhase += (2.0 * math.pi * instFreq) / sampleRate;
-            final double whineEnv = math.sin(dt * math.pi) * 0.25;
-            sig += math.sin(whinePhase) * whineEnv;
-          }
-
-          samples[i] = (sig.clamp(-0.92, 0.92) * 32767.0).round();
+          samples[i] = (sig.clamp(-0.85, 0.85) * 32767.0).round();
         }
         break;
 

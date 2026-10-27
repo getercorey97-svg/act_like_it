@@ -11,6 +11,8 @@ import '../main.dart';
 import '../offline_manager.dart';
 import '../ui/game_app_bar.dart';
 import '../ui/intro_cinematic.dart';
+import '../ui/red_carpet_25d_parallax.dart';
+import '../ui/soundstage_audio_controller.dart';
 import '../webrtc_manager.dart';
 
 /// Immutable model representing an audition take in "The Cutting Room Floor"
@@ -988,59 +990,111 @@ ${take.scriptExcerpt}
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          _castingDutyRewardClaimedToday
-                              ? '🎬 CASTING DUTY: 5/5 REELS JUDGED (+2 AI TOKENS CLAIMED)'
-                              : '🎬 CASTING DUTY: $ratedCount/5 REELS JUDGED (EARN +2 FREE AI TOKENS)',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: _castingDutyRewardClaimedToday
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFFFD700),
-                          ),
-                        ),
+                // Relocated Clickable 2.5D Card: The Ruthless Casting Director (13014.jpg)
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    SoundstageAudioController.instance.playClapperboardSnap();
+                    if (activeTakes.isNotEmpty) {
+                      final currentTake = activeTakes[
+                          _activeIndex.clamp(0, activeTakes.length - 1)];
+                      _submitStarRating(currentTake, 5);
+                    }
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111624),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _castingDutyRewardClaimedToday
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFFFFD700),
+                        width: 1.5,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() {
-                          _showSundayBoxOfficeBanner =
-                              !_showSundayBoxOfficeBanner;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0x26FFD700),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFFFD700)),
-                        ),
-                        child: const Text(
-                          '🏆 WEEKLY AWARDS',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFF5DEB3),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 58,
+                          height: 58,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: RuthlessCastingDirectorRig(
+                              phase: _reelLoopController.value * math.pi * 2,
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'THE RUTHLESS CASTING DIRECTOR · TAP TO STAMP 5★',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFF5DEB3),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  _castingDutyRewardClaimedToday
+                                      ? '🎬 CASTING DUTY: 5/5 REELS JUDGED (+2 AI TOKENS CLAIMED)'
+                                      : '🎬 CASTING DUTY: $ratedCount/5 REELS JUDGED (EARN +2 FREE AI TOKENS)',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: _castingDutyRewardClaimedToday
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFFFD700),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              _showSundayBoxOfficeBanner =
+                                  !_showSundayBoxOfficeBanner;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0x26FFD700),
+                              borderRadius: BorderRadius.circular(6),
+                              border:
+                                  Border.all(color: const Color(0xFFFFD700)),
+                            ),
+                            child: const Text(
+                              '🏆 WEEKLY AWARDS',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFF5DEB3),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
                 // Fixture #17: Collapsible Sunday Night Box Office Weekly Awards Banner
                 if (_showSundayBoxOfficeBanner) ...[
@@ -1104,7 +1158,7 @@ ${take.scriptExcerpt}
                 : PageView.builder(
                     controller: _verticalPageController,
                     scrollDirection: Axis.vertical,
-                    physics: const BouncingScrollPhysics(),
+                    physics: const PageScrollPhysics(),
                     itemCount: activeTakes.length,
                     onPageChanged: (idx) {
                       HapticFeedback.selectionClick();

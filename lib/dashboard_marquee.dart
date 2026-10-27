@@ -777,11 +777,6 @@ class _LivingMarqueeDashboardScreenState
                                           _buildPaparazziPremiereHeader(),
                                     ),
                                     const SizedBox(height: 12),
-                                    RedCarpetFlankShowcaseRow(
-                                      scrollOffset: _redCarpetScrollOffset,
-                                      onFlashTriggered: _triggerPaparazziFrenzy,
-                                    ),
-                                    const SizedBox(height: 12),
                                     // Fixture #3: Daily Cattle Call — Global 24-Hour Challenge Banner
                                     _buildDailyCattleCallCard(),
                                     const SizedBox(height: 10),

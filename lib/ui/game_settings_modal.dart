@@ -1,9 +1,11 @@
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
+import 'red_carpet_25d_parallax.dart';
 import 'soundstage_audio_controller.dart';
 
 /// Immutable configuration returned when the player taps "ROLL CAMERA"
@@ -1220,6 +1222,545 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
     );
   }
 
+  String _duetCoStarPreference = 'ai_costar_tts';
+  String _stoneFacedTomatoSensitivity = 'standard_15pt';
+  int _blockbusterPreviewAct = 1;
+
+  Widget _buildCallSheet25DHeaderBanner({
+    required String title,
+    required Color neonColor,
+    required bool isEnabled,
+  }) {
+    final lower = title.toLowerCase();
+    if (lower.contains('screen test duet')) {
+      return Container(
+        height: 112,
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF07090E),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isEnabled ? neonColor : const Color(0xFF1E293B),
+            width: 1.6,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 148,
+              height: 112,
+              child: DuetRivalsSplitPortraitRig(phase: 1.25),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0x260CB6D4),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF0CB6D4)),
+                      ),
+                      child: const Text(
+                        'LEAD A (GOLD) VS. LEAD B (CYAN)',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFF5DEB3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Lead A & Lead B — Screen Test Rivals',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _duetCoStarPreference == 'ai_costar_tts'
+                          ? 'Sub-Mode: AI Co-Star with TTS Voice Lines'
+                          : 'Sub-Mode: Live 2-Player Split-Screen Co-Star',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        color: Color(0xFF0CB6D4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    String bannerBadge = '2.5D SOUNDSTAGE TELEMETRY DECK';
+    String bannerGraphicTitle = 'Real-Time 60fps Studio Rig';
+    IconData primaryGraphicIcon = Icons.graphic_eq_rounded;
+    IconData secondaryGraphicIcon = Icons.auto_awesome_rounded;
+
+    if (lower.contains('stone-faced')) {
+      bannerBadge = '2.5D DEADPAN STARE VS. FLYING TOMATOES & SIREN';
+      bannerGraphicTitle = 'Zero-Smirk Facial Lock (1.20x) · -15 Pt Siren';
+      primaryGraphicIcon = Icons.sentiment_neutral_rounded;
+      secondaryGraphicIcon = Icons.crisis_alert_rounded;
+    } else if (lower.contains('3-act blockbuster')) {
+      bannerBadge = '2.5D 24K GOLDEN STATUETTE & 3-ACT FILM REEL';
+      bannerGraphicTitle = 'Act I Setup → Act II Twist → Act III 1.50x Climax';
+      primaryGraphicIcon = Icons.emoji_events_rounded;
+      secondaryGraphicIcon = Icons.movie_filter_rounded;
+    } else if (lower.contains('tv / dex') || lower.contains('clean broadcast')) {
+      bannerBadge = '2.5D 3-MONITOR STUDIO CONTROL DECK';
+      bannerGraphicTitle = '16:9 Widescreen HDMI / DeX / Stream-Safe Output';
+      primaryGraphicIcon = Icons.desktop_windows_rounded;
+      secondaryGraphicIcon = Icons.cast_connected_rounded;
+    } else if (lower.contains('ai telemetrics')) {
+      bannerBadge = '2.5D GEMINI 2.5 FLASH TELEMETRY WAVEFORM';
+      bannerGraphicTitle =
+          'Normalized Weight: ${_actualAiWeight.toStringAsFixed(1)}% (Total 100%)';
+      primaryGraphicIcon = Icons.psychology_alt_rounded;
+      secondaryGraphicIcon = Icons.multitrack_audio_rounded;
+    } else if (lower.contains('peer judging')) {
+      bannerBadge = '2.5D ENSEMBLE SCREENING ROOM SPOTLIGHT';
+      bannerGraphicTitle =
+          'Normalized Weight: ${_actualPeerWeight.toStringAsFixed(1)}% (Total 100%)';
+      primaryGraphicIcon = Icons.thumbs_up_down_rounded;
+      secondaryGraphicIcon = Icons.groups_3_rounded;
+    } else if (lower.contains('social judging')) {
+      bannerBadge = '2.5D CUTTING ROOM VIRAL REEL METER';
+      bannerGraphicTitle =
+          'Normalized Weight: ${_actualSocialWeight.toStringAsFixed(1)}% (Total 100%)';
+      primaryGraphicIcon = Icons.local_fire_department_rounded;
+      secondaryGraphicIcon = Icons.share_arrival_time_rounded;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            neonColor.withValues(alpha: isEnabled ? 0.22 : 0.08),
+            const Color(0xFF07090E),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isEnabled
+              ? neonColor.withValues(alpha: 0.75)
+              : const Color(0xFF1E293B),
+          width: 1.4,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF07090E),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: neonColor, width: 1.5),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(primaryGraphicIcon, color: neonColor, size: 22),
+                Positioned(
+                  right: 2,
+                  bottom: 2,
+                  child: Icon(
+                    secondaryGraphicIcon,
+                    color: const Color(0xFFF5DEB3),
+                    size: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  bannerBadge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    color: neonColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  bannerGraphicTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openDedicatedModeSubPage({
+    required String title,
+    required String channelCode,
+    required String subtitle,
+    required Color neonColor,
+    required bool currentValue,
+    required ValueChanged<bool> onChanged,
+  }) async {
+    HapticFeedback.mediumImpact();
+    SoundstageAudioController.instance.playClapperboardSnap();
+    final lower = title.toLowerCase();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF07090E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        bool sheetToggleVal = currentValue;
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '📖 DEDICATED MODE PAGE & OFFICIAL RULES',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: neonColor,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(sheetCtx).pop(),
+                            icon: const Icon(Icons.close, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                      _buildCallSheet25DHeaderBanner(
+                        title: title,
+                        neonColor: neonColor,
+                        isEnabled: sheetToggleVal,
+                      ),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Scoring & Rules Breakdown Table
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D1320),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: neonColor.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '📊 SCORING MULTIPLIERS, RULES & WEIGHTS',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: neonColor,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildModeRuleRow(
+                              'Channel Spec',
+                              channelCode,
+                              neonColor,
+                            ),
+                            _buildModeRuleRow(
+                              'Normalized Blend',
+                              'AI ${_actualAiWeight.round()}% · Peer ${_actualPeerWeight.round()}% · Social ${_actualSocialWeight.round()}% (Total 100%)',
+                              const Color(0xFFF5DEB3),
+                            ),
+                            if (lower.contains('screen test duet'))
+                              _buildModeRuleRow(
+                                'Duet Split & Bonus',
+                                '50/50 Lead A (Gold) vs Lead B (Cyan) · +250 Scene Stealer XP',
+                                const Color(0xFF0CB6D4),
+                              ),
+                            if (lower.contains('stone-faced'))
+                              _buildModeRuleRow(
+                                'Hazard Multiplier',
+                                '1.20x Unbroken Deadpan Bonus · -15.0 Pts Smirk Siren',
+                                const Color(0xFFE11342),
+                              ),
+                            if (lower.contains('3-act blockbuster'))
+                              _buildModeRuleRow(
+                                '3-Act Arc Weights',
+                                'Act I (1.0x) → Act II (+5.0 Twist) → Act III Climax (1.50x)',
+                                const Color(0xFFFFD700),
+                              ),
+                            if (lower.contains('curveball'))
+                              _buildModeRuleRow(
+                                '15s Director Twist',
+                                'Fires at 00:15 into 30s take · +5.0 Bonus Points',
+                                const Color(0xFFE11342),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Mode-Specific Interactive Sub-Options
+                      if (lower.contains('screen test duet')) ...[
+                        const Text(
+                          '🎭 DUET CO-STAR CONFIGURATION:',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFF5DEB3),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ChoiceChip(
+                              label: const Text(
+                                '🤖 AI Co-Star with Live TTS Voice',
+                              ),
+                              selected:
+                                  _duetCoStarPreference == 'ai_costar_tts',
+                              onSelected: (_) {
+                                setState(() {
+                                  _duetCoStarPreference = 'ai_costar_tts';
+                                });
+                                setSheetState(() {});
+                              },
+                            ),
+                            ChoiceChip(
+                              label: const Text(
+                                '👥 Live 2-Player Co-Star (SFU / Couch)',
+                              ),
+                              selected: _duetCoStarPreference == 'live_costar',
+                              onSelected: (_) {
+                                setState(() {
+                                  _duetCoStarPreference = 'live_costar';
+                                });
+                                setSheetState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      if (lower.contains('stone-faced')) ...[
+                        const Text(
+                          '🍅 TOMATO HECKLE & SMIRK SENSITIVITY:',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFF5DEB3),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Standard (-15 Pts on Smirk)'),
+                              selected: _stoneFacedTomatoSensitivity ==
+                                  'standard_15pt',
+                              onSelected: (_) {
+                                setState(() {
+                                  _stoneFacedTomatoSensitivity =
+                                      'standard_15pt';
+                                });
+                                setSheetState(() {});
+                              },
+                            ),
+                            ChoiceChip(
+                              label: const Text(
+                                'Hardcore Method (-25 Pts / 1.30x)',
+                              ),
+                              selected: _stoneFacedTomatoSensitivity ==
+                                  'hardcore_25pt',
+                              onSelected: (_) {
+                                setState(() {
+                                  _stoneFacedTomatoSensitivity =
+                                      'hardcore_25pt';
+                                });
+                                setSheetState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      if (lower.contains('3-act blockbuster')) ...[
+                        const Text(
+                          '🎬 PREVIEW 3-ACT TOURNAMENT STRUCTURE:',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFF5DEB3),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [1, 2, 3].map((act) {
+                            return ChoiceChip(
+                              label: Text(
+                                act == 1
+                                    ? 'Act I: Cold Open (1.0x)'
+                                    : (act == 2
+                                        ? 'Act II: Plot Twist (+5.0)'
+                                        : 'Act III: Climax (1.50x)'),
+                              ),
+                              selected: _blockbusterPreviewAct == act,
+                              onSelected: (_) {
+                                setState(() => _blockbusterPreviewAct = act);
+                                setSheetState(() {});
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: neonColor,
+                          foregroundColor: const Color(0xFF07090E),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () {
+                          final nextVal = !sheetToggleVal;
+                          sheetToggleVal = nextVal;
+                          onChanged(nextVal);
+                          setSheetState(() {});
+                          Navigator.of(sheetCtx).pop();
+                        },
+                        icon: Icon(
+                          sheetToggleVal
+                              ? Icons.toggle_off_rounded
+                              : Icons.check_circle_rounded,
+                        ),
+                        label: Text(
+                          sheetToggleVal
+                              ? 'TURN MODE OFF & RETURN TO CALL SHEET'
+                              : 'ENABLE MODE ON CALL SHEET',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildModeRuleRow(String label, String val, Color accent) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 118,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              val,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+                color: accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStudioSoundboardToggle({
     required String channelCode,
     required String title,
@@ -1229,210 +1770,179 @@ class _GameSettingsModalState extends State<GameSettingsModal> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return GestureDetector(
-      onTap: () => onChanged(!value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: value ? const Color(0xFF101624) : const Color(0xFF07090E),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: value ? neonColor : const Color(0xFF05070B),
-            width: value ? 2.2 : 2.5,
-          ),
-          boxShadow: [
-            const BoxShadow(
-              color: Color(0xFF05070B),
-              offset: Offset(5, 5),
-              blurRadius: 0,
-            ),
-            if (value)
-              BoxShadow(
-                color: neonColor.withValues(alpha: 0.24),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-          ],
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: value ? const Color(0xFF101624) : const Color(0xFF07090E),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: value ? neonColor : const Color(0xFF1E293B),
+          width: value ? 2.2 : 2.0,
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: value
-                    ? neonColor.withValues(alpha: 0.18)
-                    : const Color(0xFF151C2C),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: value
-                      ? neonColor.withValues(alpha: 0.9)
-                      : const Color(0xFF05070B),
-                  width: 2.0,
-                ),
-              ),
-              child: Icon(
-                icon,
-                color: value ? neonColor : const Color(0xFF64748B),
-                size: 26,
-              ),
+        boxShadow: [
+          const BoxShadow(
+            color: Color(0xFF05070B),
+            offset: Offset(5, 5),
+            blurRadius: 0,
+          ),
+          if (value)
+            BoxShadow(
+              color: neonColor.withValues(alpha: 0.24),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    channelCode,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
-                      color: value ? neonColor : const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      height: 1.35,
-                      color: Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Switch.adaptive(
-              value: value,
-              activeColor: neonColor,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openDedicatedModeSubPage(
+              title: title,
+              channelCode: channelCode,
+              subtitle: subtitle,
+              neonColor: neonColor,
+              currentValue: value,
               onChanged: onChanged,
             ),
-          ],
-        ),
+            child: _buildCallSheet25DHeaderBanner(
+              title: title,
+              neonColor: neonColor,
+              isEnabled: value,
+            ),
+          ),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => _openDedicatedModeSubPage(
+                  title: title,
+                  channelCode: channelCode,
+                  subtitle: subtitle,
+                  neonColor: neonColor,
+                  currentValue: value,
+                  onChanged: onChanged,
+                ),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: value
+                        ? neonColor.withValues(alpha: 0.18)
+                        : const Color(0xFF151C2C),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: value
+                          ? neonColor.withValues(alpha: 0.9)
+                          : const Color(0xFF05070B),
+                      width: 2.0,
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: value ? neonColor : const Color(0xFF64748B),
+                    size: 24,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _openDedicatedModeSubPage(
+                    title: title,
+                    channelCode: channelCode,
+                    subtitle: subtitle,
+                    neonColor: neonColor,
+                    currentValue: value,
+                    onChanged: onChanged,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        channelCode,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.9,
+                          color: value ? neonColor : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: neonColor.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: neonColor.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        child: Text(
+                          '📖 Mode Page & Rules >',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: neonColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Switch.adaptive(
+                value: value,
+                activeColor: neonColor,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildImprovWildcardCard() {
     const wildcardColor = Color(0xFFE11342);
-    return GestureDetector(
-      onTap: () {
+    return _buildStudioSoundboardToggle(
+      channelCode: 'WILDCARD · IMPROV ROULETTE (+5.0 TWIST BONUS)',
+      title: 'Random Director Curveballs',
+      subtitle:
+          'Injects surprise mid-scene emotional twists & genre modifiers at 00:15 for +5.0 bonus multiplier points.',
+      icon: Icons.casino_rounded,
+      neonColor: wildcardColor,
+      value: _improvRouletteWildcard,
+      onChanged: (val) {
         HapticFeedback.mediumImpact();
-        setState(() => _improvRouletteWildcard = !_improvRouletteWildcard);
+        setState(() => _improvRouletteWildcard = val);
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 240),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: _improvRouletteWildcard
-                ? const [
-                    Color(0xFF520002),
-                    Color(0xFF14070B),
-                  ]
-                : const [
-                    Color(0xFF0D111C),
-                    Color(0xFF07090E),
-                  ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: _improvRouletteWildcard
-                ? const Color(0xFFF5DEB3)
-                : const Color(0xFF05070B),
-            width: 2.5,
-          ),
-          boxShadow: [
-            const BoxShadow(
-              color: Color(0xFF05070B),
-              offset: Offset(5, 5),
-              blurRadius: 0,
-            ),
-            if (_improvRouletteWildcard)
-              BoxShadow(
-                color: wildcardColor.withValues(alpha: 0.35),
-                blurRadius: 22,
-                spreadRadius: 1,
-              ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: wildcardColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: wildcardColor, width: 1.5),
-              ),
-              child: const Icon(
-                Icons.casino_rounded,
-                color: wildcardColor,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'WILDCARD · IMPROV ROULETTE',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.1,
-                      color: wildcardColor,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Random Director Curveballs',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Injects surprise mid-scene emotional twists & genre modifiers for bonus multiplier points.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.35,
-                      color: Color(0xFFCBD5E1),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Switch.adaptive(
-              value: _improvRouletteWildcard,
-              activeColor: wildcardColor,
-              onChanged: (val) {
-                HapticFeedback.mediumImpact();
-                setState(() => _improvRouletteWildcard = val);
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -11,21 +11,24 @@ import 'monetization/payment_dashboard_screen.dart';
 import 'ui/game_settings_modal.dart';
 import 'ui/parody_scenes_catalog.dart';
 
+import 'ui/red_carpet_25d_parallax.dart';
+import 'ui/soundstage_audio_controller.dart';
+
 /// Categorizes the intensity tiers inside the hidden Late-Night After-Hours Vault.
 enum LateNightSpiceTier {
   midnightNoir(
     tier: 1,
-    label: 'Tier 1 · Midnight Noir & Dark Comedy',
-    multiplier: 1.10,
+    label: '🔥 Tier 1: Messy Hookups & Raunchy Comedy [1.15x]',
+    multiplier: 1.15,
   ),
   uncensoredPrestige(
     tier: 2,
-    label: 'Tier 2 · Uncensored R-Rated Prestige',
-    multiplier: 1.20,
+    label: '💋 Tier 2: Bedroom Walk-Ins & Seductive Noir [1.25x]',
+    multiplier: 1.25,
   ),
   afterHoursDoubleDare(
     tier: 3,
-    label: 'Tier 3 · After-Hours Double-Dare & Twist',
+    label: '🧨 Tier 3: Unhinged TV-MA Meltdowns & Filthy Roasts [1.35x]',
     multiplier: 1.35,
   );
 
@@ -162,15 +165,16 @@ class LateNightVaultGateController extends ChangeNotifier {
 
   static final List<LateNightPrompt> _builtInFallbackPrompts = [
     for (int i = 0; i < kLateNightAfterHoursScenes.length; i++)
-      LateNightPrompt.fromScenePrompt(
-        kLateNightAfterHoursScenes[i],
-        spiceTier: i < 3 ? 1 : (i < 7 ? 2 : 3),
-        contentAdvisory: i < 3
-            ? '18+ Midnight Noir & Seductive Tension'
-            : (i < 7
-                ? '18+ Uncensored R-Rated Prestige Drama'
-                : '18+ After-Hours Double-Dare & Twist'),
-      ),
+      () {
+        final scene = kLateNightAfterHoursScenes[i];
+        final spiceEnum = getSpiceTierForSceneId(scene.id);
+        final tierInt = spiceEnum.tierNumber;
+        return LateNightPrompt.fromScenePrompt(
+          scene,
+          spiceTier: tierInt,
+          contentAdvisory: '${spiceEnum.badgeLabel} · RATED-R / TV-MA UNCUT',
+        );
+      }(),
   ];
 
   /// Validates that the player's birth year is >= 18 years ago and that a 4-digit
@@ -328,6 +332,8 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen>
   LifeIsImprovSetting _selectedImprovSetting =
       LifeIsImprovSetting.housePartyBar;
   int _activeDossierIndex = 0;
+  int _dossierFlipTurns = 0;
+  int _selectedSpiceFilterTab = 0; // 0 = All 60, 1 = Tier 1, 2 = Tier 2, 3 = Tier 3
 
   @override
   void initState() {
@@ -770,6 +776,181 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen>
                 ),
               ),
               const SizedBox(height: 12),
+              // RELOCATED CLICKABLE 2.5D HERO CARD: The Undercover Speakeasy Improviser (13012.jpg)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.heavyImpact();
+                  SoundstageAudioController.instance.playVaultLockTurnClunk();
+                  setState(() {
+                    _dossierFlipTurns += 1;
+                    _activeDossierIndex =
+                        (_activeDossierIndex + 1) % dossiers.length;
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0612),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFA855F7),
+                      width: 2.0,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x55A855F7),
+                        blurRadius: 16,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 112,
+                            height: 138,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: UndercoverSpeakeasyImproviserRig(
+                                phase: (_dossierFlipTurns * 0.85) + 0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0x33A855F7),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFFA855F7),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'INTERACTIVE 2.5D AGENT · TAP TO FLIP DOSSIER',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFFF5DEB3),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'The Undercover Speakeasy Improviser',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Tap his portrait or the pulsing neon-violet "CONFIDENTIAL" dossier to trigger a 3D Matrix4 Y-rotation flip and deal a fresh Real-World Dare!',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    height: 1.35,
+                                    color: Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor:
+                                              const Color(0xFFF5DEB3),
+                                          side: const BorderSide(
+                                            color: Color(0xFFA855F7),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          HapticFeedback.heavyImpact();
+                                          setState(() {
+                                            _dossierFlipTurns += 1;
+                                            _activeDossierIndex =
+                                                (_activeDossierIndex + 1) %
+                                                    dossiers.length;
+                                          });
+                                        },
+                                        icon: const Icon(
+                                          Icons.flip_camera_android_rounded,
+                                          size: 14,
+                                        ),
+                                        label: const FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            '3D FLIP NEW DARE',
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFFE11342),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                        onPressed: () =>
+                                            _launchLifeIsImprovStealthStage(
+                                          activeDossier,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.visibility_off_rounded,
+                                          size: 14,
+                                        ),
+                                        label: const FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            'Launch Stealth / POV Camera',
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const Text(
                 '1. SELECT YOUR REAL-WORLD SETTING:',
                 style: TextStyle(
@@ -805,119 +986,140 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen>
                       setState(() {
                         _selectedImprovSetting = setting;
                         _activeDossierIndex = 0;
+                        _dossierFlipTurns += 1;
                       });
                     },
                   );
                 }).toList(),
               ),
               const SizedBox(height: 14),
-              // Classified Secret Dare Dossier Card
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF07090E),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFF5DEB3),
-                    width: 1.8,
-                  ),
+              // Classified Secret Dare Dossier Card with 3D Matrix4 Y-Rotation Flip
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(
+                  begin: 0.0,
+                  end: _dossierFlipTurns * math.pi * 2,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'CLASSIFIED DOSSIER · ${activeDossier.dossierTitle.toUpperCase()}',
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFFE11342),
-                            ),
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _activeDossierIndex =
-                                  (_activeDossierIndex + 1) % dossiers.length;
-                            });
-                          },
-                          icon: const Icon(
-                            Icons.refresh_rounded,
-                            size: 15,
-                            color: Color(0xFF0CB6D4),
-                          ),
-                          label: const Text(
-                            'NEXT DOSSIER',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0CB6D4),
-                            ),
-                          ),
-                        ),
-                      ],
+                duration: const Duration(milliseconds: 520),
+                curve: Curves.easeOutBack,
+                builder: (context, angle, child) {
+                  final normalized = angle % (math.pi * 2);
+                  final tilt = math.sin(normalized) * 0.35;
+                  return Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.0012)
+                      ..rotateY(tilt),
+                    child: child,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF07090E),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFF5DEB3),
+                      width: 1.8,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '🕵️ UNDERCOVER PERSONA: ${activeDossier.undercoverPersona}',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFF5DEB3),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '🗣️ OPENING LINE TO SAY OUT LOUD:\n"${activeDossier.openingLineToSayOutLoud}"',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        height: 1.42,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF160B18),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFA55577)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '⚡ 15s MID-DARE ESCALATION (HAPTIC DOUBLE-TAP PULSE):\n${activeDossier.midDareEscalation15s}',
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              height: 1.38,
-                              color: Color(0xFFF59E0B),
+                          Expanded(
+                            child: Text(
+                              'CLASSIFIED DOSSIER (${_activeDossierIndex + 1}/${dossiers.length}) · ${activeDossier.dossierTitle.toUpperCase()}',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFE11342),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '🎯 TARGET ROOM REACTION:\n${activeDossier.targetReactionFromRoom}',
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              height: 1.38,
+                          TextButton.icon(
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _dossierFlipTurns += 1;
+                                _activeDossierIndex =
+                                    (_activeDossierIndex + 1) % dossiers.length;
+                              });
+                            },
+                            icon: const Icon(
+                              Icons.refresh_rounded,
+                              size: 15,
                               color: Color(0xFF0CB6D4),
+                            ),
+                            label: const Text(
+                              'NEXT DOSSIER',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0CB6D4),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        '🕵️ UNDERCOVER PERSONA: ${activeDossier.undercoverPersona}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFF5DEB3),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '🗣️ OPENING LINE TO SAY OUT LOUD:\n"${activeDossier.openingLineToSayOutLoud}"',
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          height: 1.42,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF160B18),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFA55577)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '⚡ 15s MID-DARE ESCALATION (HAPTIC DOUBLE-TAP PULSE):\n${activeDossier.midDareEscalation15s}',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                height: 1.38,
+                                color: Color(0xFFF59E0B),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '🎯 TARGET ROOM REACTION:\n${activeDossier.targetReactionFromRoom}',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                height: 1.38,
+                                color: Color(0xFF0CB6D4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1122,30 +1324,95 @@ class _LateNightAfterHoursScreenState extends State<LateNightAfterHoursScreen>
           ),
         ),
 
-        DropdownButtonFormField<LateNightSpiceTier>(
-          value: _controller.selectedTier,
-          decoration: const InputDecoration(
-            labelText: 'After-Hours Spice Tier & Score Multiplier',
-            filled: true,
-            fillColor: Color(0xFF121722),
-            border: OutlineInputBorder(),
+        // 3 Spice Filter Tabs + All 60 Uncut Rated-R / TV-MA Scenes Selector
+        Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF120B18),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFA55577), width: 1.6),
           ),
-          items: LateNightSpiceTier.values
-              .map(
-                (t) => DropdownMenuItem(
-                  value: t,
-                  child: Text('${t.label} (${t.multiplier}x)'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '🔞 60 UNCENSORED RATED-R / TV-MA SPEAKEASY SCRIPTS · FILTER BY SPICE TIER',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFF5DEB3),
                 ),
-              )
-              .toList(),
-          onChanged: (tier) {
-            if (tier != null) {
-              _controller.fetchLateNightPrompts(tier: tier);
-            }
-          },
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: Text(
+                      'ALL 60 UNCUT 18+ SCENES (${_controller.prompts.length})',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: _selectedSpiceFilterTab == 0
+                            ? const Color(0xFF07090E)
+                            : Colors.white,
+                      ),
+                    ),
+                    selected: _selectedSpiceFilterTab == 0,
+                    selectedColor: const Color(0xFFF5DEB3),
+                    backgroundColor: const Color(0xFF0B0E17),
+                    onSelected: (_) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedSpiceFilterTab = 0);
+                      _controller.fetchLateNightPrompts(
+                        tier: LateNightSpiceTier.afterHoursDoubleDare,
+                      );
+                    },
+                  ),
+                  ...SpeakeasySpiceTier.values.map((spice) {
+                    final selected =
+                        _selectedSpiceFilterTab == spice.tierNumber;
+                    return ChoiceChip(
+                      label: Text(
+                        spice.badgeLabel,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: selected
+                              ? const Color(0xFF07090E)
+                              : const Color(0xFFF5DEB3),
+                        ),
+                      ),
+                      selected: selected,
+                      selectedColor: const Color(0xFFE11342),
+                      backgroundColor: const Color(0xFF0B0E17),
+                      onSelected: (_) {
+                        HapticFeedback.selectionClick();
+                        setState(
+                          () => _selectedSpiceFilterTab = spice.tierNumber,
+                        );
+                        _controller.fetchLateNightPrompts(
+                          tier: LateNightSpiceTier.afterHoursDoubleDare,
+                        );
+                      },
+                    );
+                  }),
+                ],
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 18),
-        ..._controller.prompts.map(
+        const SizedBox(height: 6),
+        ..._controller.prompts
+            .where((p) =>
+                _selectedSpiceFilterTab == 0 ||
+                p.spiceTier == _selectedSpiceFilterTab)
+            .map(
           (prompt) => Container(
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.all(16),

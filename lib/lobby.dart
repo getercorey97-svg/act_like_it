@@ -223,7 +223,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
       appBar: GameAppBar(
         title: activeSession == null
             ? 'Grand Premiere Soundstage'
-            : 'Soundstage #${activeSession.roomCode}',
+            : 'GREEN ROOM · #${activeSession.roomCode}',
         activeRoomCode: activeSession?.roomCode,
         onStartOver: () => _lobbyManager.leaveLobby(),
         extraActions: [
@@ -369,11 +369,169 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
     );
   }
 
+  Widget _buildGreenRoomDuetRivalsCoStarCard({LobbySession? activeSession}) {
+    final cfg = GameSettingsModal.latestConfig;
+    final duetOn = cfg.screenTestDuetMode;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          GameSettingsModal.latestConfig = cfg.copyWith(
+            screenTestDuetMode: !duetOn,
+          );
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xF20B0E17),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: duetOn ? const Color(0xFF0CB6D4) : const Color(0xFFF59E0B),
+            width: 2.0,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x99000000),
+              blurRadius: 14,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 124,
+              height: 98,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: const DuetRivalsSplitPortraitRig(phase: 1.35),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: duetOn
+                          ? const Color(0x330CB6D4)
+                          : const Color(0x33F59E0B),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: duetOn
+                            ? const Color(0xFF0CB6D4)
+                            : const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    child: Text(
+                      duetOn
+                          ? 'DUET MODE ACTIVE · LEAD A (GOLD) VS LEAD B (CYAN)'
+                          : 'GREEN ROOM CO-STAR DECK · TAP TO ENABLE DUET',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFF5DEB3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Lead A & Lead B — Screen Test Rivals',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    duetOn
+                        ? '50/50 Split-Screen Viewfinder + AI Co-Star TTS Voice Lines enabled!'
+                        : 'Tap to toggle 2-Player Duet Mode or pick an AI / Couch Co-Star below.',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      height: 1.3,
+                      color: Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  if (activeSession != null) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ActionChip(
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: const Color(0xFF121826),
+                          side: const BorderSide(color: Color(0xFFF59E0B)),
+                          label: const Text(
+                            '🤖 + AI Co-Star (TTS)',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFF5DEB3),
+                            ),
+                          ),
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            setState(() {
+                              GameSettingsModal.latestConfig =
+                                  GameSettingsModal.latestConfig.copyWith(
+                                screenTestDuetMode: true,
+                              );
+                            });
+                            _lobbyManager.addAiCoStar();
+                          },
+                        ),
+                        ActionChip(
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: const Color(0xFF121826),
+                          side: const BorderSide(color: Color(0xFF0CB6D4)),
+                          label: const Text(
+                            '🛋️ + Pass & Play Co-Star',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0CB6D4),
+                            ),
+                          ),
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            setState(() {
+                              GameSettingsModal.latestConfig =
+                                  GameSettingsModal.latestConfig.copyWith(
+                                screenTestDuetMode: true,
+                              );
+                            });
+                            _lobbyManager.addLocalPassAndPlayPlayer();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDedicatedStudioGreenRoom() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Living25DHeroCharactersTrioSection(),
+        _buildGreenRoomDuetRivalsCoStarCard(),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(20),
@@ -1091,26 +1249,27 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                         color: Colors.white,
                       ),
                     ),
-                    if (activeScene.duetLeadA.isNotEmpty ||
-                        activeScene.duetLeadB.isNotEmpty) ...[
+                    if (GameSettingsModal.latestConfig.screenTestDuetMode &&
+                        (activeScene.duetLeadA.isNotEmpty ||
+                            activeScene.duetLeadB.isNotEmpty)) ...[
                       const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0A0D16),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: const Color(0xFF0CB6D4)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'SCREEN TEST DUET · 2-PLAYER CO-STAR MODE',
+                              'SCREEN TEST DUET · 2-PLAYER CO-STAR MODE ACTIVE',
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF94A3B8),
+                                color: Color(0xFF0CB6D4),
                               ),
                             ),
                             if (activeScene.duetLeadA.isNotEmpty) ...[
@@ -1318,189 +1477,218 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
           ),
           const SizedBox(height: 20),
         ],
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'Green Room Cast Roster (${players.length}/${session.maxPlayers})',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            if (players.length < session.maxPlayers)
-              Wrap(
-                spacing: 6,
+        // Relocated Interactive 2.5D Card: Lead A & Lead B — Screen Test Rivals
+        _buildGreenRoomDuetRivalsCoStarCard(activeSession: session),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xF20B0E17),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF1E293B), width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF0CB6D4),
-                      side: const BorderSide(
-                        color: Color(0xFF0CB6D4),
-                        width: 1.5,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      _lobbyManager.addLocalPassAndPlayPlayer();
-                    },
-                    icon: const Icon(Icons.group_add_rounded, size: 15),
-                    label: const Text(
-                      '+ Pass & Play',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10.5,
+                  Expanded(
+                    child: Text(
+                      'Green Room Cast Roster (${players.length}/${session.maxPlayers})',
+                      style: const TextStyle(
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
+                        color: Colors.white,
                       ),
                     ),
                   ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFF59E0B),
-                      side: const BorderSide(
-                        color: Color(0xFFF59E0B),
-                        width: 1.5,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
+                  if (players.length < session.maxPlayers)
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0B0E17),
+                            foregroundColor: const Color(0xFF0CB6D4),
+                            side: const BorderSide(
+                              color: Color(0xFF0CB6D4),
+                              width: 1.5,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                          ),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            _lobbyManager.addLocalPassAndPlayPlayer();
+                          },
+                          icon: const Icon(Icons.group_add_rounded, size: 15),
+                          label: const Text(
+                            '+ Pass & Play',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0B0E17),
+                            foregroundColor: const Color(0xFFF59E0B),
+                            side: const BorderSide(
+                              color: Color(0xFFF59E0B),
+                              width: 1.5,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                          ),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            _lobbyManager.addAiCoStar();
+                          },
+                          icon: const Icon(
+                            Icons.person_add_alt_1_rounded,
+                            size: 15,
+                          ),
+                          label: const Text(
+                            '+ AI Co-Star',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...players.map(
+                (player) {
+                  final isLocalUser =
+                      player.userId == _lobbyManager.localUserId;
+                  final resolvedAvatarId = isLocalUser
+                      ? AuthService.instance.currentUserAvatar
+                      : player.avatarArchetypeId;
+                  final playerArchetype =
+                      resolveAvatarArchetype(resolvedAvatarId);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF121722),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isLocalUser
+                            ? playerArchetype.rimAccentColor
+                                .withValues(alpha: 0.65)
+                            : const Color(0xFF1E293B),
                       ),
                     ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      _lobbyManager.addAiCoStar();
-                    },
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 15),
-                    label: const Text(
-                      '+ AI Co-Star',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
+                    child: ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: BoondocksAvatarPortrait(
+                          archetype: playerArchetype,
+                          size: 44,
+                          isSelected: isLocalUser,
+                          animationPhase: 0.0,
+                        ),
                       ),
+                      title: Text(
+                        player.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '${player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast'} · ${playerArchetype.name}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            player.isReady ? 'ON SET' : 'STANDBY',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: player.isReady
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFF59E0B),
+                            ),
+                          ),
+                          if (player.userId != _lobbyManager.localUserId) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.flag_outlined,
+                                size: 16,
+                                color: Color(0xFF64748B),
+                              ),
+                              tooltip: 'Report or Block Actor',
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                _lobbyManager
+                                    .blockAndRemovePlayer(player.userId);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Reported & removed ${player.displayName} from your Green Room.',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: const Color(0xF20B0E17),
+                        foregroundColor: const Color(0xFF06B6D4),
+                        side: const BorderSide(
+                          color: Color(0xFF06B6D4),
+                          width: 1.8,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () => _lobbyManager.toggleReadyState(),
+                      child: const Text(
+                        'Toggle Ready',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () => _lobbyManager.startPerformanceRound(),
+                      child: const Text('Draw New Scene'),
                     ),
                   ),
                 ],
               ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        ...players.map(
-          (player) {
-            final isLocalUser = player.userId == _lobbyManager.localUserId;
-            final resolvedAvatarId = isLocalUser
-                ? AuthService.instance.currentUserAvatar
-                : player.avatarArchetypeId;
-            final playerArchetype = resolveAvatarArchetype(resolvedAvatarId);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF121722),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isLocalUser
-                      ? playerArchetype.rimAccentColor.withValues(alpha: 0.65)
-                      : const Color(0xFF1E293B),
-                ),
-              ),
-              child: ListTile(
-                leading: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: BoondocksAvatarPortrait(
-                    archetype: playerArchetype,
-                    size: 44,
-                    isSelected: isLocalUser,
-                    animationPhase: 0.0,
-                  ),
-                ),
-                title: Text(
-                  player.displayName,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  '${player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast'} · ${playerArchetype.name}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      player.isReady ? 'ON SET' : 'STANDBY',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: player.isReady
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFFF59E0B),
-                      ),
-                    ),
-                    if (player.userId != _lobbyManager.localUserId) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.flag_outlined,
-                          size: 16,
-                          color: Color(0xFF64748B),
-                        ),
-                        tooltip: 'Report or Block Actor',
-                        onPressed: () {
-                          HapticFeedback.mediumImpact();
-                          _lobbyManager.blockAndRemovePlayer(player.userId);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Reported & removed ${player.displayName} from your Green Room.',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF06B6D4),
-                  side: const BorderSide(
-                    color: Color(0xFF06B6D4),
-                    width: 1.8,
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: () => _lobbyManager.toggleReadyState(),
-                child: const Text(
-                  'Toggle Ready',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: () => _lobbyManager.startPerformanceRound(),
-                child: const Text('Draw New Scene'),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

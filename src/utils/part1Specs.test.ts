@@ -335,3 +335,67 @@ test('Dart Release Build API & Constructor Contracts (Flutter 3.47.8 CI parity)'
   // 7. BoondocksAvatarArchetype.shortBadge getter
   assert.ok(rigDart.includes('String get shortBadge => roleBadge;'));
 });
+
+test('Samsung Galaxy S26 Ultra 5-Part Audit Upgrade (De-Cluttered Dashboard, Relocated Clickable 2.5D Rigs, Call Sheet Sub-Pages, 7-Mode Rulebook, 50 New Rated-R 18+ Scenes, and Video 1-4 Fixes)', () => {
+  const dashboardDart = fs.readFileSync('lib/dashboard_marquee.dart', 'utf8');
+  const doorsDart = fs.readFileSync('lib/ui/premiere_doors_marquee.dart', 'utf8');
+  const profileDart = fs.readFileSync('lib/profile/actor_profile_screen.dart', 'utf8');
+  const lateNightDart = fs.readFileSync('lib/late_night_vault.dart', 'utf8');
+  const raunchyScenesDart = fs.readFileSync('lib/late_night_raunchy_scenes.dart', 'utf8');
+  const catalogDart = fs.readFileSync('lib/ui/parody_scenes_catalog.dart', 'utf8');
+  const settingsDart = fs.readFileSync('lib/ui/game_settings_modal.dart', 'utf8');
+  const instructionsDart = fs.readFileSync('lib/ui/interactive_instructions.dart', 'utf8');
+  const feedDart = fs.readFileSync('lib/social/cutting_room_feed.dart', 'utf8');
+  const lobbyDart = fs.readFileSync('lib/lobby.dart', 'utf8');
+  const webrtcDart = fs.readFileSync('lib/webrtc_manager.dart', 'utf8');
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  const matchHistoryDart = fs.readFileSync('lib/match_history_screen.dart', 'utf8');
+  const introDart = fs.readFileSync('lib/ui/intro_cinematic.dart', 'utf8');
+
+  // 1. Non-functional showcase cards removed from Main Dashboard & relocated as clickable features
+  assert.equal(dashboardDart.includes('RedCarpet25DParallaxFlanksDeck('), false);
+  assert.equal(doorsDart.includes('FiveLayer25DLivingHeroPortraitsDeck('), false);
+  assert.ok(profileDart.includes('_buildStageEntranceAndCrowdFxSelector'));
+  assert.ok(profileDart.includes('LeftFlankPaparazziDuoRig'));
+  assert.ok(profileDart.includes('FirstPersonRedCarpetPovCardRig'));
+  assert.ok(profileDart.includes('RightFlankVipEntourageRig'));
+  assert.ok(webrtcDart.includes('_buildStageParallaxFlanksFxDeck'));
+  assert.ok(lateNightDart.includes('UndercoverSpeakeasyImproviserRig'));
+  assert.ok(lateNightDart.includes('Matrix4.identity()'));
+  assert.ok(feedDart.includes('RuthlessCastingDirectorRig'));
+  assert.ok(judgingDart.includes('RuthlessCastingDirectorRig'));
+  assert.ok(settingsDart.includes('DuetRivalsSplitPortraitRig'));
+  assert.ok(lobbyDart.includes('DuetRivalsSplitPortraitRig'));
+
+  // 2. Director's Call Sheet 2.5D Animated Headers & Dedicated Mode Sub-Pages
+  assert.ok(settingsDart.includes('_openDedicatedModeSubPage'));
+  assert.ok(settingsDart.includes('_buildCallSheet25DHeaderBanner'));
+  assert.ok(settingsDart.includes('DEDICATED MODE PAGE & OFFICIAL RULES'));
+
+  // 3. Interactive 7-Mode Scene-Editing Rulebook with Tabs & Tables
+  assert.ok(instructionsDart.includes('EDITING BAY & RULEBOOK'));
+  assert.ok(instructionsDart.includes('OFFICIAL RULES, WEIGHTS & MULTIPLIER TABLE'));
+  assert.ok(instructionsDart.includes('_buildStructuredRulesTable'));
+  assert.ok(instructionsDart.includes('_launchModeFromRulebook'));
+
+  // 4. 50 New Uncensored Rated-R / TV-MA 18+ Midnight Speakeasy Scenes (ln_11..ln_60)
+  for (let i = 11; i <= 60; i++) {
+    const id = `ln_${String(i).padStart(2, '0')}`;
+    assert.ok(
+      raunchyScenesDart.includes(`id: '${id}'`),
+      `Expected late_night_raunchy_scenes.dart to include ${id}`
+    );
+  }
+  assert.ok(catalogDart.includes('...kFiftyNewRatedRSpeakeasyScenes'));
+
+  // 5. Video 1-4 Fixes (Intro video logo suppression, Green Room Room Code title, Permission-synced Pre-Roll, 15s Curveball, 30s Auto-Cut, CUT & JUDGE pill, 1200ms delayed replay, Scorecard FACIAL/VOCAL/CUE labels)
+  assert.ok(introDart.includes('if (!_isVideoReady)'));
+  assert.ok(lobbyDart.includes("'GREEN ROOM · #${activeSession.roomCode}'"));
+  assert.ok(webrtcDart.includes('_initializeStageAfterPermissions'));
+  assert.ok(webrtcDart.includes('CUT & JUDGE'));
+  assert.ok(judgingDart.includes('formattedScoringTierBadge'));
+  assert.ok(matchHistoryDart.includes('FACIAL'));
+  assert.ok(matchHistoryDart.includes('VOCAL'));
+  assert.ok(matchHistoryDart.includes('CUE'));
+});
+

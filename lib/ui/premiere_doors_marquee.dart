@@ -455,10 +455,6 @@ class BespokePremiereDoorsList {
     VoidCallback? onCuttingRoomElevatorTap,
   }) {
     return [
-      _buildPersistentFirstPersonArchetypeCrowdBar(phase: phase),
-      const SizedBox(height: 16),
-      const Living25DHeroCharactersTrioSection(),
-      const SizedBox(height: 18),
       Interactive3DDoorCard(
         scrollController: scrollController,
         index: 0,

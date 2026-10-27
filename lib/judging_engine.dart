@@ -23,6 +23,8 @@ import 'ui/game_settings_modal.dart';
 import 'ui/intro_cinematic.dart';
 import 'ui/match_finalization_screen.dart';
 import 'ui/opening_maestro_hero.dart';
+import 'ui/red_carpet_25d_parallax.dart';
+import 'ui/soundstage_audio_controller.dart';
 import 'ui/tutorial_overlay.dart';
 import 'auth/auth_service.dart';
 
@@ -121,6 +123,21 @@ class AiTelemetricsReport {
     this.facialMicroExpressions = const <FacialMicroExpressionTelemetry>[],
     this.vocalProsodyShifts = const <VocalProsodyShiftTelemetry>[],
   });
+
+  String get formattedScoringTierBadge {
+    switch (scoringTier) {
+      case '90-100_OSCAR_LEVEL':
+        return 'STANDING OVATION TIER';
+      case '70-89_AVERAGE_ATTEMPT':
+        return 'WORKING ACTOR CALLBACK TIER';
+      case '50-69_FLAT_DELIVERY':
+        return 'ENSEMBLE REHEARSAL TIER';
+      case '0-49_LOW_ENERGY_OR_MISSED_CUE':
+        return 'MISSED CUE / STUDIO RETAKE TIER';
+      default:
+        return scoringTier.replaceAll('_', ' ');
+    }
+  }
 
   factory AiTelemetricsReport.fromJson(Map<String, dynamic> json) {
     final facial =
@@ -1116,6 +1133,8 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   bool _isPlaying = true;
   bool _isMuted = false;
   bool _lifeImprovRewardClaimed = false;
+  bool _expandedDirectorTelemetryReceipt = true;
+  bool _directorMegaphoneReadingAloud = false;
 
   ScenePrompt get _scene =>
       widget.lobbySession.activeScene ??
@@ -1192,13 +1211,17 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
         videoUrl: _engine.supabaseLoopUrl,
       );
     });
-    _engine.uploadAndStartSupabaseVideoLoop(
-      roomCode: widget.lobbySession.roomCode,
-      userId: widget.performerUserId,
-      roundNumber: widget.lobbySession.roundNumber,
-      localFilePath: widget.localRecordedVideoPath,
-      recordedMp4Bytes: widget.recordedMp4Bytes,
-    );
+    // Delay recorded video/voice loop playback by 1200ms so it never clashes with the 1.2s award fanfare sting
+    Future<void>.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      _engine.uploadAndStartSupabaseVideoLoop(
+        roomCode: widget.lobbySession.roomCode,
+        userId: widget.performerUserId,
+        roundNumber: widget.lobbySession.roundNumber,
+        localFilePath: widget.localRecordedVideoPath,
+        recordedMp4Bytes: widget.recordedMp4Bytes,
+      );
+    });
   }
 
   Future<void> _playOneShotVerdictSting() async {
@@ -1387,58 +1410,27 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                       ),
                     ),
                   Positioned(
-                    top: 12,
+                    top: 10,
                     left: 12,
-                    right: 12,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black87,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'VIDEO LOOP · AUTO-REPLAY ENABLED',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 10,
-                              color: Color(0xFF10B981),
-                            ),
-                          ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xCC05070B),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF10B981)),
+                      ),
+                      child: const Text(
+                        'VIDEO LOOP · AUTO-REPLAY ENABLED',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF10B981),
                         ),
-                        const SizedBox(height: 6),
-                        // Fixture #2: Millisecond AI Receipt Overlays on Video Loop
-                        for (final receipt in _engine.millisecondReceiptStamps)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 4),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xD905070B),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xFFFFD700),
-                                width: 1.2,
-                              ),
-                            ),
-                            child: Text(
-                              receipt,
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFFF5DEB3),
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
                     ),
                   ),
                   Positioned(
@@ -1529,7 +1521,45 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            // Millisecond AI Receipt Strip placed cleanly below the VIDEO LOOP so the actor's face is 100% unobstructed
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xEB0B0E17),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFD700), width: 1.4),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '⏱️ MILLISECOND AI TELEMETRY STAMPS (UNOBSTRUCTED REPLAY RECEIPT)',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  for (final receipt in _engine.millisecondReceiptStamps)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        receipt,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFF5DEB3),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -1580,7 +1610,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                       'Facial: ${report.facialExpressionScore.toStringAsFixed(0)} · '
                       'Vocal: ${report.vocalCadenceScore.toStringAsFixed(0)} · '
                       'Cue Fidelity: ${report.directorCueFidelity.toStringAsFixed(0)} · '
-                      'Tier: ${report.scoringTier}',
+                      'Tier: ${report.formattedScoringTierBadge}',
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
@@ -1589,8 +1619,9 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                     ),
                     const SizedBox(height: 12),
                     _buildCellShadedDirectorCritiqueCard(report.directorCritique),
-                    if (report.facialMicroExpressions.isNotEmpty ||
-                        report.vocalProsodyShifts.isNotEmpty) ...[
+                    if (_expandedDirectorTelemetryReceipt &&
+                        (report.facialMicroExpressions.isNotEmpty ||
+                            report.vocalProsodyShifts.isNotEmpty)) ...[
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -2496,75 +2527,125 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   }
 
   Widget _buildCellShadedDirectorCritiqueCard(String critique) {
-    final directorArchetype = resolveAvatarArchetype('the_director');
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B0E17),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFF05070B),
-          width: 2.8,
-        ),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0xFF05070B),
-            offset: Offset(4, 4),
-            blurRadius: 0,
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        SoundstageAudioController.instance.playVerdictFanfare();
+        setState(() {
+          _directorMegaphoneReadingAloud = true;
+          _expandedDirectorTelemetryReceipt =
+              !_expandedDirectorTelemetryReceipt;
+        });
+        Future<void>.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() => _directorMegaphoneReadingAloud = false);
+          }
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B0E17),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _directorMegaphoneReadingAloud
+                ? const Color(0xFFFFD700)
+                : const Color(0xFF05070B),
+            width: 2.8,
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: BoondocksAvatarPortrait(
-              archetype: directorArchetype,
-              size: 62,
-              isSelected: true,
-              animationPhase: 0.0,
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0xFF05070B),
+              offset: Offset(4, 4),
+              blurRadius: 0,
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0x26FFD700),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(color: const Color(0xFFFFD700)),
-                  ),
-                  child: const Text(
-                    'THE DIRECTOR · MEGAPHONE VERDICT',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFFFD700),
+                SizedBox(
+                  width: 108,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: const RuthlessCastingDirectorRig(
+                      phase: 0.42,
+                      height: 112,
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '"$critique"',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    height: 1.45,
-                    color: Colors.white,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0x26FFD700),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: const Color(0xFFFFD700)),
+                        ),
+                        child: Text(
+                          _directorMegaphoneReadingAloud
+                              ? '🔊 READING ALOUD · CASTING DIRECTOR CALLBACK'
+                              : '🎬 THE RUTHLESS CASTING DIRECTOR · TAP FOR TTS & RECEIPT',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFFD700),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '"$critique"',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1.45,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            _expandedDirectorTelemetryReceipt
+                                ? Icons.expand_less_rounded
+                                : Icons.expand_more_rounded,
+                            size: 16,
+                            color: const Color(0xFF0CB6D4),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _expandedDirectorTelemetryReceipt
+                                ? 'Tap card to speak callback & collapse ms telemetry'
+                                : 'Tap card to speak callback & expand ms telemetry',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0CB6D4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

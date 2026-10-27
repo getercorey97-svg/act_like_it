@@ -19,6 +19,8 @@ import 'auth/auth_service.dart';
 import 'ui/intro_cinematic.dart';
 import 'ui/transitions.dart';
 import 'ui/parody_scenes_catalog.dart';
+import 'ui/red_carpet_25d_parallax.dart';
+import 'ui/soundstage_audio_controller.dart';
 import 'social/cutting_room_feed.dart';
 
 enum SfuParticipantRole {
@@ -723,8 +725,16 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
 
   // Pre-Roll Countdown State (10s -> 0s)
   bool _isPreRolling = true;
+  bool _permissionsResolvedForPreRoll = false;
   int _preRollSecondsLeft = 10;
   Timer? _preRollTimer;
+
+  // Stage FX & AI Co-Star Vocal State
+  bool _paparazziFrenzyActive = false;
+  bool _velvetCarpetVignetteActive = false;
+  bool _coStarLeadBSpoken = false;
+  bool _coStarSpeakingNow = false;
+  bool _autoCutTriggeredAt30s = false;
 
   // VU Meter Dynamic Dancing Animation
   Timer? _vuModulationTimer;
@@ -744,7 +754,13 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     _stageManager = WebRtcStageManager();
     _stageManager.addListener(_onStageUpdated);
 
-    _stageManager.connectToSfuStage(
+    _initializeStageAfterPermissions();
+    _bindSpectatorHypeRealtimeChannel();
+    _startVuMeterModulation();
+  }
+
+  Future<void> _initializeStageAfterPermissions() async {
+    await _stageManager.connectToSfuStage(
       roomName: widget.lobbySession.livekitRoomName,
       participantIdentity: widget.localUserId,
       participantName: widget.localDisplayName,
@@ -752,10 +768,11 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
       targetEmotion: widget.lobbySession.activeScene?.emotionalTarget ??
           'Dramatic Intensity',
     );
-
-    _bindSpectatorHypeRealtimeChannel();
+    if (!mounted) return;
+    setState(() {
+      _permissionsResolvedForPreRoll = true;
+    });
     _startPreRollCountdown();
-    _startVuMeterModulation();
   }
 
   void _bindSpectatorHypeRealtimeChannel() {
@@ -851,13 +868,22 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     _preRollTimer?.cancel();
     _preRollSecondsLeft = 10;
     _isPreRolling = true;
+    _autoCutTriggeredAt30s = false;
+    _coStarLeadBSpoken = false;
+    _coStarSpeakingNow = false;
 
     _preRollTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
+      if (!_permissionsResolvedForPreRoll && _stageManager.isConnecting) {
+        return;
+      }
       if (_preRollSecondsLeft <= 1) {
         _skipPreRollAndRollCamera();
       } else {
         HapticFeedback.selectionClick();
+        SoundstageAudioController.instance.playCountdownTick(
+          finalBeat: _preRollSecondsLeft <= 3,
+        );
         setState(() {
           _preRollSecondsLeft -= 1;
         });
@@ -870,6 +896,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     _preRollTimer = null;
     if (!_isPreRolling) return;
     HapticFeedback.heavyImpact();
+    SoundstageAudioController.instance.playClapperSnap();
     setState(() {
       _isPreRolling = false;
       _preRollSecondsLeft = 0;
@@ -937,6 +964,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   void _triggerImprovTwist() {
     if (_improvTwistTriggered) return;
     HapticFeedback.heavyImpact();
+    SoundstageAudioController.instance.playCurveballSiren();
     Future<void>.delayed(const Duration(milliseconds: 120), () {
       HapticFeedback.mediumImpact();
     });
@@ -954,15 +982,87 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     _triggerPersonaCutIn('⚡ CURVEBALL ACTIVE · +150 METHOD STREAK');
   }
 
+  void _triggerCoStarLeadBDelivery() {
+    if (_coStarSpeakingNow) return;
+    _coStarLeadBSpoken = true;
+    setState(() {
+      _coStarSpeakingNow = true;
+    });
+    SoundstageAudioController.instance.playSelectSweep();
+    Future<void>.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _coStarSpeakingNow = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _finishTakeAndNavigateToVerdict() async {
+    if (_stageManager.isFinishingTake || !mounted) return;
+    _autoCutTriggeredAt30s = true;
+    SoundstageAudioController.instance.playClapperSnap();
+    final samplesSnapshot = List<TelemetricsFrameSample>.from(
+      _stageManager.capturedSamples,
+    );
+    final hadImprovTwist = _improvTwistTriggered;
+    final hadCharacterBroken = _characterBrokenTriggered;
+    final hadCrowdCombo = _standingOvationComboActive;
+    final recorded = await _stageManager.finishRecordingTake();
+    if (!mounted) return;
+    await BespokeTransitionEngine.navigate<void>(
+      context: context,
+      type: BespokeTransitionType.vintageFlashbulbPop,
+      destination: TriModalJudgingScreen(
+        lobbySession: widget.lobbySession,
+        performerUserId: widget.localUserId,
+        performerDisplayName: widget.localDisplayName,
+        capturedSamples: samplesSnapshot,
+        localRecordedVideoPath: recorded.filePath,
+        recordedMp4Bytes: recorded.bytes,
+        improvTwistCompleted: hadImprovTwist,
+        characterBrokenPenalty: hadCharacterBroken,
+        standingOvationCrowdCombo: hadCrowdCombo,
+        currentPlayerIndex: widget.lobbySession.currentPlayerIndex,
+        totalLocalPlayers: math.max(
+          widget.lobbySession.totalLocalPlayers,
+          widget.lobbySession.players.length,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _improvTwistTriggered = false;
+      _activeImprovTwistPrompt = null;
+      _characterBrokenTriggered = false;
+      _standingOvationComboActive = false;
+      _autoCutTriggeredAt30s = false;
+      _coStarLeadBSpoken = false;
+      _coStarSpeakingNow = false;
+    });
+    _startPreRollCountdown();
+    await _stageManager.resumeStageAfterJudging(
+      targetEmotion:
+          widget.lobbySession.activeScene?.emotionalTarget ?? 'Dramatic Intensity',
+    );
+  }
+
   void _onStageUpdated() {
     if (!mounted) return;
     final elapsed = _stageManager.performanceElapsedSeconds;
+    // Trigger AI Co-Star Lead B vocal cue at 12s in Duet Mode
+    if (_duetModeEnabled &&
+        _stageManager.isRecordingTake &&
+        !_coStarLeadBSpoken &&
+        elapsed >= 12) {
+      _triggerCoStarLeadBDelivery();
+    }
+    // Fire 15s Director Curveball banner at Take: 15s
     if (GameSettingsModal.latestConfig.improvRouletteWildcard &&
         !_improvTwistTriggered &&
         _stageManager.isRecordingTake &&
-        elapsed >= 5) {
+        elapsed >= 15) {
       _triggerImprovTwist();
-      return;
     }
     // Fixture #5: 10s sustained vocal energy triggers 1.2s Boondocks Persona Cut-In
     if (_stageManager.isRecordingTake &&
@@ -991,6 +1091,14 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         _activeImprovTwistPrompt =
             '15s HAPTIC ESCALATION: ${dare.escalationAt15s}';
       });
+    }
+    // Auto-Cut at 30s and transition directly to Tri-Modal Verdict Screen
+    if (_stageManager.isRecordingTake &&
+        !_stageManager.isFinishingTake &&
+        !_autoCutTriggeredAt30s &&
+        elapsed >= 30) {
+      unawaited(_finishTakeAndNavigateToVerdict());
+      return;
     }
     setState(() {});
   }
@@ -1585,10 +1693,113 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                 ),
               ),
             ),
+          // Velvet Carpet Stage Vignette & Spotlight Sweep FX
+          if (_velvetCarpetVignetteActive && !_stealthDimmedHudMode)
+            IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 0.92,
+                    colors: [
+                      Colors.transparent,
+                      const Color(0x66E11D48),
+                      const Color(0xAA3B0412),
+                    ],
+                    stops: const [0.55, 0.85, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          // Blinding Paparazzi Flash Frenzy Burst FX
+          if (_paparazziFrenzyActive && !_stealthDimmedHudMode)
+            IgnorePointer(
+              child: Container(
+                color: const Color(0x88FFFBEB),
+                alignment: Alignment.topCenter,
+                padding: const EdgeInsets.only(top: 84),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xEB05070B),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFFFD700), width: 2),
+                  ),
+                  child: const Text(
+                    '📸 PAPARAZZI FLASH FRENZY · SHUTTER BURST ACTIVE!',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face — shown once recording starts)
           if (scene != null && !_isPreRolling && !_stealthDimmedHudMode)
             _buildTeleprompterOverlay(scene),
-          // 10-Second Pre-Roll Semi-Transparent Clapperboard Overlay
+          // Floating "⏹️ CUT & JUDGE" Pill directly on STAGE tab during active take
+          if (!_isPreRolling && !_stealthDimmedHudMode)
+            Positioned(
+              top: 44,
+              left: 12,
+              child: GestureDetector(
+                onTap: _stageManager.isFinishingTake
+                    ? null
+                    : () => _finishTakeAndNavigateToVerdict(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE11D48), Color(0xFF9F1239)],
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 1.8,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0xAA05070B),
+                        offset: Offset(2, 2),
+                        blurRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.stop_circle_rounded,
+                        size: 15,
+                        color: Color(0xFFFFD700),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _stageManager.isFinishingTake
+                            ? 'CUTTING...'
+                            : '⏹️ CUT & JUDGE (${30 - _stageManager.performanceElapsedSeconds.clamp(0, 30)}s)',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          // 10-Second Pre-Roll Compact Top/Bottom HUD Overlay (Leaves 80%+ center viewfinder completely unobstructed)
           if (_isPreRolling && !_stealthDimmedHudMode)
             _buildPreRollClapperboardOverlay(scene),
         ],
@@ -1855,6 +2066,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                 ),
               ),
             ],
+              const SizedBox(height: 16),
+            _buildStageParallaxFlanksFxDeck(),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
@@ -2052,8 +2265,193 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
             }),
             const SizedBox(height: 8),
             _buildSpectatorStrip(),
+            const SizedBox(height: 12),
+            _buildStageParallaxFlanksFxDeck(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStageParallaxFlanksFxDeck() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111624),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD700), width: 1.6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_motion_rounded,
+                color: Color(0xFFFFD700),
+                size: 16,
+              ),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '2.5D RED CARPET STAGE FX DECK · TAP TO TRIGGER ON STAGE',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    SoundstageAudioController.instance.playPaparazziFlashBurst();
+                    setState(() {
+                      _paparazziFrenzyActive = true;
+                      _latestReactionBanner =
+                          '📸 LEFT FLANK · PAPARAZZI FLASH FRENZY TRIGGERED!';
+                      _latestReactionColor = const Color(0xFFFFD700);
+                    });
+                    Future<void>.delayed(const Duration(milliseconds: 650), () {
+                      if (mounted) {
+                        setState(() => _paparazziFrenzyActive = false);
+                      }
+                    });
+                  },
+                  child: Column(
+                    children: [
+                      const LeftFlankPaparazziDuoRig(phase: 0.3, height: 92),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF07090E),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFFD700)),
+                        ),
+                        child: const Text(
+                          '📸 PAPARAZZI BURST',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFFD700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    SoundstageAudioController.instance.playCurtainSwish();
+                    setState(() {
+                      _velvetCarpetVignetteActive =
+                          !_velvetCarpetVignetteActive;
+                      _latestReactionBanner = _velvetCarpetVignetteActive
+                          ? '🎬 POV · 3D VELVET CARPET VIGNETTE & SPOTLIGHT ON!'
+                          : '🎬 POV · VELVET CARPET VIGNETTE OFF';
+                      _latestReactionColor = const Color(0xFFE11D48);
+                    });
+                  },
+                  child: Column(
+                    children: [
+                      const FirstPersonRedCarpetPovCardRig(
+                        phase: 0.5,
+                        height: 92,
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _velvetCarpetVignetteActive
+                              ? const Color(0x33E11D48)
+                              : const Color(0xFF07090E),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFE11D48)),
+                        ),
+                        child: Text(
+                          _velvetCarpetVignetteActive
+                              ? '🎬 VIGNETTE ON'
+                              : '🎬 VELVET POV',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFF5DEB3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    SoundstageAudioController.instance.playCrowdOvation();
+                    _applyStageHypeReaction(
+                      kind: 'rose',
+                      senderName: 'VIP ENTOURAGE',
+                    );
+                    _applyStageHypeReaction(
+                      kind: 'ovation',
+                      senderName: 'VIP ENTOURAGE',
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      const RightFlankVipEntourageRig(phase: 0.7, height: 92),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF07090E),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF0CB6D4)),
+                        ),
+                        child: const Text(
+                          '🌹 VIP HYPE SHOWER',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0CB6D4),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -2176,128 +2574,138 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         ? '3... 2... 1... ACTION!'
         : (isFinalThree
             ? 'CLAPPERBOARD READY · $_preRollSecondsLeft...'
-            : 'DIRECTOR\'S 10s PRE-ROLL · FRAME YOUR SHOT');
+            : 'DIRECTOR\'S 10s PRE-ROLL · FRAME YOUR SHOT (80% CLEAR VIEW)');
 
-    return Container(
-      // Semi-transparent 35% backdrop so the live camera feed stays visible
-      color: Colors.black.withValues(alpha: 0.35),
-      padding: const EdgeInsets.all(20),
-      child: Center(
+    // Compact lower-third HUD card so 80%+ of the center camera viewfinder stays completely unobstructed
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xEB0B0E17),
-            borderRadius: BorderRadius.circular(20),
+            color: const Color(0xD90B0E17),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: const Color(0xFF05070B),
-              width: 4.0,
+              color: isFinalThree
+                  ? const Color(0xFFE11D48)
+                  : const Color(0xFFFFD700),
+              width: 2.4,
             ),
-            boxShadow: <BoxShadow>[
-              const BoxShadow(
-                color: Color(0xFF05070B),
-                offset: Offset(6, 6),
-                blurRadius: 0,
-              ),
+            boxShadow: const <BoxShadow>[
               BoxShadow(
-                color: (isFinalThree
-                        ? const Color(0xFFE11D48)
-                        : const Color(0xFFFFD700))
-                    .withValues(alpha: 0.35),
-                blurRadius: 24,
+                color: Color(0xFF05070B),
+                offset: Offset(4, 4),
+                blurRadius: 0,
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isFinalThree
-                      ? const Color(0x33E11D48)
-                      : const Color(0x3306B6D4),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isFinalThree
-                        ? const Color(0xFFE11D48)
-                        : const Color(0xFF06B6D4),
-                    width: 1.8,
-                  ),
-                ),
-                child: Text(
-                  countdownHeadline,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                    color: isFinalThree
-                        ? const Color(0xFFFFD700)
-                        : const Color(0xFF06B6D4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _preRollSecondsLeft <= 1 ? 'ACTION!' : '$_preRollSecondsLeft',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: _preRollSecondsLeft <= 1 ? 52 : 64,
-                  fontWeight: FontWeight.w900,
-                  color: isFinalThree
-                      ? const Color(0xFFE11D48)
-                      : const Color(0xFFFFD700),
-                  shadows: const [
-                    Shadow(
-                      color: Color(0xFF05070B),
-                      offset: Offset(4, 4),
-                      blurRadius: 0,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                    Shadow(color: Color(0xFFF59E0B), blurRadius: 28),
-                  ],
-                ),
+                    decoration: BoxDecoration(
+                      color: isFinalThree
+                          ? const Color(0x33E11D48)
+                          : const Color(0x3306B6D4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isFinalThree
+                            ? const Color(0xFFE11D48)
+                            : const Color(0xFF06B6D4),
+                        width: 1.8,
+                      ),
+                    ),
+                    child: Text(
+                      _preRollSecondsLeft <= 1
+                          ? 'ACTION!'
+                          : '${_preRollSecondsLeft}s',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: isFinalThree
+                            ? const Color(0xFFE11D48)
+                            : const Color(0xFFFFD700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          countdownHeadline,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: isFinalThree
+                                ? const Color(0xFFFFD700)
+                                : const Color(0xFF06B6D4),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          scene != null
+                              ? 'Scene: "${scene.title}" · ${scene.characterName}'
+                              : 'Preparing Soundstage...',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        if (scene != null)
+                          Text(
+                            'Cue: ${scene.directorCue}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
-              Text(
-                scene != null
-                    ? 'Scene: "${scene.title}" · ${scene.characterName}'
-                    : 'Preparing Soundstage...',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                scene != null ? 'Cue: ${scene.directorCue}' : '',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFFFD700),
-                  side: const BorderSide(color: Color(0xFFFFD700), width: 2.0),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFD700),
+                    side: const BorderSide(
+                      color: Color(0xFFFFD700),
+                      width: 1.8,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
                   ),
-                ),
-                onPressed: _skipPreRollAndRollCamera,
-                icon: const Icon(Icons.fast_forward_rounded, size: 18),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'SNAP CLAPPERBOARD & ROLL CAMERA (30s TAKE)',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.w900,
+                  onPressed: _skipPreRollAndRollCamera,
+                  icon: const Icon(Icons.fast_forward_rounded, size: 17),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'SNAP CLAPPERBOARD & ROLL CAMERA (30s TAKE)',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
@@ -2492,33 +2900,67 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                         ],
                       ),
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          BoondocksCharacterRig(
-                            archetype: coStarArchetype,
-                            size: 108,
-                            isSelected: true,
-                            externalPhase: animPhase,
-                          ),
-                          const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                coStarName,
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0CB6D4),
+                    child: GestureDetector(
+                      onTap: _triggerCoStarLeadBDelivery,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            BoondocksCharacterRig(
+                              archetype: coStarArchetype,
+                              size: 108,
+                              isSelected: true,
+                              externalPhase: _coStarSpeakingNow
+                                  ? animPhase * 2.4
+                                  : animPhase,
+                            ),
+                            const SizedBox(height: 6),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  coStarName,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0CB6D4),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _coStarSpeakingNow
+                                    ? const Color(0x330CB6D4)
+                                    : const Color(0x8805070B),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: _coStarSpeakingNow
+                                      ? const Color(0xFFFFD700)
+                                      : const Color(0xFF0CB6D4),
+                                ),
+                              ),
+                              child: Text(
+                                _coStarSpeakingNow
+                                    ? '🔊 AI CO-STAR DELIVERING LEAD B LINE...'
+                                    : '🔊 TAP OR HIT 12s FOR AI CO-STAR VOICE CUE',
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 7.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -3014,50 +3456,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           ),
           onPressed: _stageManager.isFinishingTake
               ? null
-              : () async {
-                  final samplesSnapshot = List<TelemetricsFrameSample>.from(
-                    _stageManager.capturedSamples,
-                  );
-                  final hadImprovTwist = _improvTwistTriggered;
-                  final hadCharacterBroken = _characterBrokenTriggered;
-                  final hadCrowdCombo = _standingOvationComboActive;
-                  final recorded = await _stageManager.finishRecordingTake();
-                  if (!mounted) return;
-                  await BespokeTransitionEngine.navigate<void>(
-                    context: context,
-                    type: BespokeTransitionType.vintageFlashbulbPop,
-                    destination: TriModalJudgingScreen(
-                      lobbySession: widget.lobbySession,
-                      performerUserId: widget.localUserId,
-                      performerDisplayName: widget.localDisplayName,
-                      capturedSamples: samplesSnapshot,
-                      localRecordedVideoPath: recorded.filePath,
-                      recordedMp4Bytes: recorded.bytes,
-                      improvTwistCompleted: hadImprovTwist,
-                      characterBrokenPenalty: hadCharacterBroken,
-                      standingOvationCrowdCombo: hadCrowdCombo,
-                      currentPlayerIndex:
-                          widget.lobbySession.currentPlayerIndex,
-                      totalLocalPlayers: math.max(
-                        widget.lobbySession.totalLocalPlayers,
-                        widget.lobbySession.players.length,
-                      ),
-                    ),
-                  );
-                  if (!mounted) return;
-                  setState(() {
-                    _improvTwistTriggered = false;
-                    _activeImprovTwistPrompt = null;
-                    _characterBrokenTriggered = false;
-                    _standingOvationComboActive = false;
-                  });
-                  _startPreRollCountdown();
-                  await _stageManager.resumeStageAfterJudging(
-                    targetEmotion:
-                        widget.lobbySession.activeScene?.emotionalTarget ??
-                            'Dramatic Intensity',
-                  );
-                },
+              : () => _finishTakeAndNavigateToVerdict(),
           icon: const Icon(Icons.movie_filter_rounded, size: 17),
           label: Text(
             _stageManager.isFinishingTake

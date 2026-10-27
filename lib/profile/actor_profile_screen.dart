@@ -10,6 +10,7 @@ import '../monetization/payment_dashboard_screen.dart';
 import '../offline_manager.dart';
 import '../ui/boondocks_character_rig.dart';
 import '../ui/game_app_bar.dart';
+import '../ui/red_carpet_25d_parallax.dart';
 import '../ui/soundstage_audio_controller.dart';
 
 /// PART 2: Actor Profile Page & Multi-Profile Account Switcher
@@ -58,6 +59,9 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
   late TextEditingController _handleCtrl;
   late TextEditingController _birthYearCtrl;
   bool _isEditingIdentity = false;
+  String _selectedStageEntranceFx = 'LEFT FLANK · PAPARAZZI DUO';
+  double _fxFrenzyPulse = 0.35;
+  bool _velvetVignetteActive = true;
 
   @override
   void initState() {
@@ -954,6 +958,10 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
           ),
 
           const SizedBox(height: 16),
+          _buildStageEntranceAndCrowdFxSelector(
+            resolveAvatarArchetype(profile.avatarArchetypeId),
+          ),
+          const SizedBox(height: 16),
 
           // Fixture #9 & #15: 5-Tier Character Mastery Track & Undercover Legend Frame
           Builder(
@@ -1370,4 +1378,266 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
       ),
     );
   }
+
+  Widget _buildStageEntranceAndCrowdFxSelector(AvatarArchetype archetype) {
+    final cards = <({
+      String id,
+      String badge,
+      String title,
+      String subtitle,
+      Color accent,
+      Widget rig,
+      VoidCallback onActivate,
+    })>[
+      (
+        id: 'paparazzi_frenzy',
+        badge: 'LEFT FLANK · PAPARAZZI DUO',
+        title: 'Paparazzi Flash Frenzy Entrance',
+        subtitle:
+            'Tap to trigger an immediate blinding Paparazzi Flash Frenzy + shutter burst & equip as your Stage Entrance.',
+        accent: const Color(0xFFFFD700),
+        rig: const LeftFlankPaparazziDuoRig(
+          phase: 0.35,
+          height: 112,
+        ),
+        onActivate: () {
+          HapticFeedback.heavyImpact();
+          SoundstageAudioController.instance.playPaparazziFlashBurst();
+          setState(() {
+            _selectedStageEntranceFx = 'paparazzi_frenzy';
+            _fxFrenzyPulse = true;
+          });
+          Future<void>.delayed(const Duration(milliseconds: 520), () {
+            if (mounted) {
+              setState(() => _fxFrenzyPulse = false);
+            }
+          });
+        },
+      ),
+      (
+        id: 'velvet_carpet_pov',
+        badge: 'POV · RED CARPET RUNNER',
+        title: '3D Velvet Carpet Vignette & Spotlight Sweep',
+        subtitle:
+            'Tap to toggle the 3D Velvet Carpet stage vignette and Hollywood searchlight sweep around your dressing room mirror.',
+        accent: const Color(0xFFE11D48),
+        rig: const FirstPersonRedCarpetPovCardRig(
+          phase: 0.5,
+          height: 112,
+        ),
+        onActivate: () {
+          HapticFeedback.mediumImpact();
+          SoundstageAudioController.instance.playCurtainSwish();
+          setState(() {
+            _selectedStageEntranceFx = 'velvet_carpet_pov';
+            _velvetVignetteActive = !_velvetVignetteActive;
+          });
+        },
+      ),
+      (
+        id: 'vip_hype_entourage',
+        badge: 'RIGHT FLANK · VIP HYPE',
+        title: 'VIP Entourage Cheering & Golden Rose Shower',
+        subtitle:
+            'Tap to fire a live VIP Entourage cheering burst + Golden Rose shower on stage.',
+        accent: const Color(0xFF0CB6D4),
+        rig: const RightFlankVipEntourageRig(
+          phase: 0.65,
+          height: 112,
+        ),
+        onActivate: () {
+          HapticFeedback.heavyImpact();
+          SoundstageAudioController.instance.playCrowdOvation();
+          setState(() {
+            _selectedStageEntranceFx = 'vip_hype_entourage';
+          });
+        },
+      ),
+    ];
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _fxFrenzyPulse
+            ? const Color(0xFF282112)
+            : (_velvetVignetteActive
+                ? const Color(0xFF1A0710)
+                : const Color(0xEB0B0E17)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _fxFrenzyPulse
+              ? const Color(0xFFFFD700)
+              : (_velvetVignetteActive
+                  ? const Color(0xFFE11D48)
+                  : archetype.rimAccentColor),
+          width: 2.2,
+        ),
+        boxShadow: [
+          if (_fxFrenzyPulse)
+            const BoxShadow(
+              color: Color(0xAAFFD700),
+              blurRadius: 24,
+              spreadRadius: 3,
+            ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome_motion_rounded,
+                color: Color(0xFFFFD700),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'STAGE ENTRANCE & CROWD FX SELECTOR · 2.5D PARALLAX RIGS',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
+              ),
+              if (_velvetVignetteActive)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x33E11D48),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFE11D48)),
+                  ),
+                  child: const Text(
+                    'VELVET VIGNETTE ON',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFF5DEB3),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Tap any 2.5D Red Carpet Flank Card below to preview its live audio/visual stage burst and equip your signature soundstage entrance:',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: Color(0xFFCBD5E1),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final item in cards) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: GestureDetector(
+                onTap: item.onActivate,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _selectedStageEntranceFx == item.id
+                        ? item.accent.withValues(alpha: 0.14)
+                        : const Color(0xFF07090E),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _selectedStageEntranceFx == item.id
+                          ? item.accent
+                          : const Color(0xFF1E293B),
+                      width: _selectedStageEntranceFx == item.id ? 2.2 : 1.3,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 112,
+                        height: 88,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: item.rig,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.badge,
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: item.accent,
+                                    ),
+                                  ),
+                                ),
+                                if (_selectedStageEntranceFx == item.id)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: item.accent,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'EQUIPPED',
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF05070B),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              item.subtitle,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
+

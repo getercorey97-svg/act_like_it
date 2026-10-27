@@ -1234,34 +1234,36 @@ class BespokeTransitionAudioSynthesizer {
       return _cachedFlashbulbPopWhineWav!;
     }
     const int sampleRate = 22050;
-    const double durationSec = 0.72;
+    const double durationSec = 0.58;
     final int numSamples = (sampleRate * durationSec).round();
     final samples = Int16List(numSamples);
     final rng = math.Random(77);
 
-    double whinePhase = 0.0;
     for (int i = 0; i < numSamples; i++) {
       final t = i / sampleRate;
       double signal = 0.0;
 
-      // 0.0s - 0.14s: Vintage flashbulb filament "POP!"
-      if (t < 0.16) {
-        final popEnv = math.exp(-t * 36.0);
-        final popThump = math.sin(2 * math.pi * (420.0 - t * 1800.0) * t) * 0.55;
-        final popSnap = (rng.nextDouble() * 2.0 - 1.0) * 0.50;
-        signal += (popThump + popSnap) * popEnv;
+      // 0.0s - 0.035s: Soft 35ms mechanical DSLR shutter click + brass vault tumbler lock
+      if (t < 0.035) {
+        final clickEnv = math.exp(-t * 95.0);
+        final mirrorBody = math.sin(2 * math.pi * 172.0 * t) * 0.48;
+        final brassTumbler = math.sin(2 * math.pi * 560.0 * t) * 0.24;
+        final softSnap = (rng.nextDouble() * 2.0 - 1.0) * 0.18;
+        signal += (mirrorBody + brassTumbler + softSnap) * clickEnv;
       }
 
-      // 0.06s - 0.72s: Classic press camera capacitor recharge "WHINE" (1.6kHz -> 4.4kHz)
-      if (t >= 0.06) {
-        final dt = (t - 0.06) / 0.66;
-        final instFreq = 1650.0 + 2750.0 * Curves.easeOutQuad.transform(dt.clamp(0.0, 1.0));
-        whinePhase += (2 * math.pi * instFreq) / sampleRate;
-        final whineEnv = math.sin(dt.clamp(0.0, 1.0) * math.pi) * 0.28;
-        signal += math.sin(whinePhase) * whineEnv;
+      // 0.02s - 0.58s: Warm low-pass velvet jazz chord (A3 + C#4 + E4 + G#4, zero high-pitched whine)
+      if (t >= 0.02) {
+        final dt = t - 0.02;
+        final chordEnv = math.exp(-dt * 4.6);
+        final warmChord = math.sin(2 * math.pi * 220.0 * dt) * 0.22 +
+            math.sin(2 * math.pi * 277.18 * dt) * 0.18 +
+            math.sin(2 * math.pi * 329.63 * dt) * 0.15 +
+            math.sin(2 * math.pi * 415.30 * dt) * 0.11;
+        signal += warmChord * chordEnv;
       }
 
-      final pcm = (signal.clamp(-0.95, 0.95) * 32767.0).round();
+      final pcm = (signal.clamp(-0.88, 0.88) * 32767.0).round();
       samples[i] = pcm.clamp(-32768, 32767);
     }
 

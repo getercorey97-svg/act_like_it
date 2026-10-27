@@ -612,13 +612,14 @@ class _HistoryThreeAxisPainter extends CustomPainter {
     if (size.width <= 0 || size.height <= 0) return;
 
     final axes = <(String label, double value, Color color)>[
-      ('FACIAL EMOTION', facialScore.clamp(0.0, 100.0), const Color(0xFFE11D48)),
-      ('VOCAL CADENCE', vocalScore.clamp(0.0, 100.0), const Color(0xFF06B6D4)),
-      ('CUE FIDELITY', cueScore.clamp(0.0, 100.0), const Color(0xFFFFD700)),
+      ('FACIAL', facialScore.clamp(0.0, 100.0), const Color(0xFFE11D48)),
+      ('VOCAL', vocalScore.clamp(0.0, 100.0), const Color(0xFF06B6D4)),
+      ('CUE', cueScore.clamp(0.0, 100.0), const Color(0xFFFFD700)),
     ];
 
-    final barHeight = 14.0;
-    final spacing = (size.height - (axes.length * barHeight)) / (axes.length + 1);
+    const barHeight = 20.0;
+    final spacing =
+        (size.height - (axes.length * barHeight)) / (axes.length + 1);
 
     for (var i = 0; i < axes.length; i++) {
       final item = axes[i];
@@ -644,6 +645,23 @@ class _HistoryThreeAxisPainter extends CustomPainter {
         );
         canvas.drawRRect(fillRRect, fillPaint);
       }
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: ' ${item.$1}: ${item.$2.toStringAsFixed(0)}/100',
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 10.5,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.width - 12);
+      textPainter.paint(
+        canvas,
+        Offset(8, y + (barHeight - textPainter.height) / 2),
+      );
     }
   }
 

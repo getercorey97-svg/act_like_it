@@ -491,25 +491,26 @@ class _CellShadedIntroCinematicScreenState
 
                       const Spacer(),
 
-                      // Lower-Third Signature Brand Logo Climax (t >= 1.2s)
-                      AnimatedScale(
-                        scale: _hasTriggeredLogoClimax ? 1.0 : 0.76,
-                        duration: const Duration(milliseconds: 620),
-                        curve: Curves.elasticOut,
-                        child: AnimatedOpacity(
-                          opacity: _hasTriggeredLogoClimax ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 340),
-                          child: ActLikeItBrandLogo(
-                            heroTag: kActLikeItBrandLogoHeroTag,
-                            height: 158,
-                            subtitle:
-                                'OFFICIAL PREMIERE SOUNDSTAGE · TAP LOGO OR SIGN IN',
-                            onTap: _triggerChoreographedGlideToAuth,
+                      // Lower-Third Signature Brand Logo Climax (only shown in procedural fallback mode so it never overlaps the MP4 video's built-in 3D gold title)
+                      if (!_isVideoReady) ...[
+                        AnimatedScale(
+                          scale: _hasTriggeredLogoClimax ? 1.0 : 0.76,
+                          duration: const Duration(milliseconds: 620),
+                          curve: Curves.elasticOut,
+                          child: AnimatedOpacity(
+                            opacity: _hasTriggeredLogoClimax ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 340),
+                            child: ActLikeItBrandLogo(
+                              heroTag: kActLikeItBrandLogoHeroTag,
+                              height: 158,
+                              subtitle:
+                                  'OFFICIAL PREMIERE SOUNDSTAGE · TAP LOGO OR SIGN IN',
+                              onTap: _triggerChoreographedGlideToAuth,
+                            ),
                           ),
                         ),
-                      ),
-
-                      const SizedBox(height: 10),
+                        const SizedBox(height: 10),
+                      ],
 
                       // Compact 14-Character Red Carpet Spotlight Bar
                       GestureDetector(
