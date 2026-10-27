@@ -150,7 +150,7 @@ const List<InstructionStorySlide> kInstructionStorySlides = [
             'Generate a 6-digit room code in the Green Room or tap "Quick-Join Public Ensemble" to jump straight into an active soundstage.',
       ),
       InstructionHighlightPoint(
-        icon: Icons.couch_rounded,
+        icon: Icons.weekend_rounded,
         heading: '+ Pass & Play & + AI Co-Star Roster Buttons',
         detail:
             'Playing on one phone at a party? Tap "+ Pass & Play" to add local couch actors who take turns on camera, or "+ AI Co-Star" to fill the cast roster.',

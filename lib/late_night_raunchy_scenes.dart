@@ -788,9 +788,9 @@ const List<ScenePrompt> kFiftyNewRatedRSpeakeasyScenes = [
     releaseYear: 2026,
     characterName: 'Unstoppable Ex & Broke Club Promoter',
     promptScript:
-        'Turn the fucking DJ booth down because everyone in VIP needs to hear why Chad\'s credit card just got declined on a $400 tab! You brought me to this club to soft-launch a breakup while wearing a chain I bought you, you audacity-powered clown! Keep the watered-down vodka, I\'m leaving with the promoter and taking the valet ticket, bitch!',
+        'Turn the fucking DJ booth down because everyone in VIP needs to hear why Chad\'s credit card just got declined on a \$400 tab! You brought me to this club to soft-launch a breakup while wearing a chain I bought you, you audacity-powered clown! Keep the watered-down vodka, I\'m leaving with the promoter and taking the valet ticket, bitch!',
     duetLeadA:
-        'Turn the fucking music down—everyone in VIP needs to hear how your card just declined on a $400 bottle tab!',
+        'Turn the fucking music down—everyone in VIP needs to hear how your card just declined on a \$400 bottle tab!',
     duetLeadB:
         'Wait—it was a fraud alert because I bought these fake veneers! Don\'t leave with the DJ, give me the valet ticket!',
     directorCue:
@@ -1028,7 +1028,7 @@ const List<ScenePrompt> kFiftyNewRatedRSpeakeasyScenes = [
         'Part two imaginary fur coats and react to catching your friend red-handed with your sworn nemesis.',
     emotionalTarget: 'Betrayed Hyped-Up Disbelief [Tier 3 · 1.35x]',
     improvTwist:
-        'TWIST AT 15s: The coat-check attendant pops up from behind the counter eating popcorn and charges you $5 for the show!',
+        'TWIST AT 15s: The coat-check attendant pops up from behind the counter eating popcorn and charges you \$5 for the show!',
     is18Plus: true,
     durationSeconds: 35,
     difficultyTier: 4,

@@ -438,5 +438,11 @@ test('Samsung Galaxy S26 Ultra 5-Part Audit Upgrade (De-Cluttered Dashboard, Rel
   assert.ok(matchHistoryDart.includes('FACIAL'));
   assert.ok(matchHistoryDart.includes('VOCAL'));
   assert.ok(matchHistoryDart.includes('CUE'));
-});
 
+  // 6. Flutter 3.47.8 Release Build String Escaping & Material Icons Guards
+  assert.ok(raunchyScenesDart.includes(String.raw`\$400`));
+  assert.ok(raunchyScenesDart.includes(String.raw`\$5`));
+  assert.equal(/(?<!\\)\$\d/.test(raunchyScenesDart), false);
+  assert.equal(instructionsDart.includes('Icons.couch_rounded'), false);
+  assert.ok(instructionsDart.includes('Icons.weekend_rounded'));
+});
