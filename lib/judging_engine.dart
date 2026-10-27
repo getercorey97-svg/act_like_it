@@ -23,7 +23,7 @@ import 'ui/game_settings_modal.dart';
 import 'ui/intro_cinematic.dart';
 import 'ui/match_finalization_screen.dart';
 import 'ui/opening_maestro_hero.dart';
-import 'ui/red_carpet_25d_parallax.dart';
+import 'ui/living_25d_animation_engine.dart';
 import 'ui/soundstage_audio_controller.dart';
 import 'ui/tutorial_overlay.dart';
 import 'auth/auth_service.dart';

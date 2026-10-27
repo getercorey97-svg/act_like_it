@@ -697,6 +697,30 @@ class SoundstageAudioController extends ChangeNotifier {
       await enterZone(_activeZone, forceRestart: false);
     }
   }
+
+  Future<void> playVaultLockTurnClunk() =>
+      playSfx(SoundstageSfx.soundstageDoorThud);
+
+  Future<void> playCountdownTick({bool finalBeat = false}) => playSfx(
+        finalBeat ? SoundstageSfx.clapperSnap : SoundstageSfx.filmReelClick,
+      );
+
+  Future<void> playClapperSnap() => playSfx(SoundstageSfx.clapperSnap);
+
+  Future<void> playClapperboardSnap() => playSfx(SoundstageSfx.clapperSnap);
+
+  Future<void> playCurveballSiren() => playSfx(SoundstageSfx.oscarTrophyChime);
+
+  Future<void> playSelectSweep() => playSfx(SoundstageSfx.callSheetStamp);
+
+  Future<void> playPaparazziFlashBurst() =>
+      playSfx(SoundstageSfx.paparazziShutterFlash);
+
+  Future<void> playCurtainSwish() => playSfx(SoundstageSfx.velvetRopeHook);
+
+  Future<void> playCrowdOvation() => playSfx(SoundstageSfx.oscarTrophyChime);
+
+  Future<void> playVerdictFanfare() => playSfx(SoundstageSfx.oscarTrophyChime);
 }
 
 /// Compact, high-contrast Hollywood Soundstage Audio Console Bar that can be

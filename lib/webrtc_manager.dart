@@ -19,7 +19,7 @@ import 'auth/auth_service.dart';
 import 'ui/intro_cinematic.dart';
 import 'ui/transitions.dart';
 import 'ui/parody_scenes_catalog.dart';
-import 'ui/red_carpet_25d_parallax.dart';
+import 'ui/living_25d_animation_engine.dart';
 import 'ui/soundstage_audio_controller.dart';
 import 'social/cutting_room_feed.dart';
 

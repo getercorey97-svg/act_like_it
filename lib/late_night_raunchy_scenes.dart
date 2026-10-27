@@ -10,27 +10,37 @@ import 'ui/parody_scenes_catalog.dart';
 /// - Tier 3 (ln_08..ln_10 + ln_45..ln_60 = 19 scenes): 🧨 Tier 3: Unhinged TV-MA Meltdowns & Filthy Roasts [1.35x]
 
 enum SpeakeasySpiceTier {
-  all('ALL 60 SCENES', '🔞 All 60 Uncensored Scenes', 1.25),
   tier1MessyHookups(
+    1,
     'TIER 1 · 1.15x',
     '🔥 Tier 1: Messy Hookups & Raunchy Comedy [1.15x]',
     1.15,
   ),
   tier2BedroomNoir(
+    2,
     'TIER 2 · 1.25x',
     '💋 Tier 2: Bedroom Walk-Ins & Seductive Noir [1.25x]',
     1.25,
   ),
   tier3UnhingedRoasts(
+    3,
     'TIER 3 · 1.35x',
     '🧨 Tier 3: Unhinged TV-MA Meltdowns & Filthy Roasts [1.35x]',
     1.35,
   );
 
+  final int tierNumber;
   final String shortBadge;
   final String label;
   final double multiplier;
-  const SpeakeasySpiceTier(this.shortBadge, this.label, this.multiplier);
+  const SpeakeasySpiceTier(
+    this.tierNumber,
+    this.shortBadge,
+    this.label,
+    this.multiplier,
+  );
+
+  String get badgeLabel => label;
 }
 
 SpeakeasySpiceTier getSpiceTierForSceneId(String id) {

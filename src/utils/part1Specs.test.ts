@@ -332,8 +332,49 @@ test('Dart Release Build API & Constructor Contracts (Flutter 3.47.8 CI parity)'
   assert.equal(feedDart.includes('LobbyStatus.performing'), false);
   assert.ok(feedDart.includes("hostId: 'local-costar'"));
 
-  // 7. BoondocksAvatarArchetype.shortBadge getter
+  // 7. BoondocksAvatarArchetype.shortBadge getter & AvatarArchetype typedef
   assert.ok(rigDart.includes('String get shortBadge => roleBadge;'));
+  assert.ok(rigDart.includes('typedef AvatarArchetype = BoondocksAvatarArchetype;'));
+
+  // 8. SpeakeasySpiceTier tierNumber & badgeLabel getters
+  const raunchyDart = fs.readFileSync('lib/late_night_raunchy_scenes.dart', 'utf8');
+  assert.ok(raunchyDart.includes('final int tierNumber;'));
+  assert.ok(raunchyDart.includes('String get badgeLabel => label;'));
+
+  // 9. SoundstageAudioController defines all convenience SFX methods called across lib/
+  const audioDart = fs.readFileSync('lib/ui/soundstage_audio_controller.dart', 'utf8');
+  const requiredAudioMethods = [
+    'playVaultLockTurnClunk',
+    'playCountdownTick',
+    'playClapperSnap',
+    'playClapperboardSnap',
+    'playCurveballSiren',
+    'playSelectSweep',
+    'playPaparazziFlashBurst',
+    'playCurtainSwish',
+    'playCrowdOvation',
+    'playVerdictFanfare',
+  ];
+  for (const methodName of requiredAudioMethods) {
+    assert.ok(
+      audioDart.includes(`Future<void> ${methodName}(`),
+      `Expected SoundstageAudioController to define ${methodName}`
+    );
+  }
+
+  // 10. 2.5D Rig classes & const constructors in lib/ui/living_25d_animation_engine.dart
+  const living25dDart = fs.readFileSync('lib/ui/living_25d_animation_engine.dart', 'utf8');
+  assert.ok(living25dDart.includes('const FirstPersonRedCarpetPovCardRig('));
+  assert.ok(living25dDart.includes('const LeftFlankPaparazziDuoRig('));
+  assert.ok(living25dDart.includes('const RightFlankVipEntourageRig('));
+  assert.ok(living25dDart.includes('const UndercoverSpeakeasyImproviserRig('));
+  assert.ok(living25dDart.includes('const RuthlessCastingDirectorRig('));
+  assert.ok(living25dDart.includes('const DuetRivalsSplitPortraitRig('));
+
+  // 11. _fxFrenzyPulse is bool in lib/profile/actor_profile_screen.dart
+  const profileDart = fs.readFileSync('lib/profile/actor_profile_screen.dart', 'utf8');
+  assert.ok(profileDart.includes('bool _fxFrenzyPulse = false;'));
+  assert.equal(profileDart.includes('double _fxFrenzyPulse'), false);
 });
 
 test('Samsung Galaxy S26 Ultra 5-Part Audit Upgrade (De-Cluttered Dashboard, Relocated Clickable 2.5D Rigs, Call Sheet Sub-Pages, 7-Mode Rulebook, 50 New Rated-R 18+ Scenes, and Video 1-4 Fixes)', () => {

@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../daily_challenge/daily_cattle_call_card.dart';
 import '../late_night_vault.dart';
 import '../lobby.dart';
 import '../social/cutting_room_feed.dart';
 import 'game_settings_modal.dart';
-import 'red_carpet_25d_parallax.dart';
+import 'living_25d_animation_engine.dart';
 import 'soundstage_audio_controller.dart';
 import 'transitions.dart';
 

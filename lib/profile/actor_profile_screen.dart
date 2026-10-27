@@ -10,7 +10,7 @@ import '../monetization/payment_dashboard_screen.dart';
 import '../offline_manager.dart';
 import '../ui/boondocks_character_rig.dart';
 import '../ui/game_app_bar.dart';
-import '../ui/red_carpet_25d_parallax.dart';
+import '../ui/living_25d_animation_engine.dart';
 import '../ui/soundstage_audio_controller.dart';
 
 /// PART 2: Actor Profile Page & Multi-Profile Account Switcher
@@ -60,7 +60,7 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
   late TextEditingController _birthYearCtrl;
   bool _isEditingIdentity = false;
   String _selectedStageEntranceFx = 'LEFT FLANK · PAPARAZZI DUO';
-  double _fxFrenzyPulse = 0.35;
+  bool _fxFrenzyPulse = false;
   bool _velvetVignetteActive = true;
 
   @override

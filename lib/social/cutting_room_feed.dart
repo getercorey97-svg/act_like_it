@@ -11,7 +11,7 @@ import '../main.dart';
 import '../offline_manager.dart';
 import '../ui/game_app_bar.dart';
 import '../ui/intro_cinematic.dart';
-import '../ui/red_carpet_25d_parallax.dart';
+import '../ui/living_25d_animation_engine.dart';
 import '../ui/soundstage_audio_controller.dart';
 import '../webrtc_manager.dart';
 

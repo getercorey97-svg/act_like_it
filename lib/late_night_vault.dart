@@ -11,7 +11,7 @@ import 'monetization/payment_dashboard_screen.dart';
 import 'ui/game_settings_modal.dart';
 import 'ui/parody_scenes_catalog.dart';
 
-import 'ui/red_carpet_25d_parallax.dart';
+import 'ui/living_25d_animation_engine.dart';
 import 'ui/soundstage_audio_controller.dart';
 
 /// Categorizes the intensity tiers inside the hidden Late-Night After-Hours Vault.

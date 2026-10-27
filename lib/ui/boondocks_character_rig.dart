@@ -39,6 +39,8 @@ class BoondocksAvatarArchetype {
   String get shortBadge => roleBadge;
 }
 
+typedef AvatarArchetype = BoondocksAvatarArchetype;
+
 /// Master registry of all 14 persistent 2.5D Cell-Shaded Avatar Archetypes,
 /// matching the official character artwork, neon rim lights, outfits, and props.
 const List<BoondocksAvatarArchetype> kFourteenAvatarArchetypes =

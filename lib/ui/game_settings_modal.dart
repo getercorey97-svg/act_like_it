@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
-import 'red_carpet_25d_parallax.dart';
+import 'living_25d_animation_engine.dart';
 import 'soundstage_audio_controller.dart';
 
 /// Immutable configuration returned when the player taps "ROLL CAMERA"

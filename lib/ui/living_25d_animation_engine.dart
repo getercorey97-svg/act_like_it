@@ -548,13 +548,18 @@ class FirstPersonRedCarpetPovCardRig extends StatelessWidget {
   final double externalPhase;
   final double scrollOffset;
   final double flashPulse;
+  final double? height;
+  final double? width;
 
   const FirstPersonRedCarpetPovCardRig({
     super.key,
-    required this.externalPhase,
+    double? externalPhase,
+    double? phase,
     this.scrollOffset = 0.0,
     this.flashPulse = 0.0,
-  });
+    this.height,
+    this.width,
+  }) : externalPhase = externalPhase ?? phase ?? 0.5;
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +570,7 @@ class FirstPersonRedCarpetPovCardRig extends StatelessWidget {
       ..setEntry(3, 2, 0.0016)
       ..rotateX(tiltX);
 
-    return Transform(
+    Widget content = Transform(
       alignment: Alignment.center,
       transform: matrix,
       child: Container(
@@ -586,6 +591,11 @@ class FirstPersonRedCarpetPovCardRig extends StatelessWidget {
         ),
       ),
     );
+
+    if (height != null || width != null) {
+      content = SizedBox(height: height, width: width, child: content);
+    }
+    return content;
   }
 }
 
@@ -595,12 +605,19 @@ class FirstPersonRedCarpetPovCardRig extends StatelessWidget {
 class LeftFlankPaparazziDuoRig extends StatelessWidget {
   final double externalPhase;
   final double flashPulse;
+  final double? height;
+  final double? width;
 
   const LeftFlankPaparazziDuoRig({
     super.key,
-    required this.externalPhase,
-    this.flashPulse = 0.0,
-  });
+    double? externalPhase,
+    double? phase,
+    double? flashPulse,
+    double? frenzyIntensity,
+    this.height,
+    this.width,
+  }) : externalPhase = externalPhase ?? phase ?? 0.35,
+       flashPulse = flashPulse ?? frenzyIntensity ?? 0.0;
 
   @override
   Widget build(BuildContext context) {
@@ -612,7 +629,7 @@ class LeftFlankPaparazziDuoRig extends StatelessWidget {
       ..translate(0.0, breatheY)
       ..scale(1.0, breatheScaleY, 1.0);
 
-    return Transform(
+    Widget content = Transform(
       alignment: Alignment.bottomCenter,
       transform: matrix,
       child: Container(
@@ -632,6 +649,11 @@ class LeftFlankPaparazziDuoRig extends StatelessWidget {
         ),
       ),
     );
+
+    if (height != null || width != null) {
+      content = SizedBox(height: height, width: width, child: content);
+    }
+    return content;
   }
 }
 
@@ -754,17 +776,24 @@ class _LeftFlankPaparazziDuoPainter extends CustomPainter {
 /// - Blonde starlet with an animated clapping loop and gold sequin sparkles.
 class RightFlankVipEntourageRig extends StatelessWidget {
   final double externalPhase;
+  final double frenzyIntensity;
+  final double? height;
+  final double? width;
 
   const RightFlankVipEntourageRig({
     super.key,
-    required this.externalPhase,
-  });
+    double? externalPhase,
+    double? phase,
+    this.frenzyIntensity = 0.0,
+    this.height,
+    this.width,
+  }) : externalPhase = externalPhase ?? phase ?? 0.65;
 
   @override
   Widget build(BuildContext context) {
     final breatheY = math.cos(externalPhase * 1.5) * 2.0;
 
-    return Transform.translate(
+    Widget content = Transform.translate(
       offset: Offset(0, breatheY),
       child: Container(
         decoration: BoxDecoration(
@@ -780,6 +809,11 @@ class RightFlankVipEntourageRig extends StatelessWidget {
         ),
       ),
     );
+
+    if (height != null || width != null) {
+      content = SizedBox(height: height, width: width, child: content);
+    }
+    return content;
   }
 }
 
@@ -1565,6 +1599,99 @@ class _HeroCharacter5LayerOverlayPainter extends CustomPainter {
       oldDelegate.phase != phase ||
       oldDelegate.normalizedTime != normalizedTime ||
       oldDelegate.characterType != characterType;
+}
+
+/// Standalone `const`-constructible 2.5D Rig for `13012.jpg` (The Undercover Speakeasy Improviser).
+class UndercoverSpeakeasyImproviserRig extends StatelessWidget {
+  final double phase;
+  final double? height;
+  final double? width;
+  final VoidCallback? onTap;
+  final bool showCaptionBadge;
+
+  const UndercoverSpeakeasyImproviserRig({
+    super.key,
+    this.phase = 0.0,
+    this.height,
+    this.width,
+    this.onTap,
+    this.showCaptionBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget rig = Living25DHeroCharacterRig(
+      characterType: Living25DHeroCharacterType.undercoverSpeakeasyImproviser,
+      onTap: onTap,
+      showCaptionBadge: showCaptionBadge,
+    );
+    if (height != null || width != null) {
+      rig = SizedBox(height: height, width: width, child: rig);
+    }
+    return rig;
+  }
+}
+
+/// Standalone `const`-constructible 2.5D Rig for `13014.jpg` (The Ruthless Casting Director).
+class RuthlessCastingDirectorRig extends StatelessWidget {
+  final double phase;
+  final double? height;
+  final double? width;
+  final VoidCallback? onTap;
+  final bool showCaptionBadge;
+
+  const RuthlessCastingDirectorRig({
+    super.key,
+    this.phase = 0.0,
+    this.height,
+    this.width,
+    this.onTap,
+    this.showCaptionBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget rig = Living25DHeroCharacterRig(
+      characterType: Living25DHeroCharacterType.ruthlessCastingDirector,
+      onTap: onTap,
+      showCaptionBadge: showCaptionBadge,
+    );
+    if (height != null || width != null) {
+      rig = SizedBox(height: height, width: width, child: rig);
+    }
+    return rig;
+  }
+}
+
+/// Standalone `const`-constructible 2.5D Rig for `13013.jpg` (Lead A & Lead B Screen Test Rivals).
+class DuetRivalsSplitPortraitRig extends StatelessWidget {
+  final double phase;
+  final double? height;
+  final double? width;
+  final VoidCallback? onTap;
+  final bool showCaptionBadge;
+
+  const DuetRivalsSplitPortraitRig({
+    super.key,
+    this.phase = 0.0,
+    this.height,
+    this.width,
+    this.onTap,
+    this.showCaptionBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget rig = Living25DHeroCharacterRig(
+      characterType: Living25DHeroCharacterType.screenTestRivalsDuel,
+      onTap: onTap,
+      showCaptionBadge: showCaptionBadge,
+    );
+    if (height != null || width != null) {
+      rig = SizedBox(height: height, width: width, child: rig);
+    }
+    return rig;
+  }
 }
 
 /// Horizontal/Grid Showcase of the 3 Reusable 2.5D Hero Character Rigs (`13012.jpg`, `13014.jpg`, `13013.jpg`)
