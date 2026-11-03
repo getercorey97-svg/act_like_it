@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../auth/auth_screen.dart';
 import '../auth/auth_service.dart';
+import '../auth/nda_tester_gate.dart';
 import '../auth/onboarding_questionnaire.dart';
 import '../match_history_screen.dart';
 import '../monetization/payment_dashboard_screen.dart';
@@ -60,7 +61,7 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
   late TextEditingController _birthYearCtrl;
   bool _isEditingIdentity = false;
   String _selectedStageEntranceFx = 'LEFT FLANK · PAPARAZZI DUO';
-  bool _fxFrenzyPulse = false;
+  double _fxFrenzyPulse = 0.0;
   bool _velvetVignetteActive = true;
 
   @override
@@ -440,6 +441,38 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
       appBar: GameAppBar(
         title: 'My Dressing Room · Profile',
         subtitle: '@${profile.username.toUpperCase()} · ${profile.careerRankBadge}',
+        actions: [
+          if (auth.isFounderAdmin)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () => FounderCommandTelemetryDrawer.show(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0x33FFD700),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Text(
+                    '👑 FOUNDER ADMIN',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFD700),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
@@ -1405,11 +1438,11 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
           SoundstageAudioController.instance.playPaparazziFlashBurst();
           setState(() {
             _selectedStageEntranceFx = 'paparazzi_frenzy';
-            _fxFrenzyPulse = true;
+            _fxFrenzyPulse = 1.0;
           });
           Future<void>.delayed(const Duration(milliseconds: 520), () {
             if (mounted) {
-              setState(() => _fxFrenzyPulse = false);
+              setState(() => _fxFrenzyPulse = 0.0);
             }
           });
         },
@@ -1459,14 +1492,14 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
       duration: const Duration(milliseconds: 240),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _fxFrenzyPulse
+        color: _fxFrenzyPulse > 0.5
             ? const Color(0xFF282112)
             : (_velvetVignetteActive
                 ? const Color(0xFF1A0710)
                 : const Color(0xEB0B0E17)),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: _fxFrenzyPulse
+          color: _fxFrenzyPulse > 0.5
               ? const Color(0xFFFFD700)
               : (_velvetVignetteActive
                   ? const Color(0xFFE11D48)
@@ -1474,7 +1507,7 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
           width: 2.2,
         ),
         boxShadow: [
-          if (_fxFrenzyPulse)
+          if (_fxFrenzyPulse > 0.5)
             const BoxShadow(
               color: Color(0xAAFFD700),
               blurRadius: 24,

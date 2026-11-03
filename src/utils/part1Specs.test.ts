@@ -371,10 +371,10 @@ test('Dart Release Build API & Constructor Contracts (Flutter 3.47.8 CI parity)'
   assert.ok(living25dDart.includes('const RuthlessCastingDirectorRig('));
   assert.ok(living25dDart.includes('const DuetRivalsSplitPortraitRig('));
 
-  // 11. _fxFrenzyPulse is bool in lib/profile/actor_profile_screen.dart
+  // 11. _fxFrenzyPulse is double (0.0 to 1.0) with explicit > 0.5 comparisons in lib/profile/actor_profile_screen.dart
   const profileDart = fs.readFileSync('lib/profile/actor_profile_screen.dart', 'utf8');
-  assert.ok(profileDart.includes('bool _fxFrenzyPulse = false;'));
-  assert.equal(profileDart.includes('double _fxFrenzyPulse'), false);
+  assert.ok(profileDart.includes('double _fxFrenzyPulse = 0.0;'));
+  assert.ok(profileDart.includes('_fxFrenzyPulse > 0.5'));
 });
 
 test('Samsung Galaxy S26 Ultra 5-Part Audit Upgrade (De-Cluttered Dashboard, Relocated Clickable 2.5D Rigs, Call Sheet Sub-Pages, 7-Mode Rulebook, 50 New Rated-R 18+ Scenes, and Video 1-4 Fixes)', () => {
@@ -445,4 +445,62 @@ test('Samsung Galaxy S26 Ultra 5-Part Audit Upgrade (De-Cluttered Dashboard, Rel
   assert.equal(/(?<!\\)\$\d/.test(raunchyScenesDart), false);
   assert.equal(instructionsDart.includes('Icons.couch_rounded'), false);
   assert.ok(instructionsDart.includes('Icons.weekend_rounded'));
+});
+
+test('7 Surgical Production Upgrades (Vercel Camera Headers, Founder Admin God-Mode, Instant Beta Access, Real PNG Social Sharing, Judging/Calibration/Sandbox Telemetry, and Supabase RLS)', () => {
+  const vercelJson = fs.readFileSync('vercel.json', 'utf8');
+  const authDart = fs.readFileSync('lib/auth/auth_service.dart', 'utf8');
+  const ndaGateDart = fs.readFileSync('lib/auth/nda_tester_gate.dart', 'utf8');
+  const dashboardDart = fs.readFileSync('lib/dashboard_marquee.dart', 'utf8');
+  const profileDart = fs.readFileSync('lib/profile/actor_profile_screen.dart', 'utf8');
+  const paymentDart = fs.readFileSync('lib/monetization/payment_dashboard_screen.dart', 'utf8');
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  const rlsSql = fs.readFileSync(
+    'supabase/migrations/20261025000004_public_repo_rls_lockdown.sql',
+    'utf8'
+  );
+
+  // 1. Vercel Camera & Microphone Permissions-Policy Header
+  assert.ok(
+    vercelJson.includes('"camera=(self), microphone=(self), geolocation=()"')
+  );
+  assert.equal(judgingDart.includes('const RuthlessCastingDirectorRig('), false);
+
+  // 2. Founder Admin God-Mode & Command Drawer
+  assert.ok(authDart.includes('bool get isFounderAdmin'));
+  assert.ok(authDart.includes('bool get adminSimulatePaywall'));
+  assert.ok(authDart.includes('bool get isGodModeActive'));
+  assert.ok(authDart.includes('999999'));
+  assert.ok(ndaGateDart.includes('class FounderCommandTelemetryDrawer'));
+  assert.ok(dashboardDart.includes('FOUNDER ADMIN'));
+  assert.ok(profileDart.includes('FOUNDER ADMIN'));
+
+  // 3. Universal Beta Passcodes & Instant Beta Tester Access + 50 Free AI Tokens
+  assert.ok(authDart.includes('const int kDefaultStarterAiTokens = 50;'));
+  assert.ok(ndaGateDart.includes('ACTVIP2026'));
+  assert.ok(ndaGateDart.includes('BETA2026'));
+  assert.ok(
+    ndaGateDart.includes('INSTANT BETA TESTER ACCESS (SIGN & PLAY NOW)')
+  );
+
+  // 4. Real Social Media PNG Scorecard Sharing & Viral Caption
+  assert.ok(judgingDart.includes('RepaintBoundary'));
+  assert.ok(judgingDart.includes('_scorecardBoundaryKey'));
+  assert.ok(judgingDart.includes('buildViralShareCaption'));
+  assert.ok(judgingDart.includes('https://act-like-it.vercel.app/?room='));
+  assert.ok(judgingDart.includes('SOCIAL_SHARE_TELEMETRY'));
+
+  // 5. Real Judging Telemetry, AI Calibration Bar & $0.00 Sandbox Store Unlock
+  assert.ok(judgingDart.includes('JUDGING_TELEMETRY'));
+  assert.ok(judgingDart.includes('Judging Accurate?'));
+  assert.ok(judgingDart.includes('AI_CALIBRATION_FEEDBACK'));
+  assert.ok(paymentDart.includes(String.raw`BETA TESTER \$0.00 SANDBOX UNLOCK`));
+  assert.ok(paymentDart.includes('PURCHASE_INTENT_TELEMETRY'));
+
+  // 6. Supabase RLS Policies & Universal Passcode Verification
+  assert.ok(rlsSql.includes("'ACTVIP2026', 'BETA2026'"));
+  assert.ok(rlsSql.includes('profiles_anon_auth_select'));
+  assert.ok(rlsSql.includes('lobbies_anon_auth_select'));
+  assert.ok(rlsSql.includes('match_history_anon_auth_insert'));
+  assert.ok(rlsSql.includes('qa_feedback_anon_auth_insert'));
 });

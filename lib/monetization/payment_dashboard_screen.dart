@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_screen.dart';
 import '../auth/auth_service.dart';
 import '../offline_manager.dart';
+import '../qa/qa_overlay.dart';
 import '../social/cutting_room_feed.dart';
 import '../ui/game_app_bar.dart';
 
@@ -313,6 +314,18 @@ class _PaymentDashboardScreenState extends State<PaymentDashboardScreen>
     _receipts.insert(0, receipt);
     await _persistBillingState();
 
+    try {
+      final profile = AuthService.instance.currentProfile;
+      await QaTelemetryRepository.submitBugReport(
+        testerHandle: profile?.username ?? 'BetaTester',
+        bugType: 'PURCHASE_INTENT_TELEMETRY',
+        testerNote:
+            'PURCHASE_INTENT_TELEMETRY | product_key: $productKey | title: "$title" | price: $priceLabel | token_grant: $tokenGrant | packs: ${unlockPacks.join(",")} | tokens_after: ${AuthService.instance.aiTokenBalance}',
+        activeRoute: '/vip-box-office-store',
+        context: context,
+      );
+    } catch (_) {}
+
     if (!mounted) return;
     setState(() {
       _lastUnlockedTitle = title;
@@ -325,7 +338,7 @@ class _PaymentDashboardScreenState extends State<PaymentDashboardScreen>
       SnackBar(
         backgroundColor: const Color(0xFF065F46),
         content: Text(
-          'VIP Box Office Unlocked: $title via ${_activePaymentMethodLabel()}!',
+          'VIP Box Office Unlocked: $title ($priceLabel) — Telemetry logged!',
           style: const TextStyle(
             fontFamily: 'monospace',
             fontWeight: FontWeight.w900,
@@ -435,13 +448,57 @@ class _PaymentDashboardScreenState extends State<PaymentDashboardScreen>
       backgroundColor: const Color(0xFF07090E),
       appBar: GameAppBar(
         title: 'VIP Box Office & Store',
-        subtitle: '$tokens AI TOKENS · ${_activePaymentMethodLabel()}',
+        subtitle:
+            '${auth.isGodModeActive ? "∞ ADMIN TOKENS" : "$tokens AI TOKENS"} · ${_activePaymentMethodLabel()}',
       ),
       body: Stack(
         fit: StackFit.expand,
         children: [
           Column(
             children: [
+              if (auth.isFounderAdmin)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F1705),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFFD700)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        '👑 FOUNDER GOD-MODE',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFFFD700),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          auth.isGodModeActive
+                              ? 'All items unlocked · Toggle to test standard paywall'
+                              : 'Simulating standard user paywall',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFFDE68A),
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        value: auth.adminSimulatePaywall,
+                        activeThumbColor: const Color(0xFFE11D48),
+                        onChanged: (_) => auth.toggleAdminSimulatePaywall(),
+                      ),
+                    ],
+                  ),
+                ),
               if (widget.contextBannerText != null &&
                   widget.contextBannerText!.isNotEmpty)
                 Container(
@@ -1005,7 +1062,7 @@ class _PaymentDashboardScreenState extends State<PaymentDashboardScreen>
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    isUnlocked ? const Color(0xFF1E293B) : accent,
+                    isUnlocked ? const Color(0xFF1E293B) : const Color(0xFF10B981),
                 foregroundColor:
                     isUnlocked ? const Color(0xFF10B981) : const Color(0xFF05070B),
                 padding: const EdgeInsets.symmetric(vertical: 13),
@@ -1017,7 +1074,7 @@ class _PaymentDashboardScreenState extends State<PaymentDashboardScreen>
               icon: Icon(
                 isUnlocked
                     ? Icons.check_circle_rounded
-                    : Icons.shopping_bag_rounded,
+                    : Icons.science_rounded,
                 size: 18,
               ),
               label: FittedBox(
@@ -1025,7 +1082,7 @@ class _PaymentDashboardScreenState extends State<PaymentDashboardScreen>
                 child: Text(
                   isUnlocked
                       ? 'ACTIVE IN YOUR STUDIO VAULT'
-                      : 'INSTANT CHECKOUT · $priceLabel',
+                      : '🧪 BETA TESTER \$0.00 SANDBOX UNLOCK (WAS $priceLabel)',
                   style: const TextStyle(
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w900,

@@ -2,10 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeSessionSeal,
+  createInstantApprovedTesterDossier,
   createPendingTesterDossier,
   evaluatePasscodeUnlockAttempt,
   generateUniqueTesterPasscode,
   getTesterVisiblePasscode,
+  isUniversalBetaPasscode,
   updateTesterApprovalStatus,
   verifyFounderAdminCredentials,
   verifySessionSeal,
@@ -129,7 +131,7 @@ describe('NDA Manual Founder Approval & Founder Admin Login Gate', () => {
     assert.equal(unlockResult.status, 'unlocked_tester');
   });
 
-  it('triggers NDA_BREACH alert if an approved tester shares their passcode with a different device', () => {
+  it('triggers NDA_BREACH alert if an approved tester shares their passcode with a different device when allowCrossBrowserRebind is false', () => {
     const dossier = createPendingTesterDossier({
       fullName: 'Donald Glover',
       email: 'donald@gilga.com',
@@ -160,6 +162,48 @@ describe('NDA Manual Founder Approval & Founder Admin Login Gate', () => {
 
     assert.equal(breachAttempt.unlocked, false);
     assert.equal(breachAttempt.status, 'breach_detected');
+
+    // Cross-browser / Web-to-APK rebind succeeds when allowCrossBrowserRebindForSameTester is true
+    const rebindAttempt = evaluatePasscodeUnlockAttempt({
+      enteredCode: dossier.unique_passcode,
+      currentDeviceFingerprint: 'DEV-AND-S26ULTRA',
+      registry,
+      allowCrossBrowserRebindForSameTester: true,
+    });
+    assert.equal(rebindAttempt.unlocked, true);
+    assert.equal(rebindAttempt.status, 'unlocked_tester');
+  });
+
+  it('supports Universal Beta Passcodes (ACTVIP2026 & BETA2026) and Instant Beta Tester Access', () => {
+    assert.equal(isUniversalBetaPasscode('ACTVIP2026'), true);
+    assert.equal(isUniversalBetaPasscode('beta2026'), true);
+    assert.equal(isUniversalBetaPasscode('RANDOM123'), false);
+
+    const universalUnlock = evaluatePasscodeUnlockAttempt({
+      enteredCode: 'ACTVIP2026',
+      currentDeviceFingerprint: 'DEV-AND-S26ULTRA',
+      registry: {},
+    });
+    assert.equal(universalUnlock.unlocked, true);
+    assert.equal(universalUnlock.status, 'unlocked_tester');
+
+    const instantDossier = createInstantApprovedTesterDossier({
+      fullName: 'Keke Palmer',
+      email: 'keke@bigboss.com',
+      phone: '555-777-8888',
+      signature: 'Keke Palmer',
+      deviceFingerprint: 'DEV-AND-S26',
+      deviceModel: 'Samsung Galaxy S26 Ultra',
+      osVersion: 'Android 16',
+      networkConnection: 'Wi-Fi',
+      agreedIp: true,
+      agreedConfidential: true,
+      interestedInPartnership: false,
+      selectedTracks: [],
+      backgroundSummary: 'Lead Actress & Host',
+    });
+    assert.equal(instantDossier.approval_status, 'approved');
+    assert.ok(getTesterVisiblePasscode(instantDossier)?.startsWith('ALI-KP-'));
   });
 
   it('verifies Studio Master Secret and Founder password', () => {

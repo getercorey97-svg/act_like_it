@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:share_plus/share_plus.dart';
@@ -17,6 +19,7 @@ import 'webrtc_manager.dart';
 import 'offline_manager.dart';
 import 'judging/feedback_engine.dart';
 import 'monetization/payment_dashboard_screen.dart';
+import 'qa/qa_overlay.dart';
 import 'social/cutting_room_feed.dart';
 import 'ui/game_app_bar.dart';
 import 'ui/game_settings_modal.dart';
@@ -914,20 +917,54 @@ Return strict JSON matching this exact schema:
     }
   }
 
+  static String buildViralShareCaption({
+    required double score,
+    required String characterName,
+    required String sceneTitle,
+    required String roomCode,
+  }) {
+    final formattedScore = score.toStringAsFixed(1);
+    final cleanRoom = roomCode.trim().isEmpty ? 'STAGE1' : roomCode.trim();
+    return "🎬 I just scored $formattedScore/100 as $characterName in '$sceneTitle' on ACT LIKE IT™! Think you can beat my take? Join my soundstage: https://act-like-it.vercel.app/?room=$cleanRoom #ActLikeIt #MethodActing";
+  }
+
   Future<void> sharePerformanceClipExternally({
     required ScenePrompt scene,
     required String actorDisplayName,
+    String roomCode = 'STAGE1',
+    Uint8List? scorecardPngBytes,
   }) async {
     if (_isDisposed) return;
-    final shareUrl = _supabaseLoopUrl ?? 'https://github.com/act_like_it';
+    final caption = buildViralShareCaption(
+      score: compositeTriModalScore,
+      characterName: scene.characterName,
+      sceneTitle: scene.title,
+      roomCode: roomCode,
+    );
     try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text:
-              'I just scored ${compositeTriModalScore.toStringAsFixed(1)}/100 performing "${scene.title}" (${scene.filmOrSeries}, ${scene.releaseYear}) on Act Like It! $shareUrl',
-        ),
-      );
-    } catch (_) {}
+      if (scorecardPngBytes != null && scorecardPngBytes.isNotEmpty) {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: <XFile>[
+              XFile.fromData(
+                scorecardPngBytes,
+                mimeType: 'image/png',
+                name: 'act_like_it_scorecard.png',
+              ),
+            ],
+            text: caption,
+          ),
+        );
+      } else {
+        await SharePlus.instance.share(
+          ShareParams(text: caption),
+        );
+      }
+    } catch (_) {
+      try {
+        await SharePlus.instance.share(ShareParams(text: caption));
+      } catch (_) {}
+    }
 
     _externalShares += 1;
     _externalReactions += 4;
@@ -939,6 +976,8 @@ Return strict JSON matching this exact schema:
     required ScenePrompt scene,
     required String actorDisplayName,
     required int roundNumber,
+    String roomCode = 'STAGE1',
+    Uint8List? scorecardPngBytes,
   }) async {
     if (_isDisposed) return;
     final archetype = showstopperArchetype;
@@ -949,35 +988,57 @@ Return strict JSON matching this exact schema:
     final stamp = compositeTriModalScore >= 85.0
         ? 'STANDING OVATION · CERTIFIED FRESH'
         : 'OFFICIAL HOLLYWOOD SCREEN TEST';
-    final shareUrl = _supabaseLoopUrl ?? 'https://github.com/act_like_it';
+    final viralCaption = buildViralShareCaption(
+      score: compositeTriModalScore,
+      characterName: scene.characterName,
+      sceneTitle: scene.title,
+      roomCode: roomCode,
+    );
 
     final receipts = millisecondReceiptStamps.join('\n');
     final payload = '''
+$viralCaption
+
 🎬 ACT LIKE IT — HOLLYWOOD CRITIC'S SCORECARD 🎬
 ⭐ $stamp ⭐
-Actor: $actorDisplayName
-Archetype Badge: 🏆 ${archetype.title}
+Actor: $actorDisplayName · 🏆 ${archetype.title}
 Scene: "${scene.title}" — ${scene.characterName} (${scene.filmOrSeries}, ${scene.releaseYear})
-
 📊 TRI-MODAL VERDICT: ${compositeTriModalScore.toStringAsFixed(1)} / 100${_improvBonus > 0 ? ' (+5.0 IMPROV BONUS)' : ''}
 • Facial Expression: ${(_aiReport?.facialExpressionScore ?? 86).toStringAsFixed(0)}/100
 • Vocal Cadence: ${(_aiReport?.vocalCadenceScore ?? 85).toStringAsFixed(0)}/100
 • Cue Fidelity: ${(_aiReport?.directorCueFidelity ?? 86).toStringAsFixed(0)}/100
 • Peer Score: ${peerScore.toStringAsFixed(0)}/100
-👑 Kingmaker / Executive Producer: @ENSEMBLE_VIP (+50 XP)
 
 ⏱️ MILLISECOND AI RECEIPTS:
 $receipts
 
 🗣️ Critic's Verdict: "$criticQuote"
-Watch Premiere Reel: $shareUrl
 ''';
 
     try {
-      await SharePlus.instance.share(
-        ShareParams(text: payload.trim()),
-      );
-    } catch (_) {}
+      if (scorecardPngBytes != null && scorecardPngBytes.isNotEmpty) {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: <XFile>[
+              XFile.fromData(
+                scorecardPngBytes,
+                mimeType: 'image/png',
+                name: 'act_like_it_premiere_scorecard.png',
+              ),
+            ],
+            text: payload.trim(),
+          ),
+        );
+      } else {
+        await SharePlus.instance.share(
+          ShareParams(text: payload.trim()),
+        );
+      }
+    } catch (_) {
+      try {
+        await SharePlus.instance.share(ShareParams(text: payload.trim()));
+      } catch (_) {}
+    }
 
     _externalShares += 1;
     _externalReactions += 5;
@@ -1136,9 +1197,76 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   bool _expandedDirectorTelemetryReceipt = true;
   bool _directorMegaphoneReadingAloud = false;
 
+  final GlobalKey _scorecardBoundaryKey = GlobalKey();
+  final TextEditingController _aiCalibrationCommentController =
+      TextEditingController();
+  String? _selectedCalibrationRating;
+  bool _calibrationFeedbackSubmitted = false;
+
   ScenePrompt get _scene =>
       widget.lobbySession.activeScene ??
       kBuiltInSceneVault[SceneCategory.era1970To1999]!.first;
+
+  Future<Uint8List?> _captureScorecardPngBytes() async {
+    try {
+      final ctx = _scorecardBoundaryKey.currentContext;
+      if (ctx == null) return null;
+      final renderObj = ctx.findRenderObject();
+      if (renderObj is! RenderRepaintBoundary) return null;
+      final image = await renderObj.toImage(pixelRatio: 2.5);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _submitAiCalibrationFeedback(String ratingLabel) async {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _selectedCalibrationRating = ratingLabel;
+      _calibrationFeedbackSubmitted = true;
+    });
+    final profile = AuthService.instance.currentProfile;
+    final comment = _aiCalibrationCommentController.text.trim();
+    final report = _engine.aiReport;
+    final payload = <String, dynamic>{
+      'tester_handle': profile?.username ?? widget.performerDisplayName,
+      'room_code': widget.lobbySession.roomCode,
+      'scene_id': _scene.id,
+      'scene_title': _scene.title,
+      'calibration_verdict': ratingLabel,
+      'tester_comment': comment,
+      'ai_score': _engine.aiScore,
+      'facial_score': report?.facialExpressionScore ?? 86.0,
+      'vocal_score': report?.vocalCadenceScore ?? 85.0,
+      'cue_fidelity_score': report?.directorCueFidelity ?? 86.0,
+      'final_composite_score': _engine.compositeTriModalScore,
+    };
+    try {
+      await QaTelemetryRepository.submitBugReport(
+        testerHandle: profile?.username ?? widget.performerDisplayName,
+        bugType: 'AI_CALIBRATION_FEEDBACK',
+        testerNote: jsonEncode(payload),
+        activeRoute: '/tri-modal-verdict',
+        context: context,
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFF065F46),
+        content: Text(
+          '✅ Telemetry sent to Studio HQ!',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -1165,13 +1293,16 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
       unawaited(AuthService.instance.addAiTokens(1));
     }
 
+    final evalStartedAt = DateTime.now();
     _engine
         .evaluatePerformanceWithGemini(
       scene: _scene,
       samples: widget.capturedSamples,
     )
-        .then((_) async {
+        .then((report) async {
       if (!mounted) return;
+      final latencyMs =
+          DateTime.now().difference(evalStartedAt).inMilliseconds;
       AuthService.instance.upsertAdditiveProfileFields(
         telemetryOptIn: true,
       );
@@ -1181,6 +1312,40 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
         isOfflineLocalParty: widget.isOfflineLocalParty,
       );
       final profile = AuthService.instance.currentProfile;
+      // Requirement 5A: Automatic Match & Judging Telemetry Logging
+      try {
+        final weights = _engine.normalizedWeights;
+        final telemetryJson = <String, dynamic>{
+          'tester_handle': profile?.username ?? widget.performerDisplayName,
+          'room_code': widget.lobbySession.roomCode,
+          'scene_id': _scene.id,
+          'game_mode': _engine.isLifeIsImprovTake
+              ? 'life_is_improv'
+              : widget.lobbySession.selectedCategory.name,
+          'ai_score': _engine.aiScore,
+          'facial_score': report.facialExpressionScore,
+          'vocal_score': report.vocalCadenceScore,
+          'cue_fidelity_score': report.directorCueFidelity,
+          'ai_receipt_stamps': _engine.millisecondReceiptStamps,
+          'peer_score': _engine.peerScore,
+          'peer_votes_count': _passAndPlayRatings1To10.length,
+          'social_score': _engine.socialScore,
+          'final_composite_score': _engine.compositeTriModalScore,
+          'normalized_weights': <String, double>{
+            'ai': weights.aiW,
+            'peer': weights.peerW,
+            'social': weights.socialW,
+          },
+          'gemini_latency_ms': latencyMs,
+        };
+        await QaTelemetryRepository.submitBugReport(
+          testerHandle: profile?.username ?? widget.performerDisplayName,
+          bugType: 'JUDGING_TELEMETRY',
+          testerNote: jsonEncode(telemetryJson),
+          activeRoute: '/tri-modal-verdict',
+          context: context,
+        );
+      } catch (_) {}
       // Fixture #15 (Part B): +2 Free AI Tokens & "Undercover Legend" unlock for Life Is Improv >= 80.0
       if (_engine.isLifeIsImprovTake &&
           _engine.compositeTriModalScore >= 80.0 &&
@@ -1257,6 +1422,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _aiCalibrationCommentController.dispose();
     _verdictStingPlayer?.stop();
     _verdictStingPlayer?.dispose();
     _engine.removeListener(_onEngineUpdated);
@@ -1728,6 +1894,95 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                         ),
                       ),
                     ],
+                    const SizedBox(height: 14),
+                    // Requirement 5B: 1-Tap "Rate the AI Casting Director" Tester Feedback Bar
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0B0F17),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _calibrationFeedbackSubmitted
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFFFD700),
+                          width: 1.4,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _calibrationFeedbackSubmitted
+                                ? '✅ AI CALIBRATION FEEDBACK SENT ($_selectedCalibrationRating)'
+                                : '🎯 Was Gemini\'s Judging Accurate?',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: _calibrationFeedbackSubmitted
+                                  ? const Color(0xFF34D399)
+                                  : const Color(0xFFFFD700),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _aiCalibrationCommentController,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Tell us why... (optional)',
+                              hintStyle: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF64748B),
+                              ),
+                              isDense: true,
+                              filled: true,
+                              fillColor: const Color(0xFF07090E),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 9,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final opt in const <String>[
+                                '👍 Spot On',
+                                '📈 Too Lenient',
+                                '📉 Too Harsh',
+                              ])
+                                ChoiceChip(
+                                  label: Text(opt),
+                                  selected: _selectedCalibrationRating == opt,
+                                  selectedColor: const Color(0xFF10B981),
+                                  backgroundColor: const Color(0xFF121722),
+                                  labelStyle: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: _selectedCalibrationRating == opt
+                                        ? const Color(0xFF05070B)
+                                        : Colors.white,
+                                  ),
+                                  onSelected: (_) =>
+                                      _submitAiCalibrationFeedback(opt),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -1995,11 +2250,42 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        _engine.sharePerformanceClipExternally(
+                      onPressed: () async {
+                        final pngBytes = await _captureScorecardPngBytes();
+                        await _engine.sharePerformanceClipExternally(
                           scene: _scene,
                           actorDisplayName: widget.performerDisplayName,
+                          roomCode: widget.lobbySession.roomCode,
+                          scorecardPngBytes: pngBytes,
                         );
+                        final profile = AuthService.instance.currentProfile;
+                        await CuttingRoomFeedStore.publishCompletedPerformance(
+                          takeId:
+                              'crf_share_${widget.lobbySession.roomCode}_${DateTime.now().millisecondsSinceEpoch}',
+                          actorHandle:
+                              '@${(profile?.username ?? widget.performerDisplayName).toUpperCase()}',
+                          avatarArchetypeId:
+                              AuthService.instance.currentUserAvatar,
+                          sceneTitle: _scene.title,
+                          filmOrSeries: _scene.filmOrSeries,
+                          releaseYear: _scene.releaseYear,
+                          scriptExcerpt: '"${_scene.promptScript}"',
+                          directorCommentStamp:
+                              'SHARED TO SOCIALS · +20% SOCIAL BOOST',
+                          compositeScore: _engine.compositeTriModalScore,
+                          videoUrl: _engine.supabaseLoopUrl,
+                        );
+                        try {
+                          await QaTelemetryRepository.submitBugReport(
+                            testerHandle: profile?.username ??
+                                widget.performerDisplayName,
+                            bugType: 'SOCIAL_SHARE_TELEMETRY',
+                            testerNote:
+                                'SOCIAL_SHARE_TELEMETRY | room: ${widget.lobbySession.roomCode} | scene: ${_scene.id} | score: ${_engine.compositeTriModalScore.toStringAsFixed(1)} | social_score: ${_engine.socialScore.toStringAsFixed(1)}',
+                            activeRoute: '/tri-modal-verdict',
+                            context: context,
+                          );
+                        } catch (_) {}
                       },
                       icon: const Icon(Icons.share_outlined, size: 18),
                       label: const FittedBox(
@@ -2572,7 +2858,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                   width: 108,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: const RuthlessCastingDirectorRig(
+                    child: RuthlessCastingDirectorRig(
                       phase: 0.42,
                       height: 112,
                     ),
@@ -2768,7 +3054,9 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
     );
     final hasWatermarkPro = AuthService.instance.hasWatermarkFreePro;
 
-    return Container(
+    return RepaintBoundary(
+      key: _scorecardBoundaryKey,
+      child: Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -2894,11 +3182,14 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                 backgroundColor: const Color(0xFFFFD700),
                 foregroundColor: const Color(0xFF050508),
               ),
-              onPressed: () {
-                _engine.exportAndSharePremiereReel(
+              onPressed: () async {
+                final pngBytes = await _captureScorecardPngBytes();
+                await _engine.exportAndSharePremiereReel(
                   scene: _scene,
                   actorDisplayName: widget.performerDisplayName,
                   roundNumber: widget.lobbySession.roundNumber,
+                  roomCode: widget.lobbySession.roomCode,
+                  scorecardPngBytes: pngBytes,
                 );
               },
               icon: const Icon(Icons.movie_filter_rounded, size: 18),
@@ -2952,6 +3243,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
           ),
         ],
       ),
+    ),
     );
   }
 }

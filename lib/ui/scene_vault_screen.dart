@@ -367,7 +367,8 @@ class _SceneVaultScreenState extends State<SceneVaultScreen> {
     final promptIndex = (_selectedPromptIndexByCategory[ticket.category] ?? 0)
         .clamp(0, prompts.isEmpty ? 0 : prompts.length - 1);
     final activePrompt = prompts.isNotEmpty ? prompts[promptIndex] : null;
-    final isUnlocked = AuthService.instance.hasAllEraBundle ||
+    final isUnlocked = AuthService.instance.isGodModeActive ||
+        AuthService.instance.hasAllEraBundle ||
         AuthService.instance.hasEmmyAndCultVault;
 
     return GestureDetector(

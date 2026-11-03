@@ -139,6 +139,13 @@ export function generateUniqueTesterPasscode(
   return `ALI-${initials}-${code}`;
 }
 
+export const UNIVERSAL_BETA_PASSCODES = ['ACTVIP2026', 'BETA2026'] as const;
+
+export function isUniversalBetaPasscode(rawInput: string): boolean {
+  const norm = rawInput.trim().toUpperCase();
+  return (UNIVERSAL_BETA_PASSCODES as readonly string[]).includes(norm);
+}
+
 export function createPendingTesterDossier(params: {
   fullName: string;
   email: string;
@@ -154,6 +161,7 @@ export function createPendingTesterDossier(params: {
   selectedTracks: string[];
   backgroundSummary: string;
   nowIso?: string;
+  instantBetaApprove?: boolean;
 }): NdaTesterDossierRecord {
   const uniqueCode = generateUniqueTesterPasscode(
     params.fullName,
@@ -161,6 +169,8 @@ export function createPendingTesterDossier(params: {
     params.phone,
     params.deviceFingerprint
   );
+  const signedIso = params.nowIso ?? new Date().toISOString();
+  const isInstant = params.instantBetaApprove === true;
   return {
     full_legal_name: params.fullName.trim(),
     email: params.email.trim(),
@@ -169,6 +179,7 @@ export function createPendingTesterDossier(params: {
     unique_passcode: uniqueCode,
     bound_device_fingerprint: params.deviceFingerprint,
     device_model: params.deviceModel.trim(),
+    osVersion: params.osVersion.trim(),
     os_version: params.osVersion.trim(),
     network_connection_used: params.networkConnection,
     agreed_17_usc_102_copyright: params.agreedIp,
@@ -177,17 +188,39 @@ export function createPendingTesterDossier(params: {
     selected_partnership_tracks: [...params.selectedTracks],
     partnership_background_summary: params.backgroundSummary.trim(),
     official_portal_url: 'https://act-like-it.vercel.app',
-    signed_at: params.nowIso ?? new Date().toISOString(),
-    approval_status: 'pending',
-    approved_by: null,
-    approved_at: null,
-  };
+    signed_at: signedIso,
+    approval_status: isInstant ? 'approved' : 'pending',
+    approved_by: isInstant ? 'Instant Beta Fast-Track (ACTVIP2026)' : null,
+    approved_at: isInstant ? signedIso : null,
+  } as NdaTesterDossierRecord;
+}
+
+export function createInstantApprovedTesterDossier(params: {
+  fullName: string;
+  email: string;
+  phone: string;
+  signature: string;
+  deviceFingerprint: string;
+  deviceModel: string;
+  osVersion: string;
+  networkConnection: string;
+  agreedIp: boolean;
+  agreedConfidential: boolean;
+  interestedInPartnership: boolean;
+  selectedTracks: string[];
+  backgroundSummary: string;
+  nowIso?: string;
+}): NdaTesterDossierRecord {
+  return createPendingTesterDossier({
+    ...params,
+    instantBetaApprove: true,
+  });
 }
 
 /**
- * Returns the personal passcode ONLY when the Founder has explicitly approved
- * the tester (`approval_status === 'approved'`). Never exposes the passcode
- * while `pending` or `rejected`.
+ * Returns the personal passcode ONLY when the Founder or Instant Beta Fast-Track
+ * has approved the tester (`approval_status === 'approved'`). Never exposes the
+ * passcode while `pending` or `rejected`.
  */
 export function getTesterVisiblePasscode(
   record: NdaTesterDossierRecord | null | undefined
@@ -252,6 +285,7 @@ export function evaluatePasscodeUnlockAttempt(params: {
   currentDeviceFingerprint: string;
   registry: Record<string, NdaTesterDossierRecord>;
   envSecretOverride?: string;
+  allowCrossBrowserRebindForSameTester?: boolean;
 }): PasscodeVerificationOutcome {
   const entered = params.enteredCode.trim();
   if (!entered) {
@@ -259,7 +293,7 @@ export function evaluatePasscodeUnlockAttempt(params: {
       status: 'empty_input',
       unlocked: false,
       errorMessage:
-        'Please enter your Founder-Approved Personal Tester Passcode (ALI-XX-XXXX).',
+        'Please enter your Personal Tester Passcode (ALI-XX-XXXX) or Universal Beta Passcode (ACTVIP2026 / BETA2026).',
     };
   }
 
@@ -271,12 +305,51 @@ export function evaluatePasscodeUnlockAttempt(params: {
   }
 
   const normalizedCode = entered.toUpperCase();
+
+  // Universal Beta Invite Passcodes (ACTVIP2026 & BETA2026) unlock immediately across Web & APK without false-positive device lockouts
+  if (isUniversalBetaPasscode(normalizedCode)) {
+    const existingBeta = params.registry[normalizedCode];
+    const nowIso = new Date().toISOString();
+    const betaRecord: NdaTesterDossierRecord = existingBeta
+      ? {
+          ...existingBeta,
+          approval_status: 'approved',
+          bound_device_fingerprint: params.currentDeviceFingerprint,
+        }
+      : {
+          full_legal_name: 'VIP Live Beta Tester',
+          email: 'beta@actlikeit.stage',
+          phone_number: '555-0199',
+          digital_signature: 'VIP Live Beta Tester',
+          unique_passcode: normalizedCode,
+          bound_device_fingerprint: params.currentDeviceFingerprint,
+          device_model: 'Cross-Platform Beta Device',
+          os_version: 'Android / iOS / Web',
+          network_connection_used: 'Both Tested',
+          agreed_17_usc_102_copyright: true,
+          agreed_strict_nda_no_recording_or_sharing: true,
+          interested_in_partnership: false,
+          selected_partnership_tracks: [],
+          partnership_background_summary: 'Universal Beta Invite Passcode',
+          official_portal_url: 'https://act-like-it.vercel.app',
+          signed_at: nowIso,
+          approval_status: 'approved',
+          approved_by: 'Universal Beta Invite (ACTVIP2026)',
+          approved_at: nowIso,
+        };
+    return {
+      status: 'unlocked_tester',
+      unlocked: true,
+      record: betaRecord,
+    };
+  }
+
   const matched = params.registry[normalizedCode];
   if (!matched) {
     return {
       status: 'unrecognized',
       unlocked: false,
-      errorMessage: `UNRECOGNIZED PASSCODE ("${normalizedCode}"). Every tester must sign the Non-Disclosure Agreement first and receive manual Founder Approval before their personal passcode is activated.`,
+      errorMessage: `UNRECOGNIZED PASSCODE ("${normalizedCode}"). Sign the Beta NDA & use Instant Beta Access, or enter ACTVIP2026 / BETA2026.`,
     };
   }
 
@@ -288,7 +361,7 @@ export function evaluatePasscodeUnlockAttempt(params: {
       status: 'pending_approval',
       unlocked: false,
       record: matched,
-      errorMessage: `⏳ PENDING FOUNDER APPROVAL: The NDA dossier for ${matched.full_legal_name} is awaiting manual review and approval by Founder Corey Geter (${FOUNDER_CONTACT_EMAIL}). Your passcode cannot unlock the app until approved.`,
+      errorMessage: `⏳ PENDING FOUNDER APPROVAL: The NDA dossier for ${matched.full_legal_name} is awaiting review by Founder Corey Geter (${FOUNDER_CONTACT_EMAIL}), or tap "⚡ INSTANT BETA TESTER ACCESS" to activate immediately.`,
     };
   }
 
@@ -305,6 +378,16 @@ export function evaluatePasscodeUnlockAttempt(params: {
     matched.bound_device_fingerprint &&
     matched.bound_device_fingerprint !== params.currentDeviceFingerprint
   ) {
+    if (params.allowCrossBrowserRebindForSameTester) {
+      return {
+        status: 'unlocked_tester',
+        unlocked: true,
+        record: {
+          ...matched,
+          bound_device_fingerprint: params.currentDeviceFingerprint,
+        },
+      };
+    }
     return {
       status: 'breach_detected',
       unlocked: false,

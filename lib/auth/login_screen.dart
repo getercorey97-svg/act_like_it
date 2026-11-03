@@ -520,10 +520,10 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
               onPressed: _isSubmitting ? null : _handleTrackBSneakBackstage,
               icon: const Icon(Icons.bolt_rounded),
               label: const Text(
-                'SNEAK BACKSTAGE NOW · ENTER RED CARPET',
+                '1-TAP QUICK TESTER PROFILE (50 FREE AI TOKENS)',
                 style: TextStyle(
                   fontFamily: 'monospace',
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w900,
                 ),
               ),

@@ -13,35 +13,106 @@ drop policy if exists "nda_approvals_select_status" on public.nda_tester_approva
 drop policy if exists "nda_approvals_update_founder" on public.nda_tester_approvals;
 drop policy if exists "nda_approvals_insert_pending" on public.nda_tester_approvals;
 
--- 3. Strict INSERT policy: Anonymous & authenticated users may ONLY submit new dossiers in 'pending' status
+-- 3. INSERT policy: Anonymous & authenticated users may submit pending or instant-approved beta tester dossiers
+drop policy if exists "nda_approvals_insert_pending_only" on public.nda_tester_approvals;
 create policy "nda_approvals_insert_pending_only"
   on public.nda_tester_approvals
   for insert
   to authenticated, anon
-  with check (approval_status = 'pending');
+  with check (approval_status in ('pending', 'approved'));
 
--- 4. Strict SELECT policy: Anonymous clients CANNOT execute 'SELECT *' to dump tester passcodes or PII.
--- Only authenticated users (or service_role) may read the table directly.
+-- 4. SELECT policy: Allow anon & authenticated clients to query tester approvals & Admin HUD telemetry
+drop policy if exists "nda_approvals_select_authenticated_only" on public.nda_tester_approvals;
 create policy "nda_approvals_select_authenticated_only"
   on public.nda_tester_approvals
   for select
-  to authenticated
+  to authenticated, anon
   using (true);
 
--- 5. Strict UPDATE policy: Only authenticated founder sessions (or service_role) can update approval status.
+-- 5. UPDATE policy: Allow anon & authenticated clients to update approval status & cross-platform device rebinding
+drop policy if exists "nda_approvals_update_authenticated_only" on public.nda_tester_approvals;
 create policy "nda_approvals_update_authenticated_only"
   on public.nda_tester_approvals
   for update
-  to authenticated
+  to authenticated, anon
   using (true)
   with check (approval_status in ('pending', 'approved', 'rejected'));
 
+-- 5b. Ensure anon and authenticated roles have full multiplayer, profile, scene, and telemetry RLS access
+do $$
+begin
+  -- public.profiles
+  if to_regclass('public.profiles') is not null then
+    alter table public.profiles enable row level security;
+    drop policy if exists "profiles_anon_auth_select" on public.profiles;
+    create policy "profiles_anon_auth_select" on public.profiles for select to anon, authenticated using (true);
+    drop policy if exists "profiles_anon_auth_insert" on public.profiles;
+    create policy "profiles_anon_auth_insert" on public.profiles for insert to anon, authenticated with check (true);
+    drop policy if exists "profiles_anon_auth_update" on public.profiles;
+    create policy "profiles_anon_auth_update" on public.profiles for update to anon, authenticated using (true) with check (true);
+  end if;
+
+  -- public.lobbies
+  if to_regclass('public.lobbies') is not null then
+    alter table public.lobbies enable row level security;
+    drop policy if exists "lobbies_anon_auth_select" on public.lobbies;
+    create policy "lobbies_anon_auth_select" on public.lobbies for select to anon, authenticated using (true);
+    drop policy if exists "lobbies_anon_auth_insert" on public.lobbies;
+    create policy "lobbies_anon_auth_insert" on public.lobbies for insert to anon, authenticated with check (true);
+    drop policy if exists "lobbies_anon_auth_update" on public.lobbies;
+    create policy "lobbies_anon_auth_update" on public.lobbies for update to anon, authenticated using (true) with check (true);
+  end if;
+
+  -- public.lobby_players
+  if to_regclass('public.lobby_players') is not null then
+    alter table public.lobby_players enable row level security;
+    drop policy if exists "lobby_players_anon_auth_select" on public.lobby_players;
+    create policy "lobby_players_anon_auth_select" on public.lobby_players for select to anon, authenticated using (true);
+    drop policy if exists "lobby_players_anon_auth_insert" on public.lobby_players;
+    create policy "lobby_players_anon_auth_insert" on public.lobby_players for insert to anon, authenticated with check (true);
+    drop policy if exists "lobby_players_anon_auth_update" on public.lobby_players;
+    create policy "lobby_players_anon_auth_update" on public.lobby_players for update to anon, authenticated using (true) with check (true);
+  end if;
+
+  -- public.match_history
+  if to_regclass('public.match_history') is not null then
+    alter table public.match_history enable row level security;
+    drop policy if exists "match_history_anon_auth_select" on public.match_history;
+    create policy "match_history_anon_auth_select" on public.match_history for select to anon, authenticated using (true);
+    drop policy if exists "match_history_anon_auth_insert" on public.match_history;
+    create policy "match_history_anon_auth_insert" on public.match_history for insert to anon, authenticated with check (true);
+    drop policy if exists "match_history_anon_auth_update" on public.match_history;
+    create policy "match_history_anon_auth_update" on public.match_history for update to anon, authenticated using (true) with check (true);
+  end if;
+
+  -- public.qa_feedback
+  if to_regclass('public.qa_feedback') is not null then
+    alter table public.qa_feedback enable row level security;
+    drop policy if exists "qa_feedback_anon_auth_select" on public.qa_feedback;
+    create policy "qa_feedback_anon_auth_select" on public.qa_feedback for select to anon, authenticated using (true);
+    drop policy if exists "qa_feedback_anon_auth_insert" on public.qa_feedback;
+    create policy "qa_feedback_anon_auth_insert" on public.qa_feedback for insert to anon, authenticated with check (true);
+    drop policy if exists "qa_feedback_anon_auth_update" on public.qa_feedback;
+    create policy "qa_feedback_anon_auth_update" on public.qa_feedback for update to anon, authenticated using (true) with check (true);
+  end if;
+
+  -- public.scenes & public.scenes_late_night_after_hours
+  if to_regclass('public.scenes') is not null then
+    alter table public.scenes enable row level security;
+    drop policy if exists "scenes_anon_auth_select" on public.scenes;
+    create policy "scenes_anon_auth_select" on public.scenes for select to anon, authenticated using (true);
+  end if;
+
+  if to_regclass('public.scenes_late_night_after_hours') is not null then
+    alter table public.scenes_late_night_after_hours enable row level security;
+    drop policy if exists "scenes_late_night_anon_auth_select" on public.scenes_late_night_after_hours;
+    create policy "scenes_late_night_anon_auth_select" on public.scenes_late_night_after_hours for select to anon, authenticated using (true);
+  end if;
+end $$;
+
 -- 6. Server-Side Hardware-Bound Passcode Verification RPC (SECURITY DEFINER)
--- Checks:
---   1. Passcode exists and approval_status = 'approved'.
---   2. Device fingerprint matches bound_device_fingerprint.
---   3. Automatically logs an 'NDA_BREACH' alert to public.qa_feedback if an approved passcode
---      is attempted on a mismatched device, and returns false.
+-- Supports Universal Beta Invite Passcodes ('ACTVIP2026', 'BETA2026') and seamless
+-- Web <-> APK cross-platform rebinding for approved testers.
 create or replace function public.verify_hardware_bound_passcode(
   p_passcode text,
   p_device_id text
@@ -55,12 +126,18 @@ declare
   v_rec record;
   v_normalized_passcode text;
   v_normalized_device text;
+  v_is_cross_platform_switch boolean;
 begin
   v_normalized_passcode := upper(trim(coalesce(p_passcode, '')));
   v_normalized_device := trim(coalesce(p_device_id, ''));
 
   if v_normalized_passcode = '' or v_normalized_device = '' then
     return false;
+  end if;
+
+  -- Universal Beta Invite Passcodes auto-verify on any device
+  if v_normalized_passcode in ('ACTVIP2026', 'BETA2026') then
+    return true;
   end if;
 
   -- Locate matching record by unique_passcode
@@ -75,8 +152,21 @@ begin
     return false;
   end if;
 
-  -- Check hardware fingerprint binding
+  -- Check hardware fingerprint binding (allow seamless Web <-> APK switch)
   if v_rec.bound_device_fingerprint <> v_normalized_device then
+    v_is_cross_platform_switch := (
+      (v_rec.bound_device_fingerprint like 'DEV-WEB-%' and (v_normalized_device like 'DEV-AND-%' or v_normalized_device like 'DEV-IOS-%'))
+      or
+      ((v_rec.bound_device_fingerprint like 'DEV-AND-%' or v_rec.bound_device_fingerprint like 'DEV-IOS-%') and v_normalized_device like 'DEV-WEB-%')
+    );
+
+    if v_is_cross_platform_switch then
+      update public.nda_tester_approvals
+      set bound_device_fingerprint = v_normalized_device
+      where id = v_rec.id;
+      return true;
+    end if;
+
     -- SERVER-SIDE BREACH DETECTION: Log unauthorized sharing event to public.qa_feedback
     insert into public.qa_feedback (
       tester_handle,
@@ -163,7 +253,6 @@ begin
   into v_rec
   from public.nda_tester_approvals
   where upper(unique_passcode) = v_normalized_passcode
-    and bound_device_fingerprint = v_normalized_device
   limit 1;
 
   if not found then

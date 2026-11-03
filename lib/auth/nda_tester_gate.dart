@@ -10,6 +10,7 @@ import '../main.dart';
 import '../qa/qa_overlay.dart';
 import '../ui/brand_logo.dart';
 import '../ui/soundstage_audio_controller.dart';
+import 'auth_service.dart';
 
 /// Mandatory Closed Alpha NDA, Partnership Dossier, Dedicated Founder's Admin
 /// Login Page (`admin88` / `Cg0167853!8808`), State-of-the-Art Founder Command
@@ -89,6 +90,16 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
 
   /// Preserved deep-link room code (e.g., from ?room=XXXXXX) across the gate lock.
   static String? pendingDeepLinkRoomCode;
+
+  static const List<String> universalBetaPasscodes = <String>[
+    'ACTVIP2026',
+    'BETA2026',
+  ];
+
+  static bool isUniversalBetaPasscode(String rawInput) {
+    final norm = rawInput.trim().toUpperCase();
+    return universalBetaPasscodes.contains(norm);
+  }
 
   /// Verifies the Founder's Dedicated Admin Login Credentials:
   /// Username: `admin88`
@@ -475,6 +486,9 @@ class _OfficialClosedAlphaNdaGateWrapperState
             if (isMaster ||
                 ((boundFp.isEmpty || boundFp == _deviceFingerprint) &&
                     status == 'approved')) {
+              if (isMaster) {
+                unawaited(AuthService.instance.setFounderAdminStatus(true));
+              }
               OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
               if (mounted) {
                 setState(() {
@@ -747,7 +761,173 @@ class _OfficialClosedAlphaNdaGateWrapperState
       _pendingSignedDossier = dossierPayload;
       _testerApprovalStatus = 'pending';
       _statusCheckFeedback =
-          'NDA submitted! Your dossier is now in Founder Corey Geter\'s approval queue.';
+          'NDA submitted! Your dossier is in Founder Corey Geter\'s queue — or tap "⚡ INSTANT BETA TESTER ACCESS" below to activate your pass and play right now.';
+    });
+  }
+
+  /// Fast-Track Beta Tester Onboarding: Signs the NDA (or uses the already-filled
+  /// form / quick defaults), immediately sets `approval_status = 'approved'`,
+  /// displays the tester's `ALI-XX-XXXX` pass on-screen, initializes their
+  /// 50-token Actor Profile, and unlocks the app without waiting.
+  Future<void> _handleInstantBetaTesterSignAndPlayNow() async {
+    final fullName = _fullNameController.text.trim().length >= 3
+        ? _fullNameController.text.trim()
+        : (_pendingSignedDossier?['full_legal_name']?.toString() ??
+            'Live Beta Tester');
+    final email = _emailController.text.trim().contains('@')
+        ? _emailController.text.trim()
+        : (_pendingSignedDossier?['email']?.toString() ??
+            'tester_${DateTime.now().millisecondsSinceEpoch % 10000}@actlikeit.stage');
+    final phone = _phoneController.text.trim().length >= 7
+        ? _phoneController.text.trim()
+        : (_pendingSignedDossier?['phone_number']?.toString() ?? '555-0199');
+    final deviceModel = _deviceModelController.text.trim().isNotEmpty
+        ? _deviceModelController.text.trim()
+        : (kIsWeb ? 'Web Companion Browser' : 'Galaxy S26 Ultra / Mobile');
+    final osVersion = _osVersionController.text.trim().isNotEmpty
+        ? _osVersionController.text.trim()
+        : (kIsWeb ? 'HTML5 WebRTC' : 'Android 16 / iOS 18');
+    final signature = _signatureController.text.trim().length >= 3
+        ? _signatureController.text.trim()
+        : fullName;
+
+    HapticFeedback.heavyImpact();
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.oscarTrophyChime,
+      ),
+    );
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+      _breachAlertMessage = null;
+    });
+
+    final uniquePasscode =
+        OfficialClosedAlphaNdaGateWrapper.generateUniqueTesterPasscode(
+      fullName: fullName,
+      email: email,
+      phone: phone,
+      deviceFingerprint: _deviceFingerprint,
+    ).toUpperCase();
+
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final approvedPayload = <String, dynamic>{
+      'full_legal_name': fullName,
+      'email': email,
+      'phone_number': phone,
+      'digital_signature': signature,
+      'unique_passcode': uniquePasscode,
+      'bound_device_fingerprint': _deviceFingerprint,
+      'signed_date_utc': nowIso,
+      'device_model': deviceModel,
+      'os_version': osVersion,
+      'network_connection_used': _selectedNetwork,
+      'agreed_17_usc_102_copyright': true,
+      'agreed_strict_nda_no_recording_or_sharing': true,
+      'interested_in_partnership': _interestedInPartnership,
+      'selected_partnership_tracks': _selectedPartnershipTracks.toList(),
+      'partnership_background_summary':
+          _backgroundSummaryController.text.trim(),
+      'approval_status': 'approved',
+      'approved_by': 'Instant Beta Fast-Track (ACTVIP2026)',
+      'approved_at': nowIso,
+      'official_portal_url': 'https://act-like-it.vercel.app',
+      'session_seal': OfficialClosedAlphaNdaGateWrapper.computeSessionSeal(
+        passcode: uniquePasscode,
+        deviceFingerprint: _deviceFingerprint,
+        status: 'approved',
+      ),
+    };
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingRaw =
+          prefs.getString(_prefsIssuedPasscodeRegistryKey) ?? '{}';
+      Map<String, dynamic> registry = <String, dynamic>{};
+      try {
+        final parsed = jsonDecode(existingRaw);
+        if (parsed is Map) {
+          registry = Map<String, dynamic>.from(parsed);
+        }
+      } catch (_) {}
+      registry[uniquePasscode] = approvedPayload;
+      await prefs.setString(
+        _prefsIssuedPasscodeRegistryKey,
+        jsonEncode(registry),
+      );
+      await prefs.setString(
+        _prefsDossierPayloadKey,
+        jsonEncode(approvedPayload),
+      );
+      await prefs.setBool(_prefsGateUnlockedKey, true);
+    } catch (_) {}
+
+    final client = supabaseOrNull;
+    if (client != null) {
+      try {
+        await client
+            .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+            .upsert(
+          <String, dynamic>{
+            'full_legal_name': fullName,
+            'email': email,
+            'phone_number': phone,
+            'digital_signature': signature,
+            'unique_passcode': uniquePasscode,
+            'bound_device_fingerprint': _deviceFingerprint,
+            'device_model': deviceModel,
+            'os_version': osVersion,
+            'network_connection_used': _selectedNetwork,
+            'agreed_17_usc_102_copyright': true,
+            'agreed_strict_nda_no_recording_or_sharing': true,
+            'interested_in_partnership': _interestedInPartnership,
+            'selected_partnership_tracks': _selectedPartnershipTracks.toList(),
+            'partnership_background_summary':
+                _backgroundSummaryController.text.trim(),
+            'approval_status': 'approved',
+            'approved_by': 'Instant Beta Fast-Track (ACTVIP2026)',
+            'approved_at': nowIso,
+            'official_portal_url': 'https://act-like-it.vercel.app',
+          },
+          onConflict: 'unique_passcode',
+        );
+      } catch (_) {}
+    }
+
+    try {
+      final cleanHandle = fullName.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+      if (AuthService.instance.currentProfile == null ||
+          AuthService.instance.currentProfile!.username == 'kkl') {
+        await AuthService.instance.saveOnboardingQuestionnaire(
+          username: cleanHandle.isNotEmpty ? cleanHandle : 'BetaStar',
+          birthYear: 1998,
+          favoriteEras: const <String>['1970–1999', '2000–2026'],
+          actingStrengths: const <String>['Method Drama', 'Improv Comedy'],
+          initialAiTokens: AuthService.kDefaultStarterAiTokens,
+        );
+      }
+    } catch (_) {}
+
+    try {
+      await QaTelemetryRepository.submitBugReport(
+        testerHandle: fullName.replaceAll(' ', '_'),
+        bugType: 'INSTANT_BETA_APPROVED',
+        testerNote:
+            'INSTANT_BETA_FAST_TRACK | PASSCODE: $uniquePasscode | Signer: $fullName ($email) | Device FP: $_deviceFingerprint',
+        activeRoute: '/nda-instant-beta-approved',
+        context: context,
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    _passcodeInputController.text = uniquePasscode;
+    OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
+    setState(() {
+      _isSubmitting = false;
+      _pendingSignedDossier = approvedPayload;
+      _testerApprovalStatus = 'approved';
+      _isUnlocked = true;
     });
   }
 
@@ -873,6 +1053,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
     }
 
     HapticFeedback.mediumImpact();
+    await AuthService.instance.setFounderAdminStatus(true, simulatePaywall: false);
     setState(() {
       _adminQueueUnlocked = true;
       _adminError = null;
@@ -883,6 +1064,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
   /// Allows the authenticated Founder to launch directly into the main
   /// ACT LIKE IT™ app from the Founder Admin Dashboard after reviewing testers.
   Future<void> _handleFounderLaunchIntoMainApp() async {
+    await AuthService.instance.setFounderAdminStatus(true, simulatePaywall: false);
     final masterPayload = <String, dynamic>{
       'full_legal_name': 'Founder Corey Geter (admin88)',
       'email': OfficialClosedAlphaNdaGateWrapper.founderContactEmail,
@@ -1044,6 +1226,10 @@ class _OfficialClosedAlphaNdaGateWrapperState
     });
 
     if (OfficialClosedAlphaNdaGateWrapper.verifyStudioMasterSecret(entered)) {
+      await AuthService.instance.setFounderAdminStatus(
+        true,
+        simulatePaywall: false,
+      );
       final masterPayload = _pendingSignedDossier ??
           <String, dynamic>{
             'full_legal_name': _fullNameController.text.trim().isNotEmpty
@@ -1081,6 +1267,53 @@ class _OfficialClosedAlphaNdaGateWrapperState
     }
 
     final normalizedCode = entered.toUpperCase();
+
+    // Universal Beta Invite Passcodes (ACTVIP2026 & BETA2026) unlock immediately across Web & APK without hardware lockout
+    if (OfficialClosedAlphaNdaGateWrapper.isUniversalBetaPasscode(
+      normalizedCode,
+    )) {
+      final nowIso = DateTime.now().toUtc().toIso8601String();
+      final universalPayload = <String, dynamic>{
+        'full_legal_name': _fullNameController.text.trim().isNotEmpty
+            ? _fullNameController.text.trim()
+            : 'VIP Live Beta Tester',
+        'email': _emailController.text.trim().isNotEmpty
+            ? _emailController.text.trim()
+            : 'beta@actlikeit.stage',
+        'phone_number': _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : '555-0199',
+        'unique_passcode': normalizedCode,
+        'bound_device_fingerprint': _deviceFingerprint,
+        'approval_status': 'approved',
+        'approved_by': 'Universal Beta Invite ($normalizedCode)',
+        'approved_at': nowIso,
+        'signed_date_utc': nowIso,
+        'official_portal_url': 'https://act-like-it.vercel.app',
+        'session_seal': OfficialClosedAlphaNdaGateWrapper.computeSessionSeal(
+          passcode: normalizedCode,
+          deviceFingerprint: _deviceFingerprint,
+          status: 'approved',
+        ),
+      };
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          _prefsDossierPayloadKey,
+          jsonEncode(universalPayload),
+        );
+        await prefs.setBool(_prefsGateUnlockedKey, true);
+      } catch (_) {}
+
+      if (!mounted) return;
+      OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
+      setState(() {
+        _isSubmitting = false;
+        _isUnlocked = true;
+      });
+      return;
+    }
+
     Map<String, dynamic>? matchedRecord;
 
     try {
@@ -1171,30 +1404,31 @@ class _OfficialClosedAlphaNdaGateWrapperState
     final boundFp =
         (matchedRecord['bound_device_fingerprint'] ?? '').toString();
     final ownerEmail = (matchedRecord['email'] ?? '').toString();
-    final ownerPhone = (matchedRecord['phone_number'] ?? '').toString();
 
+    // Relax cross-browser / Web-to-APK false-positive lockouts when the legitimate tester
+    // switches between mobile browser and installed APK or clears browser storage.
     if (boundFp.isNotEmpty && boundFp != _deviceFingerprint) {
-      HapticFeedback.heavyImpact();
+      matchedRecord['bound_device_fingerprint'] = _deviceFingerprint;
+      if (client != null) {
+        try {
+          await client
+              .from(OfficialClosedAlphaNdaGateWrapper.approvalsTableName)
+              .update(<String, dynamic>{
+            'bound_device_fingerprint': _deviceFingerprint,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          }).eq('unique_passcode', normalizedCode);
+        } catch (_) {}
+      }
       try {
         await QaTelemetryRepository.submitBugReport(
           testerHandle: ownerName.replaceAll(' ', '_'),
-          bugType: 'NDA_BREACH',
+          bugType: 'PASSCODE_CROSS_PLATFORM_REBIND',
           testerNote:
-              '🚨 CRITICAL NDA PASSCODE SHARING DETECTED! Passcode "$normalizedCode" issued to $ownerName (Email: $ownerEmail | Phone: $ownerPhone | Original Device FP: $boundFp) was entered on an UNAUTHORIZED SECOND DEVICE (Attempted Device FP: $_deviceFingerprint | Model: ${_deviceModelController.text.trim()} | OS: ${_osVersionController.text.trim()}). Access was blocked.',
-          activeRoute: '/nda-breach-blocked',
+              'Tester $ownerName ($ownerEmail) switched from $boundFp to $_deviceFingerprint using passcode $normalizedCode.',
+          activeRoute: '/nda-cross-platform-rebind',
           context: context,
         );
       } catch (_) {}
-
-      if (!mounted) return;
-      setState(() {
-        _isSubmitting = false;
-        _breachAlertMessage =
-            '🚨 NDA BREACH & PASSCODE SHARING DETECTED:\n'
-            'Passcode "$normalizedCode" is legally registered exclusively to $ownerName and cryptographically locked to their primary device ($boundFp).\n\n'
-            'Attempting to use another person\'s passcode on an unregistered device ($_deviceFingerprint) violates Section 0.2 of the Non-Disclosure Agreement. This unauthorized sharing attempt—along with $ownerName\'s identity and this device\'s hardware telemetry—has been logged and reported to ACT LIKE IT™ Studio Administration.';
-      });
-      return;
     }
 
     final recordWithSeal = Map<String, dynamic>.from(matchedRecord);
@@ -1567,10 +1801,9 @@ class _OfficialClosedAlphaNdaGateWrapperState
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'By accessing the Closed Alpha build or installing the Standalone App via https://act-like-it.vercel.app or the Android APK, you acknowledge and agree that this software is a Confidential Pre-Release Trade Secret. Signing this agreement submits your dossier to Founder Corey Geter for manual approval. Only after the Founder approves your submission will your UNIQUE PERSONAL TESTER PASSCODE (ALI-XX-XXXX)—cryptographically locked to your legal name and this specific device—be activated and revealed. You expressly agree NOT to:\n'
-                                  '• Share your Unique Personal Tester Passcode, the private testing URL, room codes, or build files with any third party (any attempt to use your passcode on another person\'s device immediately triggers an NDA Breach Alert under your name).\n'
-                                  '• Record, livestream, screenshot, or distribute gameplay publicly on social media (TikTok, Instagram, YouTube, X, etc.) without written authorization from ACT LIKE IT Studio.\n'
-                                  '• Copy, reverse-engineer, decompile, or appropriate any game mechanics, parody scripts, UI designs, or concepts from this software.',
+                                  'By accessing the Closed Alpha / Beta build or installing the Standalone App via https://act-like-it.vercel.app or the Android APK, you acknowledge and agree that the underlying source code and proprietary engines are a Confidential Trade Secret. Signing this agreement issues your UNIQUE PERSONAL TESTER PASSCODE (ALI-XX-XXXX) or unlocks Instant Beta Access:\n'
+                                  '• ✅ SOCIAL SHARING ENCOURAGED FOR BETA TESTERS: You ARE explicitly authorized and encouraged to share your Golden Trailer Critic\'s Scorecards, performance reels, and Room Invite Links to TikTok, Instagram, X, Snapchat, YouTube, and SMS to invite friends to your soundstage!\n'
+                                  '• 🔒 SOURCE CODE & BUILD PROTECTION: You agree NOT to copy, reverse-engineer, decompile, or appropriate any proprietary game mechanics, parody scripts, UI designs, or source code from this software.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Color(0xFFCBD5E1),
@@ -1718,7 +1951,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                             contentPadding: EdgeInsets.zero,
                             controlAffinity: ListTileControlAffinity.leading,
                             title: const Text(
-                              'I agree to the Strict Confidentiality & Non-Disclosure Agreement (NDA): I will NOT share my personal tester passcode, publicly record, screenshot, share https://act-like-it.vercel.app or build files, or appropriate any game mechanics or scripts.',
+                              'I agree to the Beta Confidentiality & Social Sharing Notice: I am encouraged to share my Golden Trailer Critic\'s Scorecards and performance reels to social media, and I will NOT reverse-engineer or appropriate any proprietary game mechanics, scripts, or source code.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.white,
@@ -1954,21 +2187,51 @@ class _OfficialClosedAlphaNdaGateWrapperState
                             child: ElevatedButton.icon(
                               onPressed: _isSubmitting
                                   ? null
-                                  : _handleSignNdaAndRequestFounderApproval,
+                                  : _handleInstantBetaTesterSignAndPlayNow,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFD4AF37),
-                                foregroundColor: const Color(0xFF07090E),
+                                backgroundColor: const Color(0xFF10B981),
+                                foregroundColor: const Color(0xFF05070B),
                                 padding:
-                                    const EdgeInsets.symmetric(vertical: 15),
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              icon: const Icon(Icons.bolt_rounded, size: 22),
+                              label: const Text(
+                                '⚡ INSTANT BETA TESTER ACCESS (SIGN & PLAY NOW)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : _handleSignNdaAndRequestFounderApproval,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFD4AF37),
+                                side: const BorderSide(
+                                  color: Color(0xFFD4AF37),
+                                  width: 1.8,
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                               icon: const Icon(Icons.fingerprint_rounded),
                               label: const Text(
-                                'STEP 1: SIGN NDA & SUBMIT FOR FOUNDER APPROVAL',
+                                'STEP 1: SIGN NDA & SUBMIT FOR MANUAL FOUNDER QUEUE',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.4,
                                 ),
@@ -2285,7 +2548,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
                                 ),
                                 const SizedBox(height: 6),
                                 const Text(
-                                  'Enter the Unique Personal Tester Passcode (ALI-XX-XXXX) sent or unlocked after Founder Corey Geter approves your NDA.',
+                                  'Enter your Personal Tester Passcode (ALI-XX-XXXX) or Universal Beta Invite Passcode (ACTVIP2026 / BETA2026).',
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     color: Color(0xFFCBD5E1),
@@ -3153,3 +3416,501 @@ class _OfficialClosedAlphaNdaGateWrapperState
     );
   }
 }
+
+/// In-App Founder Command & Telemetry Drawer accessible via the gold
+/// `"👑 FOUNDER ADMIN"` badge in the Top HUD of `DashboardMarqueeScreen`
+/// and `ActorProfileScreen`.
+class FounderCommandTelemetryDrawer extends StatefulWidget {
+  const FounderCommandTelemetryDrawer({super.key});
+
+  static Future<void> show(BuildContext context) async {
+    HapticFeedback.mediumImpact();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF07090E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        side: BorderSide(color: Color(0xFFFFD700), width: 2.0),
+      ),
+      builder: (_) => const FractionallySizedBox(
+        heightFactor: 0.88,
+        child: FounderCommandTelemetryDrawer(),
+      ),
+    );
+  }
+
+  @override
+  State<FounderCommandTelemetryDrawer> createState() =>
+      _FounderCommandTelemetryDrawerState();
+}
+
+class _FounderCommandTelemetryDrawerState
+    extends State<FounderCommandTelemetryDrawer> {
+  String _selectedTab = 'telemetry'; // 'telemetry' | 'lobbies' | 'testers'
+  bool _loading = true;
+  List<Map<String, dynamic>> _telemetryLogs = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _activeLobbies = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _testerProfiles = <Map<String, dynamic>>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshAllData();
+  }
+
+  Future<void> _refreshAllData() async {
+    setState(() => _loading = true);
+    final client = supabaseOrNull;
+    final List<Map<String, dynamic>> logs = <Map<String, dynamic>>[];
+    final List<Map<String, dynamic>> lobbies = <Map<String, dynamic>>[];
+    final List<Map<String, dynamic>> profiles = <Map<String, dynamic>>[];
+
+    if (client != null) {
+      try {
+        final qaRows = await client
+            .from('qa_feedback')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(80);
+        for (final r in qaRows.whereType<Map>()) {
+          logs.add(Map<String, dynamic>.from(r));
+        }
+      } catch (_) {}
+
+      try {
+        final lobbyRows = await client
+            .from('lobbies')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(40);
+        for (final r in lobbyRows.whereType<Map>()) {
+          lobbies.add(Map<String, dynamic>.from(r));
+        }
+      } catch (_) {}
+
+      try {
+        final profileRows = await client
+            .from('profiles')
+            .select()
+            .order('updated_at', ascending: false)
+            .limit(50);
+        for (final r in profileRows.whereType<Map>()) {
+          profiles.add(Map<String, dynamic>.from(r));
+        }
+      } catch (_) {}
+    }
+
+    for (final saved in AuthService.instance.savedProfiles) {
+      if (!profiles.any((p) => p['id'] == saved.userId)) {
+        profiles.add(saved.toJson());
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _telemetryLogs = logs;
+      _activeLobbies = lobbies;
+      _testerProfiles = profiles;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = AuthService.instance;
+    return ListenableBuilder(
+      listenable: auth,
+      builder: (context, _) {
+        final simulatePaywall = auth.adminSimulatePaywall;
+        final godMode = auth.isGodModeActive;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0x33FFD700),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFFFD700),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Text(
+                        '👑 FOUNDER ADMIN COMMAND & TELEMETRY HUD',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFFFD700),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: _refreshAllData,
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                        color: Color(0xFF0CB6D4),
+                      ),
+                      tooltip: 'Refresh Live Telemetry',
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // 1-Tap Paywall Simulation Toggle Card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: godMode
+                        ? const Color(0xFF082218)
+                        : const Color(0xFF261219),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: godMode
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFE11D48),
+                      width: 1.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        godMode
+                            ? Icons.workspace_premium_rounded
+                            : Icons.lock_person_rounded,
+                        color: godMode
+                            ? const Color(0xFFFFD700)
+                            : const Color(0xFFFDA4AF),
+                        size: 26,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              godMode
+                                  ? 'ZERO-PAYWALL GOD-MODE: ACTIVE (∞ ADMIN TOKENS)'
+                                  : 'SIMULATING STANDARD USER PAYWALL: ON',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                                color: godMode
+                                    ? const Color(0xFF34D399)
+                                    : const Color(0xFFFDA4AF),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              godMode
+                                  ? 'All Scene Vaults, 18+ Midnight Speakeasy, Pro Call Sheet Toggles & Watermark-Free Reels are 100% unlocked.'
+                                  : 'Experiencing standard tester locks, age gates, and token deductions for QA verification.',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFCBD5E1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: simulatePaywall,
+                        activeThumbColor: const Color(0xFFE11D48),
+                        onChanged: (_) async {
+                          HapticFeedback.selectionClick();
+                          await auth.toggleAdminSimulatePaywall();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Sub-tabs: Judging & QA Telemetry | Active Lobbies | Tester Profiles
+                Row(
+                  children: [
+                    _buildDrawerTabButton(
+                      id: 'telemetry',
+                      label: '📊 TELEMETRY & QA (${_telemetryLogs.length})',
+                    ),
+                    const SizedBox(width: 6),
+                    _buildDrawerTabButton(
+                      id: 'lobbies',
+                      label: '🌐 LIVE LOBBIES (${_activeLobbies.length})',
+                    ),
+                    const SizedBox(width: 6),
+                    _buildDrawerTabButton(
+                      id: 'testers',
+                      label: '🎭 TESTER PROFILES (${_testerProfiles.length})',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: _loading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFFD700),
+                          ),
+                        )
+                      : _buildSelectedTabContent(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDrawerTabButton({required String id, required String label}) {
+    final active = _selectedTab == id;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = id),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFFFD700) : const Color(0xFF0E131F),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: active ? const Color(0xFFFFD700) : const Color(0xFF334155),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: active ? const Color(0xFF05070B) : Colors.white70,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedTabContent() {
+    if (_selectedTab == 'lobbies') {
+      if (_activeLobbies.isEmpty) {
+        return const Center(
+          child: Text(
+            'No cloud lobbies found in public.lobbies right now.',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+          ),
+        );
+      }
+      return ListView.separated(
+        itemCount: _activeLobbies.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final row = _activeLobbies[index];
+          final code = (row['room_code'] ?? '------').toString();
+          final mode = (row['game_mode'] ?? 'screen_test').toString();
+          final status = (row['status'] ?? 'waiting').toString();
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E131F),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF0CB6D4)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.meeting_room_rounded, color: Color(0xFF0CB6D4)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ROOM #$code · ${mode.toUpperCase()}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        'Status: ${status.toUpperCase()} · Created: ${row['created_at'] ?? 'live'}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    if (_selectedTab == 'testers') {
+      return ListView.separated(
+        itemCount: _testerProfiles.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final p = _testerProfiles[index];
+          final handle = (p['username'] ?? 'StageStar').toString();
+          final year = (p['birth_year'] ?? 1998).toString();
+          final tokens = (p['ai_token_balance'] ?? 50).toString();
+          final archetype = (p['avatar_archetype'] ?? 'the_method_actor').toString();
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E131F),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.person_pin_rounded, color: Color(0xFFFFD700)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '@$handle · Born $year · $tokens Tokens',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        'Archetype: $archetype · Packs: ${p['unlocked_scene_packs'] ?? []}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    if (_telemetryLogs.isEmpty) {
+      return const Center(
+        child: Text(
+          'No telemetry events logged yet. Complete a take, rate the AI Casting Director, or test a $0.00 Sandbox Store unlock!',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: _telemetryLogs.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final item = _telemetryLogs[index];
+        final bugType = (item['bug_type'] ?? 'TELEMETRY').toString();
+        final handle = (item['tester_handle'] ?? 'Actor').toString();
+        final note = (item['tester_note'] ?? '').toString();
+        final route = (item['active_route'] ?? '').toString();
+        Color badgeColor = const Color(0xFF0CB6D4);
+        if (bugType.contains('JUDGING')) {
+          badgeColor = const Color(0xFFFFD700);
+        } else if (bugType.contains('CALIBRATION')) {
+          badgeColor = const Color(0xFF10B981);
+        } else if (bugType.contains('PURCHASE')) {
+          badgeColor = const Color(0xFFA855F7);
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0E131F),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: badgeColor.withValues(alpha: 0.6)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: badgeColor),
+                    ),
+                    child: Text(
+                      bugType,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: badgeColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '@$handle · $route',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFF5DEB3),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                note,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFFCBD5E1),
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+

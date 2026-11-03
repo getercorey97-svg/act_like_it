@@ -149,7 +149,7 @@ class ActorProfileState {
 
     final parsedTokens = json['ai_token_balance'] is int
         ? json['ai_token_balance'] as int
-        : int.tryParse('${json['ai_token_balance'] ?? ''}') ?? 25;
+        : int.tryParse('${json['ai_token_balance'] ?? ''}') ?? 50;
 
     final parsedVocalDb = (json['vocal_projection_db'] as num?)?.toDouble() ??
         double.tryParse('${json['vocal_projection_db'] ?? ''}') ??
@@ -213,12 +213,19 @@ class AuthService extends ChangeNotifier {
       'act_like_it_telemetrics_tokens_v1';
   static const String _kSelectedAvatarPrefsKey =
       'act_like_it_selected_avatar_v1';
-  static const int kDefaultStarterAiTokens = 25;
+  static const String _kIsFounderAdminPrefsKey =
+      'act_like_it_is_founder_admin_v1';
+  static const String _kAdminSimulatePaywallPrefsKey =
+      'act_like_it_admin_simulate_paywall_v1';
+  static const int kDefaultStarterAiTokens = 50;
+  static const int kFounderInfiniteTokenDisplay = 999999;
 
   ActorProfileState? _currentProfile;
   String _cachedSelectedAvatarId = 'the_method_actor';
   final List<ActorProfileState> _savedProfiles = <ActorProfileState>[];
   bool _isLoading = false;
+  bool _isFounderAdmin = false;
+  bool _adminSimulatePaywall = false;
   String? _lastError;
   StreamSubscription<AuthState>? _authSubscription;
 
@@ -232,23 +239,89 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
   bool get isAuthenticated => _currentProfile != null;
-  int get aiTokenBalance =>
-      _currentProfile?.aiTokenBalance ?? kDefaultStarterAiTokens;
-  bool get is18PlusVerified => _currentProfile?.is18PlusVerified ?? false;
+  bool get isFounderAdmin => _isFounderAdmin;
+  bool get adminSimulatePaywall => _adminSimulatePaywall;
+  bool get isGodModeActive => _isFounderAdmin && !_adminSimulatePaywall;
 
-  bool get hasVipSpeakeasyPass =>
-      hasUnlockedScenePack('vip_speakeasy_pass') ||
-      hasUnlockedScenePack('late_night');
+  int get aiTokenBalance {
+    if (isGodModeActive) return kFounderInfiniteTokenDisplay;
+    return _currentProfile?.aiTokenBalance ?? kDefaultStarterAiTokens;
+  }
 
-  bool get hasWatermarkFreePro => hasUnlockedScenePack('watermark_free_pro');
+  String get aiTokenDisplayLabel =>
+      isGodModeActive ? '∞ ADMIN TOKENS' : '$aiTokenBalance TOKENS';
 
-  bool get hasEmmyAndCultVault =>
-      hasUnlockedScenePack('emmy_cult_bundle') ||
-      hasUnlockedScenePack('all_era_bundle') ||
-      hasUnlockedScenePack('emmy_vault') ||
-      hasUnlockedScenePack('cult_classics');
+  bool get is18PlusVerified {
+    if (isGodModeActive) return true;
+    return _currentProfile?.is18PlusVerified ?? false;
+  }
 
-  bool get hasAllEraBundle => hasUnlockedScenePack('all_era_bundle');
+  bool get hasVipSpeakeasyPass {
+    if (isGodModeActive) return true;
+    return hasUnlockedScenePack('vip_speakeasy_pass') ||
+        hasUnlockedScenePack('late_night');
+  }
+
+  bool get hasWatermarkFreePro {
+    if (isGodModeActive) return true;
+    return hasUnlockedScenePack('watermark_free_pro');
+  }
+
+  bool get hasEmmyAndCultVault {
+    if (isGodModeActive) return true;
+    return hasUnlockedScenePack('emmy_cult_bundle') ||
+        hasUnlockedScenePack('all_era_bundle') ||
+        hasUnlockedScenePack('emmy_vault') ||
+        hasUnlockedScenePack('cult_classics');
+  }
+
+  bool get hasAllEraBundle {
+    if (isGodModeActive) return true;
+    return hasUnlockedScenePack('all_era_bundle');
+  }
+
+  bool _matchesFounderIdentity({String? email, String? username}) {
+    final normEmail = (email ?? '').trim().toLowerCase();
+    final normUser = (username ?? '').trim().toLowerCase().replaceAll('@', '');
+    return normEmail == 'getercorey97@gmail.com' ||
+        normUser == 'admin88' ||
+        normUser == 'coreygeter' ||
+        normUser == 'founder_admin88';
+  }
+
+  Future<void> setFounderAdminStatus(
+    bool isAdmin, {
+    bool? simulatePaywall,
+  }) async {
+    _isFounderAdmin = isAdmin;
+    if (simulatePaywall != null) {
+      _adminSimulatePaywall = simulatePaywall;
+    } else if (isAdmin) {
+      _adminSimulatePaywall = false;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kIsFounderAdminPrefsKey, _isFounderAdmin);
+      await prefs.setBool(
+        _kAdminSimulatePaywallPrefsKey,
+        _adminSimulatePaywall,
+      );
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<bool> toggleAdminSimulatePaywall() async {
+    _adminSimulatePaywall = !_adminSimulatePaywall;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(
+        _kAdminSimulatePaywallPrefsKey,
+        _adminSimulatePaywall,
+      );
+    } catch (_) {}
+    notifyListeners();
+    return _adminSimulatePaywall;
+  }
 
   /// Initializes the service on app boot and restores any active Supabase session
   /// plus the multi-profile registry (`saved_actor_profiles_v1`).
@@ -286,6 +359,9 @@ class AuthService extends ChangeNotifier {
       }
 
       final prefs = await SharedPreferences.getInstance();
+      _isFounderAdmin = prefs.getBool(_kIsFounderAdminPrefsKey) ?? false;
+      _adminSimulatePaywall =
+          prefs.getBool(_kAdminSimulatePaywallPrefsKey) ?? false;
       final savedAvatarId = prefs.getString(_kSelectedAvatarPrefsKey)?.trim();
       if (savedAvatarId != null && savedAvatarId.isNotEmpty) {
         _cachedSelectedAvatarId = savedAvatarId;
@@ -298,6 +374,13 @@ class AuthService extends ChangeNotifier {
               ? cached.copyWith(avatarArchetypeId: savedAvatarId)
               : cached;
           _cachedSelectedAvatarId = _currentProfile!.avatarArchetypeId;
+          if (_matchesFounderIdentity(
+            email: _currentProfile!.email,
+            username: _currentProfile!.username,
+          )) {
+            _isFounderAdmin = true;
+            await prefs.setBool(_kIsFounderAdminPrefsKey, true);
+          }
           await _syncRegistryWithProfile(_currentProfile!);
           notifyListeners();
           return;
@@ -586,6 +669,12 @@ class AuthService extends ChangeNotifier {
 
     final hydrated = ActorProfileState.fromJson(mergedData);
     _currentProfile = hydrated;
+    if (_matchesFounderIdentity(
+      email: hydrated.email,
+      username: hydrated.username,
+    )) {
+      await setFounderAdminStatus(true, simulatePaywall: false);
+    }
     await _writeLocalProfile(hydrated);
     notifyListeners();
     return hydrated;
@@ -730,6 +819,16 @@ class AuthService extends ChangeNotifier {
     ActorProfileState profile,
   ) async {
     _currentProfile = profile;
+    if (_matchesFounderIdentity(
+      email: profile.email,
+      username: profile.username,
+    )) {
+      _isFounderAdmin = true;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_kIsFounderAdminPrefsKey, true);
+      } catch (_) {}
+    }
     await _writeLocalProfile(profile);
     notifyListeners();
 
@@ -791,6 +890,9 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<bool> consumeAiToken() async {
+    if (isGodModeActive) {
+      return true;
+    }
     final profile = _currentProfile;
     if (profile == null) return false;
     if (profile.aiTokenBalance <= 0) return false;
@@ -854,6 +956,7 @@ class AuthService extends ChangeNotifier {
   }
 
   bool hasUnlockedScenePack(String packKey) {
+    if (isGodModeActive) return true;
     final packs = _currentProfile?.unlockedScenePacks ?? const <String>[];
     if (packs.contains('all_era_bundle')) return true;
     return packs.contains(packKey);

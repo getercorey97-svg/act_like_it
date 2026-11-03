@@ -156,11 +156,13 @@ class LateNightVaultGateController extends ChangeNotifier {
   bool _midTakeTwistTriggered = false;
   Timer? _twistTimer;
 
-  bool get isUnlocked => _isUnlocked;
+  bool get isUnlocked => _isUnlocked || AuthService.instance.isGodModeActive;
   bool get isVerifying => _isVerifying;
   String? get errorMessage => _errorMessage;
   LateNightSpiceTier get selectedTier => _selectedTier;
-  List<LateNightPrompt> get prompts => List.unmodifiable(_prompts);
+  List<LateNightPrompt> get prompts => List.unmodifiable(
+        _prompts.isNotEmpty ? _prompts : _builtInFallbackPrompts,
+      );
   bool get midTakeTwistTriggered => _midTakeTwistTriggered;
 
   static final List<LateNightPrompt> _builtInFallbackPrompts = [

@@ -584,7 +584,11 @@ class _LivingMarqueeDashboardScreenState
                                               true
                                           ? '@${AuthService.instance.currentProfile!.username.toUpperCase()}'
                                           : '@GALAXY_S26_ACTOR',
-                                      telemetricsTokens: _telemetricsTokens,
+                                      telemetricsTokens: AuthService
+                                              .instance.isGodModeActive
+                                          ? AuthService
+                                              .kFounderInfiniteTokenDisplay
+                                          : _telemetricsTokens,
                                       careerWins: OfflineManager
                                           .instance.totalCareerWins,
                                       isOnline:
@@ -594,6 +598,65 @@ class _LivingMarqueeDashboardScreenState
                                         highlightProductKey: 'tokens_100',
                                       ),
                                     ),
+                                    if (AuthService.instance.isFounderAdmin) ...[
+                                      const SizedBox(height: 8),
+                                      GestureDetector(
+                                        onTap: () =>
+                                            FounderCommandTelemetryDrawer.show(
+                                          context,
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF1F1705),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: const Color(0xFFFFD700),
+                                              width: 1.8,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Text(
+                                                '👑 FOUNDER ADMIN',
+                                                style: TextStyle(
+                                                  fontFamily: 'monospace',
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Color(0xFFFFD700),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  AuthService.instance
+                                                          .isGodModeActive
+                                                      ? '∞ ADMIN TOKENS · ALL VAULTS UNLOCKED · TAP FOR TELEMETRY & LOBBY HUD'
+                                                      : 'SIMULATING PAYWALL · TAP TO TOGGLE GOD-MODE OR VIEW TELEMETRY',
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontFamily: 'monospace',
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFFFDE68A),
+                                                  ),
+                                                ),
+                                              ),
+                                              const Icon(
+                                                Icons.tune_rounded,
+                                                size: 16,
+                                                color: Color(0xFFFFD700),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
