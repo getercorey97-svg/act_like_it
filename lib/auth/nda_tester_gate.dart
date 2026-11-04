@@ -3724,7 +3724,7 @@ class _FounderCommandTelemetryDrawerState
       }
       return ListView.separated(
         itemCount: _activeLobbies.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final row = _activeLobbies[index];
           final code = (row['room_code'] ?? '------').toString();
@@ -3774,7 +3774,7 @@ class _FounderCommandTelemetryDrawerState
     if (_selectedTab == 'testers') {
       return ListView.separated(
         itemCount: _testerProfiles.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final p = _testerProfiles[index];
           final handle = (p['username'] ?? 'StageStar').toString();
@@ -3825,7 +3825,7 @@ class _FounderCommandTelemetryDrawerState
     if (_telemetryLogs.isEmpty) {
       return const Center(
         child: Text(
-          'No telemetry events logged yet. Complete a take, rate the AI Casting Director, or test a $0.00 Sandbox Store unlock!',
+          'No telemetry events logged yet. Complete a take, rate the AI Casting Director, or test a \$0.00 Sandbox Store unlock!',
           textAlign: TextAlign.center,
           style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
         ),
@@ -3834,7 +3834,7 @@ class _FounderCommandTelemetryDrawerState
 
     return ListView.separated(
       itemCount: _telemetryLogs.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final item = _telemetryLogs[index];
         final bugType = (item['bug_type'] ?? 'TELEMETRY').toString();

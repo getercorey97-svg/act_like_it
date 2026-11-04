@@ -441,7 +441,7 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
       appBar: GameAppBar(
         title: 'My Dressing Room · Profile',
         subtitle: '@${profile.username.toUpperCase()} · ${profile.careerRankBadge}',
-        actions: [
+        extraActions: [
           if (auth.isFounderAdmin)
             Padding(
               padding: const EdgeInsets.only(right: 8),

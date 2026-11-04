@@ -503,4 +503,9 @@ test('7 Surgical Production Upgrades (Vercel Camera Headers, Founder Admin God-M
   assert.ok(rlsSql.includes('lobbies_anon_auth_select'));
   assert.ok(rlsSql.includes('match_history_anon_auth_insert'));
   assert.ok(rlsSql.includes('qa_feedback_anon_auth_insert'));
+
+  // 7. Flutter 3.47.9 CI guards: no (_, _) duplicate parameters, escaped \$0.00, and GameAppBar extraActions
+  assert.equal(/\(_,\s*_\)/.test(ndaGateDart), false);
+  assert.ok(ndaGateDart.includes(String.raw`\$0.00 Sandbox Store unlock!`));
+  assert.ok(profileDart.includes('extraActions: ['));
 });
