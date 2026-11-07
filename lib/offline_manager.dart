@@ -780,18 +780,15 @@ class OfflineManager extends ChangeNotifier {
 
         try {
           if (AppConfig.geminiApiKey.isNotEmpty) {
-            final model = GenerativeModel(
-              model: 'gemini-2.5-flash',
-              apiKey: AppConfig.geminiApiKey,
-              generationConfig: GenerationConfig(
-                responseMimeType: 'application/json',
-                temperature: 0.2,
-              ),
-            );
-
             final promptText = '''
 You are the AI Telemetrics Judge for "Act Like It" processing a queued Store & Forward performance recorded in Offline Local Party Mode.
-Evaluate the performance against the cached scene pack:
+Evaluate the performance against the cached scene pack and grade all 5 acting pillars out of 100:
+1. Facial Kinesiology (Duchenne smiles, brow furrowing, micro-expressions)
+2. Ocular Fidelity (Eyeline maintenance, strategic blinking, gaze intensity)
+3. Vocal Prosody (Pitch dynamics, cadence, volume control, pregnant pauses)
+4. Somatic Tension (Shoulder posture, breathing rhythm, camera framing)
+5. Curveball Adaptation (Emotional pivot at the 15-second mark)
+
 - Performer: ${item.performerName}
 - Scene Title: ${item.scene.title} (${item.scene.filmOrSeries}, ${item.scene.releaseYear})
 - Character: ${item.scene.characterName}
@@ -801,11 +798,19 @@ Evaluate the performance against the cached scene pack:
 
 Return strict JSON:
 {
+  "facial_kinesiology_score": <number 0-100>,
+  "ocular_fidelity_score": <number 0-100>,
+  "vocal_prosody_score": <number 0-100>,
+  "somatic_tension_score": <number 0-100>,
+  "curveball_adaptation_score": <number 0-100>,
+  "Composite AiScore": <number 0-100>,
+  "composite_ai_score": <number 0-100>,
   "overall_ai_score": <number 0-100>,
   "facial_expression_score": <number 0-100>,
   "vocal_cadence_score": <number 0-100>,
   "director_cue_fidelity": <number 0-100>,
-  "director_critique": "<concise 1-2 sentence director feedback>"
+  "millisecond_proof_timestamps": ["[00:04.180]", "[00:15.420]", "[00:24.890]"],
+  "director_critique": "<concise 1-2 sentence director feedback citing millisecond proof>"
 }
 ''';
 
@@ -821,30 +826,56 @@ Return strict JSON:
               }
             }
 
-            final response = await model
-                .generateContent([Content.multi(parts)])
-                .timeout(const Duration(seconds: 20));
-            var rawJson = (response.text ?? '{}').trim();
-            if (rawJson.startsWith('```')) {
-              rawJson = rawJson
-                  .replaceFirst(
-                    RegExp(r'^```(?:json)?\s*', caseSensitive: false),
-                    '',
-                  )
-                  .replaceFirst(RegExp(r'\s*```$'), '')
-                  .trim();
+            Map<String, dynamic>? decoded;
+            for (final candidateModel
+                in TriModalJudgingEngine.kGeminiModelCascade) {
+              try {
+                final model = GenerativeModel(
+                  model: candidateModel,
+                  apiKey: AppConfig.geminiApiKey,
+                  generationConfig: GenerationConfig(
+                    responseMimeType: 'application/json',
+                    temperature: 0.2,
+                  ),
+                );
+                final response = await model
+                    .generateContent([Content.multi(parts)])
+                    .timeout(const Duration(seconds: 20));
+                var rawJson = (response.text ?? '{}').trim();
+                if (rawJson.startsWith('```')) {
+                  rawJson = rawJson
+                      .replaceFirst(
+                        RegExp(r'^```(?:json)?\s*', caseSensitive: false),
+                        '',
+                      )
+                      .replaceFirst(RegExp(r'\s*```$'), '')
+                      .trim();
+                }
+                final firstBrace = rawJson.indexOf('{');
+                final lastBrace = rawJson.lastIndexOf('}');
+                if (firstBrace >= 0 && lastBrace > firstBrace) {
+                  rawJson = rawJson.substring(firstBrace, lastBrace + 1);
+                }
+                final parsed = Map<String, dynamic>.from(
+                  jsonDecode(rawJson) as Map,
+                );
+                if (parsed.isNotEmpty) {
+                  decoded = parsed;
+                  break;
+                }
+              } catch (_) {}
             }
-            final firstBrace = rawJson.indexOf('{');
-            final lastBrace = rawJson.lastIndexOf('}');
-            if (firstBrace >= 0 && lastBrace > firstBrace) {
-              rawJson = rawJson.substring(firstBrace, lastBrace + 1);
+
+            if (decoded != null) {
+              final report = AiTelemetricsReport.fromJson(decoded)
+                  .sanitizeAndGround(
+                recordedDurationMs: 30000,
+                avgDecibels: -18.0,
+                mandatoryCue: item.scene.directorCue,
+              );
+              aiScore = report.compositeAiScore;
+              critique = report.directorCritique;
             }
-            final decoded = Map<String, dynamic>.from(
-              jsonDecode(rawJson) as Map,
-            );
-            final report = AiTelemetricsReport.fromJson(decoded);
-            aiScore = report.overallAiScore;
-            critique = report.directorCritique;
           }
         } catch (_) {
           // Deterministic fallback when Gemini key is not yet entered

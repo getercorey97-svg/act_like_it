@@ -403,7 +403,7 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
   bool _isSheetOpen = false;
   bool _isCapturingScreenshot = false;
   double _fabRightOffset = 12.0;
-  double _fabBottomOffset = 92.0;
+  double _fabTopOffset = 12.0;
 
   @override
   void initState() {
@@ -522,17 +522,76 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
     }
   }
 
+  Widget _buildQaFabPill({bool isDragging = false}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () => _triggerBugReportCapture(
+          triggerSource: 'FLOATING_QA_FAB',
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: isDragging
+                ? const Color(0xFF1F122B)
+                : const Color(0xEE140C1C),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: const Color(0xFFFFD700),
+              width: 2.0,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0xCC05070B),
+                offset: Offset(0, 3),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.bug_report_rounded,
+                size: 16,
+                color: Color(0xFFFFD700),
+              ),
+              SizedBox(width: 6),
+              Text(
+                'QA BUG',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                  color: Color(0xFFF5DEB3),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hideForBroadcast =
         GameSettingsModal.latestConfig.cleanBroadcastScreenShareMode;
     final screenSize = MediaQuery.sizeOf(context);
+    final safePadding = MediaQuery.paddingOf(context);
     final maxRight =
         (screenSize.width - 110.0).clamp(8.0, 2000.0).toDouble();
-    final maxBottom =
-        (screenSize.height - 80.0).clamp(16.0, 2000.0).toDouble();
+    final maxTop =
+        (screenSize.height - safePadding.top - safePadding.bottom - 80.0)
+            .clamp(8.0, 2000.0)
+            .toDouble();
     final clampedRight = _fabRightOffset.clamp(8.0, maxRight).toDouble();
-    final clampedBottom = _fabBottomOffset.clamp(16.0, maxBottom).toDouble();
+    final clampedTop = _fabTopOffset.clamp(8.0, maxTop).toDouble();
 
     return RepaintBoundary(
       key: _repaintBoundaryKey,
@@ -542,72 +601,27 @@ class _QaBugReporterOverlayState extends State<QaBugReporterOverlay> {
           widget.child,
           if (_isTester && !hideForBroadcast)
             Positioned(
+              top: clampedTop,
               right: clampedRight,
-              bottom: clampedBottom,
               child: SafeArea(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanUpdate: (DragUpdateDetails details) {
+                child: Draggable<String>(
+                  data: 'qa_bug_fab',
+                  feedback: _buildQaFabPill(isDragging: true),
+                  childWhenDragging: Opacity(
+                    opacity: 0.35,
+                    child: _buildQaFabPill(),
+                  ),
+                  onDragEnd: (DraggableDetails details) {
                     setState(() {
-                      _fabRightOffset = (_fabRightOffset - details.delta.dx)
-                          .clamp(8.0, maxRight)
-                          .toDouble();
-                      _fabBottomOffset = (_fabBottomOffset - details.delta.dy)
-                          .clamp(16.0, maxBottom)
-                          .toDouble();
+                      final newRight =
+                          screenSize.width - details.offset.dx - 96.0;
+                      final newTop = details.offset.dy - safePadding.top;
+                      _fabRightOffset =
+                          newRight.clamp(8.0, maxRight).toDouble();
+                      _fabTopOffset = newTop.clamp(8.0, maxTop).toDouble();
                     });
                   },
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(999),
-                      onTap: () => _triggerBugReportCapture(
-                        triggerSource: 'FLOATING_QA_FAB',
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xEE140C1C),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: const Color(0xFFFFD700),
-                            width: 2.0,
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0xCC05070B),
-                              offset: Offset(0, 3),
-                              blurRadius: 0,
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.bug_report_rounded,
-                              size: 16,
-                              color: Color(0xFFFFD700),
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'QA BUG',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                                color: Color(0xFFF5DEB3),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _buildQaFabPill(),
                 ),
               ),
             ),

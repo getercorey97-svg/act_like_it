@@ -19,11 +19,13 @@ import 'ui/parody_scenes_catalog.dart';
 import 'ui/boondocks_character_rig.dart';
 import 'ui/living_25d_animation_engine.dart';
 import 'auth/auth_service.dart';
+import 'auth/onboarding_flow.dart';
 
 export 'ui/lobby_models_and_realtime.dart';
 export 'ui/premiere_doors_marquee.dart';
 export 'ui/premiere_red_carpet_painters.dart';
 export 'ui/living_25d_animation_engine.dart';
+export 'auth/onboarding_flow.dart';
 
 class LobbyMatchmakingScreen extends StatefulWidget {
   final SceneCategory initialCategory;
@@ -504,15 +506,30 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                               color: Color(0xFF0CB6D4),
                             ),
                           ),
-                          onPressed: () {
+                          onPressed: () async {
                             HapticFeedback.mediumImpact();
+                            final nextSlotNum =
+                                _lobbyManager.players.length + 1;
+                            final selectedProfile =
+                                await LocalCastRosterBottomSheet.show(
+                              context,
+                              slotLabel: 'Player $nextSlotNum',
+                              excludedUserIds: _lobbyManager.players
+                                  .map((p) => p.userId)
+                                  .toSet(),
+                            );
+                            if (!mounted || selectedProfile == null) return;
                             setState(() {
                               GameSettingsModal.latestConfig =
                                   GameSettingsModal.latestConfig.copyWith(
                                 screenTestDuetMode: true,
+                                turnMode: 'pass_and_play',
                               );
                             });
-                            _lobbyManager.addLocalPassAndPlayPlayer();
+                            _lobbyManager.addLocalPassAndPlayPlayer(
+                              selectedProfile.username,
+                              selectedProfile,
+                            );
                           },
                         ),
                       ],
@@ -962,12 +979,20 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
               ElevatedButton.icon(
                 onPressed: _lobbyManager.isLoading
                     ? null
-                    : () {
+                    : () async {
                         HapticFeedback.mediumImpact();
                         if (_isJoinMode) {
-                          _lobbyManager.joinLobbyByCode(
+                          final vipGuest = await VipGuestOnboardingFlow
+                              .ensureVipGuestBeforeJoin(
+                            context,
+                            initialName: _nameController.text,
                             roomCode: _codeController.text,
-                            displayName: _nameController.text,
+                          );
+                          if (!mounted || vipGuest == null) return;
+                          _nameController.text = vipGuest.stageName;
+                          await _lobbyManager.joinLobbyByCode(
+                            roomCode: _codeController.text,
+                            displayName: vipGuest.stageName,
                           );
                         } else {
                           _lobbyManager.createLobby(
@@ -982,7 +1007,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                   _lobbyManager.isLoading
                       ? 'Opening Soundstage Doors...'
                       : (_isJoinMode
-                          ? 'Step Onto Stage · Join 6-Digit Room'
+                          ? 'Step Onto Stage · VIP Guest 6-Digit Join'
                           : 'Generate 6-Digit Set Pass'),
                 ),
               ),
@@ -1520,9 +1545,21 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                               vertical: 6,
                             ),
                           ),
-                          onPressed: () {
+                          onPressed: () async {
                             HapticFeedback.lightImpact();
-                            _lobbyManager.addLocalPassAndPlayPlayer();
+                            final nextSlotNum = players.length + 1;
+                            final selectedProfile =
+                                await LocalCastRosterBottomSheet.show(
+                              context,
+                              slotLabel: 'Player $nextSlotNum',
+                              excludedUserIds:
+                                  players.map((p) => p.userId).toSet(),
+                            );
+                            if (!mounted || selectedProfile == null) return;
+                            _lobbyManager.addLocalPassAndPlayPlayer(
+                              selectedProfile.username,
+                              selectedProfile,
+                            );
                           },
                           icon: const Icon(Icons.group_add_rounded, size: 15),
                           label: const Text(
@@ -1569,10 +1606,18 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                 ],
               ),
               const SizedBox(height: 10),
-              ...players.map(
-                (player) {
+              ...players.asMap().entries.map(
+                (entry) {
+                  final slotIndex = entry.key;
+                  final player = entry.value;
                   final isLocalUser =
                       player.userId == _lobbyManager.localUserId;
+                  final isGenericPassAndPlaySlot =
+                      player.userId.startsWith('local-player-') ||
+                          RegExp(r'^Player\s+\d+$')
+                              .hasMatch(player.displayName.trim());
+                  final isLocalPassAndPlayActor = !isLocalUser &&
+                      !player.userId.startsWith('ai-costar-');
                   final resolvedAvatarId = isLocalUser
                       ? AuthService.instance.currentUserAvatar
                       : player.avatarArchetypeId;
@@ -1584,13 +1629,34 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                       color: const Color(0xFF121722),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isLocalUser
-                            ? playerArchetype.rimAccentColor
-                                .withValues(alpha: 0.65)
-                            : const Color(0xFF1E293B),
+                        color: isGenericPassAndPlaySlot
+                            ? const Color(0xFF00E5FF)
+                            : (isLocalUser
+                                ? playerArchetype.rimAccentColor
+                                    .withValues(alpha: 0.65)
+                                : const Color(0xFF1E293B)),
                       ),
                     ),
                     child: ListTile(
+                      onTap: isLocalPassAndPlayActor
+                          ? () async {
+                              HapticFeedback.selectionClick();
+                              final chosenProfile =
+                                  await LocalCastRosterBottomSheet.show(
+                                context,
+                                slotLabel: 'Player ${slotIndex + 1}',
+                                excludedUserIds: players
+                                    .where((p) => p.id != player.id)
+                                    .map((p) => p.userId)
+                                    .toSet(),
+                              );
+                              if (!mounted || chosenProfile == null) return;
+                              _lobbyManager.assignLocalPassAndPlayProfile(
+                                slotIndex,
+                                chosenProfile,
+                              );
+                            }
+                          : null,
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: BoondocksAvatarPortrait(
@@ -1601,14 +1667,20 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                         ),
                       ),
                       title: Text(
-                        player.displayName,
+                        isGenericPassAndPlaySlot
+                            ? '${player.displayName} (Tap to Select Local Actor)'
+                            : player.displayName,
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        '${player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast'} · ${playerArchetype.name}',
-                        style: const TextStyle(
+                        isGenericPassAndPlaySlot
+                            ? 'Couch Pass & Play Slot · Tap to open LocalCastRosterBottomSheet'
+                            : '${player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast'} · ${playerArchetype.name}',
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF94A3B8),
+                          color: isGenericPassAndPlaySlot
+                              ? const Color(0xFF00E5FF)
+                              : const Color(0xFF94A3B8),
                         ),
                       ),
                       trailing: Row(
@@ -1654,6 +1726,79 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                   );
                 },
               ),
+              if (players.length < 2)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () async {
+                      HapticFeedback.mediumImpact();
+                      final chosenProfile =
+                          await LocalCastRosterBottomSheet.show(
+                        context,
+                        slotLabel: 'Player 2',
+                        excludedUserIds:
+                            players.map((p) => p.userId).toSet(),
+                      );
+                      if (!mounted || chosenProfile == null) return;
+                      _lobbyManager.addLocalPassAndPlayPlayer(
+                        chosenProfile.username,
+                        chosenProfile,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.65),
+                          width: 1.4,
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.person_add_alt_1_rounded,
+                            color: Color(0xFF00E5FF),
+                            size: 22,
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Player 2 · Empty Couch Pass & Play Slot',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Tap to select a saved profile or "+ Create New Local Actor" so Player 2 logs separate Career XP.',
+                                  style: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: Color(0xFF00E5FF),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [

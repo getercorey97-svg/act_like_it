@@ -43,6 +43,7 @@ do $$
 begin
   -- public.profiles
   if to_regclass('public.profiles') is not null then
+    alter table public.profiles drop constraint if exists profiles_id_fkey;
     alter table public.profiles enable row level security;
     drop policy if exists "profiles_anon_auth_select" on public.profiles;
     create policy "profiles_anon_auth_select" on public.profiles for select to anon, authenticated using (true);

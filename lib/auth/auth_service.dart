@@ -467,6 +467,64 @@ class AuthService extends ChangeNotifier {
     return created;
   }
 
+  /// Reads all saved Actor Profiles from `shared_preferences` (`saved_actor_profiles_v1`)
+  /// and returns the refreshed local cast roster on this device.
+  Future<List<ActorProfileState>> loadSavedProfilesFromPrefs() async {
+    await _loadSavedProfilesRegistry();
+    if (_currentProfile != null) {
+      await _syncRegistryWithProfile(_currentProfile!);
+    }
+    notifyListeners();
+    return List<ActorProfileState>.unmodifiable(_savedProfiles);
+  }
+
+  /// Creates a distinct Local Actor Profile in `shared_preferences` (and Supabase if online)
+  /// for Couch Pass & Play (e.g., Player 2) without overwriting Player 1's active host profile
+  /// unless [switchToNewProfile] is true.
+  Future<ActorProfileState> createLocalCastProfile({
+    required String username,
+    required int birthYear,
+    required String avatarArchetypeId,
+    bool switchToNewProfile = false,
+  }) async {
+    if (switchToNewProfile) {
+      return createAndSwitchToNewProfile(
+        username: username,
+        birthYear: birthYear,
+        avatarArchetypeId: avatarArchetypeId,
+      );
+    }
+    final cleanHandle = username.trim().replaceAll('@', '').isEmpty
+        ? 'CoStar_${DateTime.now().second}'
+        : username.trim().replaceAll('@', '');
+    final newUserId =
+        'actor_${cleanHandle.toLowerCase().replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch % 100000}';
+    final created = ActorProfileState(
+      userId: newUserId,
+      email: '${cleanHandle.toLowerCase().replaceAll(' ', '_')}@actlikeit.stage',
+      username: cleanHandle,
+      birthYear: birthYear.clamp(1920, DateTime.now().year),
+      favoriteEras: const <String>['1970–1999', '2000–2026'],
+      actingStrengths: const <String>['Method Drama', 'Improv Comedy'],
+      aiTokenBalance: kDefaultStarterAiTokens,
+      unlockedScenePacks: const <String>[],
+      onboardingCompleted: true,
+      avatarArchetypeId: avatarArchetypeId,
+      careerXp: 500,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        '$_kLocalProfilePrefix${created.userId}',
+        jsonEncode(created.toJson()),
+      );
+      await _syncRegistryWithProfile(created);
+    } catch (_) {}
+    notifyListeners();
+    return created;
+  }
+
   /// Awards Career XP after a round/match finalization and persists to cache & Supabase.
   Future<ActorProfileState?> addCareerXp(int earnedXp) async {
     if (earnedXp <= 0) return _currentProfile;

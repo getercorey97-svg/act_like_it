@@ -612,16 +612,40 @@ class LobbyRealtimeManager extends ChangeNotifier {
     }
   }
 
+  Future<String> _ensurePersistentDeviceUuid() async {
+    if (_isValidUuid(_localUserId)) return _localUserId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('act_like_it_device_uuid_v1');
+      if (saved != null && _isValidUuid(saved)) {
+        _localUserId = saved;
+        return saved;
+      }
+      final generated = _generateEphemeralUuid();
+      await prefs.setString('act_like_it_device_uuid_v1', generated);
+      _localUserId = generated;
+      return generated;
+    } catch (_) {
+      final generated = _generateEphemeralUuid();
+      _localUserId = generated;
+      return generated;
+    }
+  }
+
   Future<String?> _ensureAuthenticatedAndProfile(SupabaseClient client) async {
+    final fallbackUuid = await _ensurePersistentDeviceUuid();
     try {
       var currentUser = client.auth.currentUser;
       if (currentUser == null) {
-        final anonRes = await client.auth.signInAnonymously();
-        currentUser = anonRes.user;
+        try {
+          final anonRes = await client.auth.signInAnonymously();
+          currentUser = anonRes.user;
+        } catch (_) {
+          // If Anonymous Auth is disabled in Supabase project settings,
+          // proceed with the persistent device UUID under anon RLS policies.
+        }
       }
-      if (currentUser == null) return null;
-
-      _localUserId = currentUser.id;
+      _localUserId = currentUser?.id ?? fallbackUuid;
       final cleanHandle = localDisplayName
           .trim()
           .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
@@ -629,18 +653,21 @@ class LobbyRealtimeManager extends ChangeNotifier {
       final suffix = _localUserId.substring(0, 6);
       final uniqueUsername =
           '${cleanHandle.isEmpty ? 'actor' : cleanHandle}_$suffix';
+      final birthYear = AuthService.instance.currentProfile?.birthYear ?? 1998;
 
-      await client.from('profiles').upsert(
-        {
-          'id': _localUserId,
-          'username': uniqueUsername,
-          'birth_year': 1998,
-        },
-        onConflict: 'id',
-      );
+      try {
+        await client.from('profiles').upsert(
+          {
+            'id': _localUserId,
+            'username': uniqueUsername,
+            'birth_year': birthYear.clamp(1920, DateTime.now().year),
+          },
+          onConflict: 'id',
+        );
+      } catch (_) {}
       return _localUserId;
     } catch (_) {
-      return client.auth.currentUser?.id;
+      return client.auth.currentUser?.id ?? fallbackUuid;
     }
   }
 
@@ -749,35 +776,79 @@ class LobbyRealtimeManager extends ChangeNotifier {
         _players.length < 2) {
       addLocalPassAndPlayPlayer();
     }
+    _subscribeToLobbyRealtime(_session!);
     unawaited(saveActiveRoomSession(roomCode));
     _setLoading(false);
   }
 
   /// Adds 1 local Pass-and-Play player (e.g. Player 2, Player 3) for Couch Co-Op turn rotation.
-  void addLocalPassAndPlayPlayer([String? customName]) {
+  /// When [profile] is provided from `LocalCastRosterBottomSheet`, binds the slot to that
+  /// distinct `ActorProfileState` so stats and takes log to their own profile instead of a generic "Player 2".
+  void addLocalPassAndPlayPlayer([
+    String? customName,
+    ActorProfileState? profile,
+  ]) {
     final currentSession = _session;
     if (currentSession == null) return;
     if (_players.length >= currentSession.maxPlayers) return;
 
     final nextNumber = _players.length + 1;
-    final archetype =
-        kFourteenAvatarArchetypes[(nextNumber - 1) % kFourteenAvatarArchetypes.length];
-    final playerName = (customName != null && customName.trim().isNotEmpty)
-        ? customName.trim()
-        : 'Player $nextNumber';
+    final defaultArchetype = kFourteenAvatarArchetypes[
+        (nextNumber - 1) % kFourteenAvatarArchetypes.length];
+    final resolvedAvatarId =
+        profile?.avatarArchetypeId.isNotEmpty == true
+            ? profile!.avatarArchetypeId
+            : defaultArchetype.id;
+    final resolvedUserId =
+        profile?.userId.isNotEmpty == true
+            ? profile!.userId
+            : 'local-player-$nextNumber';
+    final playerName =
+        (profile != null && profile.username.trim().isNotEmpty)
+            ? profile.username.trim()
+            : ((customName != null && customName.trim().isNotEmpty)
+                ? customName.trim()
+                : 'Player $nextNumber');
 
     _players = [
       ..._players,
       LobbyPlayer(
-        id: 'p-local-$nextNumber',
+        id: 'p-local-$nextNumber-${resolvedUserId.hashCode.abs()}',
         lobbyId: currentSession.id,
-        userId: 'local-player-$nextNumber',
+        userId: resolvedUserId,
         displayName: playerName,
-        avatarArchetypeId: archetype.id,
+        avatarArchetypeId: resolvedAvatarId,
         isHost: false,
         isReady: true,
       ),
     ];
+    _notifySafely();
+  }
+
+  /// Replaces an existing local Pass-and-Play slot (such as a generic "Player 2" slot)
+  /// with a distinct local `ActorProfileState` selected from `LocalCastRosterBottomSheet`.
+  void assignLocalPassAndPlayProfile(
+    int playerIndex,
+    ActorProfileState profile,
+  ) {
+    final currentSession = _session;
+    if (currentSession == null) return;
+    if (playerIndex < 0 || playerIndex >= _players.length) {
+      addLocalPassAndPlayPlayer(profile.username, profile);
+      return;
+    }
+    final existing = _players[playerIndex];
+    final updated = List<LobbyPlayer>.from(_players);
+    updated[playerIndex] = LobbyPlayer(
+      id: existing.id,
+      lobbyId: currentSession.id,
+      userId: profile.userId,
+      displayName: profile.username,
+      avatarArchetypeId: profile.avatarArchetypeId,
+      isHost: existing.isHost,
+      isReady: true,
+    );
+    _players = updated;
     _notifySafely();
   }
 
@@ -891,6 +962,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
       ),
     ];
     _syncSessionPlayers();
+    _subscribeToLobbyRealtime(_session!);
     unawaited(saveActiveRoomSession(sanitizedCode));
     _setLoading(false);
   }
@@ -1169,6 +1241,33 @@ class LobbyRealtimeManager extends ChangeNotifier {
           );
         }
       }
+
+      // Add any remote players discovered via Realtime Presence who are not yet in _players
+      final existingUserIds = _players.map((e) => e.userId).toSet();
+      bool addedRemotePlayer = false;
+      for (final entry in presenceByUser.entries) {
+        final uid = entry.key;
+        final p = entry.value;
+        if (!existingUserIds.contains(uid)) {
+          _players.add(
+            LobbyPlayer(
+              id: 'p-rt-$uid',
+              lobbyId: _session!.id,
+              userId: uid,
+              displayName: p['display_name']?.toString() ?? 'Remote Co-Star',
+              avatarArchetypeId: p['avatar_archetype']?.toString() ??
+                  kFourteenAvatarArchetypes.first.id,
+              isHost: p['is_host'] == true,
+              isReady: p['is_ready'] is bool ? p['is_ready'] as bool : true,
+            ),
+          );
+          addedRemotePlayer = true;
+        }
+      }
+      if (addedRemotePlayer && _players.length > 2) {
+        // Remove synthetic fallback placeholder if a real remote player joined via Presence
+        _players.removeWhere((p) => p.userId == 'remote-peer-1');
+      }
     } catch (_) {}
   }
 
@@ -1272,6 +1371,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
               await channel.track({
                 'user_id': _localUserId,
                 'display_name': localDisplayName,
+                'avatar_archetype': AuthService.instance.currentUserAvatar,
                 'is_host': isHost,
                 'is_ready': true,
               });

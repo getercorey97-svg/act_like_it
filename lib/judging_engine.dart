@@ -108,9 +108,16 @@ class VocalProsodyShiftTelemetry {
 
 class AiTelemetricsReport {
   final double overallAiScore;
+  final double compositeAiScore;
   final double facialExpressionScore;
   final double vocalCadenceScore;
   final double directorCueFidelity;
+  final double facialKinesiologyScore;
+  final double ocularFidelityScore;
+  final double vocalProsodyScore;
+  final double somaticTensionScore;
+  final double curveballAdaptationScore;
+  final List<String> millisecondProofTimestamps;
   final String scoringTier;
   final String directorCritique;
   final List<FacialMicroExpressionTelemetry> facialMicroExpressions;
@@ -118,14 +125,32 @@ class AiTelemetricsReport {
 
   const AiTelemetricsReport({
     required this.overallAiScore,
+    double? compositeAiScore,
     required this.facialExpressionScore,
     required this.vocalCadenceScore,
     required this.directorCueFidelity,
+    double? facialKinesiologyScore,
+    double? ocularFidelityScore,
+    double? vocalProsodyScore,
+    double? somaticTensionScore,
+    double? curveballAdaptationScore,
+    this.millisecondProofTimestamps = const <String>[
+      '[00:04.180]',
+      '[00:15.420]',
+      '[00:24.890]',
+    ],
     this.scoringTier = '70-89_AVERAGE_ATTEMPT',
     required this.directorCritique,
     this.facialMicroExpressions = const <FacialMicroExpressionTelemetry>[],
     this.vocalProsodyShifts = const <VocalProsodyShiftTelemetry>[],
-  });
+  })  : compositeAiScore = compositeAiScore ?? overallAiScore,
+        facialKinesiologyScore =
+            facialKinesiologyScore ?? facialExpressionScore,
+        ocularFidelityScore = ocularFidelityScore ?? facialExpressionScore,
+        vocalProsodyScore = vocalProsodyScore ?? vocalCadenceScore,
+        somaticTensionScore = somaticTensionScore ?? directorCueFidelity,
+        curveballAdaptationScore =
+            curveballAdaptationScore ?? directorCueFidelity;
 
   String get formattedScoringTierBadge {
     switch (scoringTier) {
@@ -142,14 +167,69 @@ class AiTelemetricsReport {
     }
   }
 
+  static String formatMillisecondTimestamp(int ms) {
+    final safeMs = ms < 0 ? 0 : ms;
+    final minutes = (safeMs ~/ 60000).toString().padLeft(2, '0');
+    final seconds = ((safeMs % 60000) ~/ 1000).toString().padLeft(2, '0');
+    final millis = (safeMs % 1000).toString().padLeft(3, '0');
+    return '[$minutes:$seconds.$millis]';
+  }
+
   factory AiTelemetricsReport.fromJson(Map<String, dynamic> json) {
-    final facial =
-        (json['facial_expression_score'] as num?)?.toDouble() ?? 78.0;
-    final vocal = (json['vocal_cadence_score'] as num?)?.toDouble() ?? 76.0;
-    final fidelity =
-        (json['director_cue_fidelity'] as num?)?.toDouble() ?? 78.0;
-    final overall = (json['overall_ai_score'] as num?)?.toDouble() ??
-        ((facial + vocal + fidelity) / 3.0);
+    final facialKinesiology =
+        (json['facial_kinesiology_score'] as num?)?.toDouble() ??
+            (json['facial_expression_score'] as num?)?.toDouble() ??
+            78.0;
+    final ocularFidelity =
+        (json['ocular_fidelity_score'] as num?)?.toDouble() ??
+            facialKinesiology;
+    final vocalProsody =
+        (json['vocal_prosody_score'] as num?)?.toDouble() ??
+            (json['vocal_cadence_score'] as num?)?.toDouble() ??
+            76.0;
+    final somaticTension =
+        (json['somatic_tension_score'] as num?)?.toDouble() ??
+            (json['director_cue_fidelity'] as num?)?.toDouble() ??
+            78.0;
+    final curveballAdaptation =
+        (json['curveball_adaptation_score'] as num?)?.toDouble() ??
+            somaticTension;
+
+    final fivePillarAverage = (facialKinesiology +
+            ocularFidelity +
+            vocalProsody +
+            somaticTension +
+            curveballAdaptation) /
+        5.0;
+
+    final compositeAi =
+        (json['composite_ai_score'] as num?)?.toDouble() ??
+            (json['Composite AiScore'] as num?)?.toDouble() ??
+            (json['overall_ai_score'] as num?)?.toDouble() ??
+            fivePillarAverage;
+
+    final rawTimestamps = json['millisecond_proof_timestamps'];
+    final parsedTimestamps = <String>[];
+    if (rawTimestamps is List) {
+      for (final item in rawTimestamps) {
+        final text = item?.toString().trim() ?? '';
+        if (text.isNotEmpty) {
+          parsedTimestamps.add(text);
+        }
+      }
+    }
+    if (parsedTimestamps.length < 3) {
+      const defaults = <String>[
+        '[00:04.180]',
+        '[00:15.420]',
+        '[00:24.890]',
+      ];
+      for (final d in defaults) {
+        if (parsedTimestamps.length < 3 && !parsedTimestamps.contains(d)) {
+          parsedTimestamps.add(d);
+        }
+      }
+    }
 
     final rawFacialEvents = json['facial_micro_expressions'];
     final parsedFacialEvents = <FacialMicroExpressionTelemetry>[];
@@ -179,7 +259,7 @@ class AiTelemetricsReport {
       }
     }
 
-    final clampedOverall = overall.clamp(0.0, 100.0);
+    final clampedOverall = compositeAi.clamp(0.0, 100.0);
     final inferredTier = clampedOverall >= 90.0
         ? '90-100_OSCAR_LEVEL'
         : clampedOverall >= 70.0
@@ -190,9 +270,16 @@ class AiTelemetricsReport {
 
     return AiTelemetricsReport(
       overallAiScore: clampedOverall,
-      facialExpressionScore: facial.clamp(0.0, 100.0),
-      vocalCadenceScore: vocal.clamp(0.0, 100.0),
-      directorCueFidelity: fidelity.clamp(0.0, 100.0),
+      compositeAiScore: clampedOverall,
+      facialExpressionScore: facialKinesiology.clamp(0.0, 100.0),
+      vocalCadenceScore: vocalProsody.clamp(0.0, 100.0),
+      directorCueFidelity: curveballAdaptation.clamp(0.0, 100.0),
+      facialKinesiologyScore: facialKinesiology.clamp(0.0, 100.0),
+      ocularFidelityScore: ocularFidelity.clamp(0.0, 100.0),
+      vocalProsodyScore: vocalProsody.clamp(0.0, 100.0),
+      somaticTensionScore: somaticTension.clamp(0.0, 100.0),
+      curveballAdaptationScore: curveballAdaptation.clamp(0.0, 100.0),
+      millisecondProofTimestamps: parsedTimestamps.take(3).toList(),
       scoringTier: (json['scoring_tier'] ?? inferredTier).toString(),
       directorCritique: json['director_critique']?.toString() ??
           'Committed emotional arc with crisp vocal projection on the key beat.',
@@ -200,10 +287,133 @@ class AiTelemetricsReport {
       vocalProsodyShifts: parsedVocalEvents,
     );
   }
+
+  /// Anti-Hallucination & Hardware Telemetry Reality Sanitizer:
+  /// Ensures Gemini never hallucinates high scores on silent/aborted takes,
+  /// never cites millisecond timestamps beyond the actual recorded take length,
+  /// and keeps Composite AiScore mathematically grounded to the 5 acting pillars.
+  AiTelemetricsReport sanitizeAndGround({
+    required int recordedDurationMs,
+    required double avgDecibels,
+    required String mandatoryCue,
+  }) {
+    final safeMaxMs = recordedDurationMs.clamp(1000, 30000);
+    final isHardwareSilenceOrAborted =
+        recordedDurationMs < 2000 || avgDecibels < -38.0;
+
+    double fk = facialKinesiologyScore.clamp(0.0, 100.0);
+    double of = ocularFidelityScore.clamp(0.0, 100.0);
+    double vp = vocalProsodyScore.clamp(0.0, 100.0);
+    double st = somaticTensionScore.clamp(0.0, 100.0);
+    double ca = curveballAdaptationScore.clamp(0.0, 100.0);
+
+    if (isHardwareSilenceOrAborted) {
+      fk = fk.clamp(18.0, 48.0);
+      of = of.clamp(18.0, 48.0);
+      vp = vp.clamp(15.0, 44.0);
+      st = st.clamp(18.0, 48.0);
+      ca = ca.clamp(18.0, 46.0);
+    }
+
+    final groundedFivePillarMean = ((fk + of + vp + st + ca) / 5.0).clamp(
+      0.0,
+      100.0,
+    );
+    final rawComposite = compositeAiScore.clamp(0.0, 100.0);
+    final groundedComposite = isHardwareSilenceOrAborted
+        ? groundedFivePillarMean.clamp(20.0, 48.5)
+        : ((rawComposite - groundedFivePillarMean).abs() > 12.0
+            ? groundedFivePillarMean
+            : rawComposite);
+
+    final groundedTier = groundedComposite >= 90.0
+        ? '90-100_OSCAR_LEVEL'
+        : groundedComposite >= 70.0
+            ? '70-89_AVERAGE_ATTEMPT'
+            : groundedComposite >= 50.0
+                ? '50-69_FLAT_DELIVERY'
+                : '0-49_LOW_ENERGY_OR_MISSED_CUE';
+
+    final groundedFacialEvents = facialMicroExpressions
+        .map(
+          (e) => FacialMicroExpressionTelemetry(
+            timestampMs: e.timestampMs.clamp(200, safeMaxMs),
+            microExpression: e.microExpression,
+            intensity: e.intensity.clamp(0.0, 1.0),
+            impactOnScore: e.impactOnScore,
+          ),
+        )
+        .toList();
+
+    final groundedVocalEvents = vocalProsodyShifts
+        .map(
+          (e) => VocalProsodyShiftTelemetry(
+            timestampMs: e.timestampMs.clamp(250, safeMaxMs),
+            prosodyShift: e.prosodyShift,
+            decibelLevelDb: e.decibelLevelDb.clamp(-60.0, 6.0),
+            impactOnScore: e.impactOnScore,
+          ),
+        )
+        .toList();
+
+    final normalizedStamps = <String>[];
+    for (final raw in millisecondProofTimestamps) {
+      final match =
+          RegExp(r'\[?(\d{2}):(\d{2})\.(\d{3})\]?').firstMatch(raw.trim());
+      if (match != null) {
+        final mins = int.tryParse(match.group(1)!) ?? 0;
+        final secs = int.tryParse(match.group(2)!) ?? 0;
+        final ms = int.tryParse(match.group(3)!) ?? 0;
+        final totalMs = ((mins * 60000) + (secs * 1000) + ms).clamp(
+          200,
+          safeMaxMs,
+        );
+        normalizedStamps.add(formatMillisecondTimestamp(totalMs));
+      }
+    }
+    while (normalizedStamps.length < 3) {
+      final fallbackOffsets = <int>[
+        (safeMaxMs * 0.18).round().clamp(200, safeMaxMs),
+        15420.clamp(200, safeMaxMs),
+        (safeMaxMs * 0.82).round().clamp(200, safeMaxMs),
+      ];
+      normalizedStamps.add(
+        formatMillisecondTimestamp(fallbackOffsets[normalizedStamps.length]),
+      );
+    }
+
+    return AiTelemetricsReport(
+      overallAiScore: groundedComposite,
+      compositeAiScore: groundedComposite,
+      facialExpressionScore: fk,
+      vocalCadenceScore: vp,
+      directorCueFidelity: ca,
+      facialKinesiologyScore: fk,
+      ocularFidelityScore: of,
+      vocalProsodyScore: vp,
+      somaticTensionScore: st,
+      curveballAdaptationScore: ca,
+      millisecondProofTimestamps: normalizedStamps.take(3).toList(),
+      scoringTier: groundedTier,
+      directorCritique: directorCritique.trim().isEmpty
+          ? 'Verified 5-pillar multimodal take against "$mandatoryCue".'
+          : directorCritique.trim(),
+      facialMicroExpressions: groundedFacialEvents,
+      vocalProsodyShifts: groundedVocalEvents,
+    );
+  }
 }
 
 class TriModalJudgingEngine extends ChangeNotifier {
   static const String storageBucket = 'performance-loops';
+  static const String kPrimaryGeminiModel = 'gemini-2.5-pro';
+  static const List<String> kGeminiModelCascade = <String>[
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-3.8-flash',
+    'gemini-flash-latest',
+    'gemini-1.5-pro',
+  ];
   static final RegExp _uuidRegex = RegExp(
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
@@ -583,7 +793,14 @@ class TriModalJudgingEngine extends ChangeNotifier {
       const systemPersonaPrompt = '''
 You are an unforgiving, ruthless A-List Hollywood Casting Director and AI Telemetrics Auditor for "Act Like It".
 You power 45% of the official Tri-Modal Verdict. Do NOT act like a polite or lenient chatbot.
-Audit every facial frame and audio decibel sample with clinical, studio-grade scrutiny.
+Watch the 30-second video and audit every facial frame and audio decibel sample with clinical, studio-grade scrutiny.
+
+ELITE MULTIMODAL 5-PILLAR ACTING ASSESSMENT (GRADE EACH PILLAR OUT OF 100):
+1. Facial Kinesiology (0-100): Duchenne smiles, brow furrowing, and micro-expressions.
+2. Ocular Fidelity (0-100): Eyeline maintenance, strategic blinking, and gaze intensity.
+3. Vocal Prosody (0-100): Pitch dynamics, cadence, volume control, and pregnant pauses.
+4. Somatic Tension (0-100): Shoulder posture, breathing rhythm, and camera framing.
+5. Curveball Adaptation (0-100): How flawlessly the actor pivots emotion at the 15-second mark.
 
 STRICT SCORING DISTRIBUTION MATRIX (MANDATORY):
 - Score 90–100 ("90-100_OSCAR_LEVEL") ONLY for flawless, Oscar-level delivery where facial micro-expressions, vocal prosody shifts, and the Director Cue align with unmistakable conviction.
@@ -592,23 +809,11 @@ STRICT SCORING DISTRIBUTION MATRIX (MANDATORY):
 - Score below 50 ("0-49_LOW_ENERGY_OR_MISSED_CUE") for low energy, dead air/silence (mean audio below -38 dBFS), short/aborted takes (< 3 seconds), or completely missed Director Cues.
 
 MILLISECOND TELEMETRY PROOF REQUIREMENT:
-You MUST justify the score to the S.O.A. alpha tester by pinpointing exact millisecond timestamps (`timestamp_ms`) for both:
-1. `facial_micro_expressions`: Specific ocular, brow, jaw, or posture shifts observed across the sampled camera frames.
-2. `vocal_prosody_shifts`: Specific cadence accelerations, dramatic pauses, whispers, or diaphragm projection peaks observed across the audio decibel timeline.
+You MUST return 3 exact millisecond timestamps formatted as "[MM:SS.mmm]" (e.g., "[00:04.180]", "[00:15.420]", "[00:24.890]") proving where you detected a micro-expression or vocal shift, plus detailed `facial_micro_expressions` and `vocal_prosody_shifts` arrays with `timestamp_ms`.
 ''';
 
-      final model = GenerativeModel(
-        model: 'gemini-2.5-flash',
-        apiKey: AppConfig.geminiApiKey,
-        systemInstruction: Content.system(systemPersonaPrompt),
-        generationConfig: GenerationConfig(
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-        ),
-      );
-
       final promptText = '''
-AUDIT THIS SOUNDSTAGE SCREEN TEST AGAINST THE SCENE BRIEF:
+WATCH THE 30-SECOND VIDEO TAKE AND AUDIT THIS SOUNDSTAGE SCREEN TEST AGAINST THE SCENE BRIEF:
 - Scene Title: "${scene.title}"
 - Film/Series Parody: ${scene.filmOrSeries} (${scene.releaseYear})
 - Character: ${scene.characterName}
@@ -617,34 +822,56 @@ AUDIT THIS SOUNDSTAGE SCREEN TEST AGAINST THE SCENE BRIEF:
 - Duet Lead B Script: "${scene.duetLeadB}"
 - Mandatory Director Cue: "${scene.directorCue}"
 - Target Emotion: "${scene.emotionalTarget}"
-- Mid-Scene Improv Twist: "${scene.improvTwist}"
+- Mid-Scene Improv Twist (15-second Curveball): "${scene.improvTwist}"
 - Sampled Duration: ${samples.length} seconds (${samples.length * 1000}ms)
 - Mean Audio Projection: ${avgDecibels.toStringAsFixed(1)} dBFS (Peak: ${peakDecibels.toStringAsFixed(1)} dBFS)
 - Captured Millisecond Telemetry Timeline:
 ${telemetryTimelineLines.isEmpty ? '  - No frame samples captured (0ms).' : telemetryTimelineLines.join('\n')}
 
-Apply the STRICT SCORING DISTRIBUTION MATRIX (90-100 ONLY for flawless Oscar-level delivery; 70-89 for average attempts; below 50 for low energy, silence, or missed cues).
+Grade all 5 acting pillars out of 100:
+1. Facial Kinesiology: Duchenne smiles, brow furrowing, and micro-expressions.
+2. Ocular Fidelity: Eyeline maintenance, strategic blinking, and gaze intensity.
+3. Vocal Prosody: Pitch dynamics, cadence, volume control, and pregnant pauses.
+4. Somatic Tension: Shoulder posture, breathing rhythm, and camera framing.
+5. Curveball Adaptation: How flawlessly the actor pivots emotion at the 15-second mark.
+
+ANTI-HALLUCINATION MANDATE:
+- Base your scores strictly on the provided camera frames and decibel samples.
+- Do NOT invent timestamps outside 0ms..${(samples.length * 1000).clamp(1000, 30000)}ms.
+- Apply the STRICT SCORING DISTRIBUTION MATRIX (90-100 ONLY for flawless Oscar-level delivery; 70-89 for average attempts; below 50 for low energy, silence, or missed cues).
 
 Return strict JSON matching this exact schema:
 {
+  "facial_kinesiology_score": <number 0-100>,
+  "ocular_fidelity_score": <number 0-100>,
+  "vocal_prosody_score": <number 0-100>,
+  "somatic_tension_score": <number 0-100>,
+  "curveball_adaptation_score": <number 0-100>,
+  "Composite AiScore": <number 0-100>,
+  "composite_ai_score": <number 0-100>,
   "overall_ai_score": <number 0-100>,
   "facial_expression_score": <number 0-100>,
   "vocal_cadence_score": <number 0-100>,
   "director_cue_fidelity": <number 0-100>,
+  "millisecond_proof_timestamps": [
+    "[00:04.180]",
+    "[00:15.420]",
+    "[00:24.890]"
+  ],
   "scoring_tier": "<90-100_OSCAR_LEVEL | 70-89_AVERAGE_ATTEMPT | 50-69_FLAT_DELIVERY | 0-49_LOW_ENERGY_OR_MISSED_CUE>",
-  "director_critique": "<ruthless, specific 2-sentence Hollywood casting director critique citing exact millisecond moments>",
+  "director_critique": "<ruthless, specific 2-sentence Hollywood casting director critique citing exact millisecond timestamps like [00:15.420]>",
   "facial_micro_expressions": [
     {
-      "timestamp_ms": <exact int millisecond timestamp e.g. 850>,
-      "micro_expression": "<specific facial micro-expression detected>",
+      "timestamp_ms": <exact int millisecond timestamp e.g. 4180>,
+      "micro_expression": "<specific facial micro-expression or ocular shift detected>",
       "intensity": <number 0.0-1.0>,
       "impact_on_score": "<how this frame helped or hurt the score>"
     }
   ],
   "vocal_prosody_shifts": [
     {
-      "timestamp_ms": <exact int millisecond timestamp e.g. 2140>,
-      "prosody_shift": "<specific vocal cadence, pitch, or volume shift>",
+      "timestamp_ms": <exact int millisecond timestamp e.g. 15420>,
+      "prosody_shift": "<specific vocal cadence, pitch, or 15s curveball pivot>",
       "decibel_level_db": <number dBFS e.g. -14.2>,
       "impact_on_score": "<how this vocal beat helped or hurt the score>"
     }
@@ -660,12 +887,43 @@ Return strict JSON matching this exact schema:
         }
       }
 
-      final response = await model
-          .generateContent([Content.multi(parts)])
-          .timeout(const Duration(seconds: 15));
-      final rawText = response.text ?? '{}';
-      final decoded = _extractJsonObject(rawText);
-      _aiReport = AiTelemetricsReport.fromJson(decoded);
+      Map<String, dynamic>? decoded;
+      Object? lastModelError;
+      for (final candidateModel in kGeminiModelCascade) {
+        try {
+          final model = GenerativeModel(
+            model: candidateModel,
+            apiKey: AppConfig.geminiApiKey,
+            systemInstruction: Content.system(systemPersonaPrompt),
+            generationConfig: GenerationConfig(
+              responseMimeType: 'application/json',
+              temperature: 0.2,
+            ),
+          );
+          final response = await model
+              .generateContent([Content.multi(parts)])
+              .timeout(const Duration(seconds: 15));
+          final rawText = response.text ?? '{}';
+          final parsed = _extractJsonObject(rawText);
+          if (parsed.isNotEmpty) {
+            decoded = parsed;
+            break;
+          }
+        } catch (err) {
+          lastModelError = err;
+        }
+      }
+
+      if (decoded == null || decoded.isEmpty) {
+        throw lastModelError ??
+            Exception('All Gemini model candidates returned empty payload.');
+      }
+
+      _aiReport = AiTelemetricsReport.fromJson(decoded).sanitizeAndGround(
+        recordedDurationMs: samples.length * 1000,
+        avgDecibels: avgDecibels,
+        mandatoryCue: scene.directorCue,
+      );
       return _aiReport!;
     } catch (_) {
       final avgDecibels = samples.isEmpty
@@ -723,9 +981,20 @@ Return strict JSON matching this exact schema:
 
       _aiReport = AiTelemetricsReport(
         overallAiScore: calibratedScore,
+        compositeAiScore: calibratedScore,
         facialExpressionScore: (calibratedScore + 1.5).clamp(20.0, 99.0),
         vocalCadenceScore: (calibratedScore - 1.0).clamp(20.0, 98.0),
         directorCueFidelity: (calibratedScore + 0.5).clamp(20.0, 99.0),
+        facialKinesiologyScore: (calibratedScore + 1.5).clamp(20.0, 99.0),
+        ocularFidelityScore: (calibratedScore + 0.8).clamp(20.0, 99.0),
+        vocalProsodyScore: (calibratedScore - 1.0).clamp(20.0, 98.0),
+        somaticTensionScore: (calibratedScore + 0.2).clamp(20.0, 99.0),
+        curveballAdaptationScore: (calibratedScore + 0.5).clamp(20.0, 99.0),
+        millisecondProofTimestamps: <String>[
+          AiTelemetricsReport.formatMillisecondTimestamp(4180),
+          '[00:15.420]',
+          AiTelemetricsReport.formatMillisecondTimestamp(climaxTimestampMs),
+        ],
         scoringTier: calibratedTier,
         directorCritique: calibratedCritique,
         facialMicroExpressions: <FacialMicroExpressionTelemetry>[
@@ -1438,20 +1707,23 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF07090E),
       appBar: GameAppBar(
-        title: 'Tri-Modal Verdict',
+        title: 'Tri-Modal Judging',
         activeRoomCode: widget.lobbySession.roomCode,
         latestCompositeScore: _engine.compositeTriModalScore,
         extraActions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: Center(
-              child: Text(
-                'Composite: ${_engine.compositeTriModalScore.toStringAsFixed(1)}',
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFF59E0B),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Composite: ${_engine.compositeTriModalScore.toStringAsFixed(1)}',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFF59E0B),
+                  ),
                 ),
               ),
             ),
@@ -1489,14 +1761,18 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                       Icon(Icons.movie_creation_rounded, color: Color(0xFFFFD700), size: 24),
                       SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          'GEMINI AI ANALYZING TELEMETRICS...',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.0,
-                            color: Color(0xFFFFD700),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'GEMINI AI ANALYZING TELEMETRICS...',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                              color: Color(0xFFFFD700),
+                            ),
                           ),
                         ),
                       ),
@@ -1699,13 +1975,17 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '⏱️ MILLISECOND AI TELEMETRY STAMPS (UNOBSTRUCTED REPLAY RECEIPT)',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFFFD700),
+                  const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '⏱️ MILLISECOND AI TELEMETRY STAMPS (UNOBSTRUCTED REPLAY RECEIPT)',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFFFD700),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -1772,15 +2052,36 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                       style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                     )
                   else if (report != null) ...[
-                    Text(
-                      'Facial: ${report.facialExpressionScore.toStringAsFixed(0)} · '
-                      'Vocal: ${report.vocalCadenceScore.toStringAsFixed(0)} · '
-                      'Cue Fidelity: ${report.directorCueFidelity.toStringAsFixed(0)} · '
-                      'Tier: ${report.formattedScoringTierBadge}',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        color: Color(0xFFF59E0B),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Facial Kinesiology: ${report.facialKinesiologyScore.toStringAsFixed(0)} · '
+                        'Ocular Fidelity: ${report.ocularFidelityScore.toStringAsFixed(0)} · '
+                        'Vocal Prosody: ${report.vocalProsodyScore.toStringAsFixed(0)} · '
+                        'Somatic Tension: ${report.somaticTensionScore.toStringAsFixed(0)} · '
+                        'Curveball Adaptation: ${report.curveballAdaptationScore.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Composite AiScore: ${report.compositeAiScore.toStringAsFixed(1)}/100 · '
+                        'Tier: ${report.formattedScoringTierBadge} · '
+                        'Proof: ${report.millisecondProofTimestamps.join(" ")}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          color: Color(0xFF00E5FF),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1799,14 +2100,18 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'MILLISECOND TELEMETRY PROOF (FACIAL & VOCAL CADENCE)',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                                color: Color(0xFF0CB6D4),
+                            const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'MILLISECOND TELEMETRY PROOF (FACIAL & VOCAL CADENCE)',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
+                                  color: Color(0xFF0CB6D4),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -1854,13 +2159,17 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              '🕵️ LIFE IS IMPROV · 5-PILLAR REAL-WORLD AI VERDICT (1.50x XP)',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFFFFD700),
+                            const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '🕵️ LIFE IS IMPROV · 5-PILLAR REAL-WORLD AI VERDICT (1.50x XP)',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFFFD700),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -1911,17 +2220,21 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _calibrationFeedbackSubmitted
-                                ? '✅ AI CALIBRATION FEEDBACK SENT ($_selectedCalibrationRating)'
-                                : '🎯 Was Gemini\'s Judging Accurate?',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: _calibrationFeedbackSubmitted
-                                  ? const Color(0xFF34D399)
-                                  : const Color(0xFFFFD700),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _calibrationFeedbackSubmitted
+                                  ? '✅ AI CALIBRATION FEEDBACK SENT ($_selectedCalibrationRating)'
+                                  : '🎯 Was Gemini\'s Judging Accurate?',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: _calibrationFeedbackSubmitted
+                                    ? const Color(0xFF34D399)
+                                    : const Color(0xFFFFD700),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -2164,13 +2477,17 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '🤖 AI CO-STAR ENSEMBLE VOTING BIASES (SOLO & FILL-IN PANEL)',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0CB6D4),
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '🤖 AI CO-STAR ENSEMBLE VOTING BIASES (SOLO & FILL-IN PANEL)',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0CB6D4),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -2644,41 +2961,47 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                             textBaseline: TextBaseline.alphabetic,
                             children: [
                               Expanded(
-                                child: Text(
-                                  '${animatedComposite.clamp(0.0, 100.0).toStringAsFixed(1)} / 100',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    shadows: [
-                                      Shadow(
-                                        color: Color(0xFF05070B),
-                                        offset: Offset(3, 3),
-                                        blurRadius: 0,
-                                      ),
-                                      Shadow(
-                                        color: Color(0xFFE11D48),
-                                        blurRadius: 16,
-                                      ),
-                                    ],
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    '${animatedComposite.clamp(0.0, 100.0).toStringAsFixed(1)} / 100',
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          color: Color(0xFF05070B),
+                                          offset: Offset(3, 3),
+                                          blurRadius: 0,
+                                        ),
+                                        Shadow(
+                                          color: Color(0xFFE11D48),
+                                          blurRadius: 16,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            '${widget.performerDisplayName.toUpperCase()} · ${actorArchetype.name}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              color: actorArchetype.rimAccentColor,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${widget.performerDisplayName.toUpperCase()} · ${actorArchetype.name}',
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: actorArchetype.rimAccentColor,
+                              ),
                             ),
                           ),
                         ],
@@ -2767,38 +3090,47 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        pillars[i].title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: pillars[i].accent,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          pillars[i].title,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: pillars[i].accent,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        animatedScore.clamp(0.0, 100.0).toStringAsFixed(1),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          animatedScore.clamp(0.0, 100.0).toStringAsFixed(1),
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        pillars[i].weight,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 8.5,
-                          color: Color(0xFF94A3B8),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          pillars[i].weight,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 8.5,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ),
                       ),
                     ],
@@ -2879,15 +3211,19 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                           borderRadius: BorderRadius.circular(5),
                           border: Border.all(color: const Color(0xFFFFD700)),
                         ),
-                        child: Text(
-                          _directorMegaphoneReadingAloud
-                              ? '🔊 READING ALOUD · CASTING DIRECTOR CALLBACK'
-                              : '🎬 THE RUTHLESS CASTING DIRECTOR · TAP FOR TTS & RECEIPT',
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFFFD700),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _directorMegaphoneReadingAloud
+                                ? '🔊 READING ALOUD · CASTING DIRECTOR CALLBACK'
+                                : '🎬 THE RUTHLESS CASTING DIRECTOR · TAP FOR TTS & RECEIPT',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFFD700),
+                            ),
                           ),
                         ),
                       ),

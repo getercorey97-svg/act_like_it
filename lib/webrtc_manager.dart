@@ -2575,142 +2575,146 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         : (isFinalThree
             ? 'CLAPPERBOARD READY · $_preRollSecondsLeft...'
             : 'DIRECTOR\'S 10s PRE-ROLL · FRAME YOUR SHOT (80% CLEAR VIEW)');
+    final maxPreRollBoxHeight =
+        (MediaQuery.sizeOf(context).height * 0.30).clamp(120.0, 320.0);
 
-    // Compact lower-third HUD card so 80%+ of the center camera viewfinder stays completely unobstructed
+    // Compact lower-third HUD card constrained to max 30% of screen height with Colors.black.withOpacity(0.4)
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xD90B0E17),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isFinalThree
-                  ? const Color(0xFFE11D48)
-                  : const Color(0xFFFFD700),
-              width: 2.4,
-            ),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0xFF05070B),
-                offset: Offset(4, 4),
-                blurRadius: 0,
-              ),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: maxPreRollBoxHeight,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isFinalThree
+                    ? const Color(0xFFE11D48)
+                    : const Color(0xFFFFD700),
+                width: 2.0,
+              ),
+            ),
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isFinalThree
-                          ? const Color(0x33E11D48)
-                          : const Color(0x3306B6D4),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isFinalThree
-                            ? const Color(0xFFE11D48)
-                            : const Color(0xFF06B6D4),
-                        width: 1.8,
-                      ),
-                    ),
-                    child: Text(
-                      _preRollSecondsLeft <= 1
-                          ? 'ACTION!'
-                          : '${_preRollSecondsLeft}s',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: isFinalThree
-                            ? const Color(0xFFE11D48)
-                            : const Color(0xFFFFD700),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          countdownHeadline,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isFinalThree
+                              ? const Color(0x33E11D48)
+                              : const Color(0x3306B6D4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isFinalThree
+                                ? const Color(0xFFE11D48)
+                                : const Color(0xFF06B6D4),
+                            width: 1.8,
+                          ),
+                        ),
+                        child: Text(
+                          _preRollSecondsLeft <= 1
+                              ? 'ACTION!'
+                              : '${_preRollSecondsLeft}s',
                           style: TextStyle(
                             fontFamily: 'monospace',
-                            fontSize: 10,
+                            fontSize: 22,
                             fontWeight: FontWeight.w900,
                             color: isFinalThree
-                                ? const Color(0xFFFFD700)
-                                : const Color(0xFF06B6D4),
+                                ? const Color(0xFFE11D48)
+                                : const Color(0xFFFFD700),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          scene != null
-                              ? 'Scene: "${scene.title}" · ${scene.characterName}'
-                              : 'Preparing Soundstage...',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        if (scene != null)
-                          Text(
-                            'Cue: ${scene.directorCue}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              countdownHeadline,
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: isFinalThree
+                                    ? const Color(0xFFFFD700)
+                                    : const Color(0xFF06B6D4),
+                              ),
                             ),
+                            const SizedBox(height: 2),
+                            Text(
+                              scene != null
+                                  ? 'Scene: "${scene.title}" · ${scene.characterName}'
+                                  : 'Preparing Soundstage...',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (scene != null)
+                              Text(
+                                'Cue: ${scene.directorCue}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFD700),
+                        backgroundColor: Colors.black.withOpacity(0.4),
+                        side: const BorderSide(
+                          color: Color(0xFFFFD700),
+                          width: 1.8,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                      ),
+                      onPressed: _skipPreRollAndRollCamera,
+                      icon: const Icon(Icons.fast_forward_rounded, size: 17),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'SNAP CLAPPERBOARD & ROLL CAMERA (30s TAKE)',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
                           ),
-                      ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFFD700),
-                    side: const BorderSide(
-                      color: Color(0xFFFFD700),
-                      width: 1.8,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 9,
-                    ),
-                  ),
-                  onPressed: _skipPreRollAndRollCamera,
-                  icon: const Icon(Icons.fast_forward_rounded, size: 17),
-                  label: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      'SNAP CLAPPERBOARD & ROLL CAMERA (30s TAKE)',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

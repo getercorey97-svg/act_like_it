@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../auth/auth_screen.dart';
 import '../auth/auth_service.dart';
 import '../auth/nda_tester_gate.dart';
+import '../auth/onboarding_flow.dart';
 import '../auth/onboarding_questionnaire.dart';
 import '../match_history_screen.dart';
 import '../monetization/payment_dashboard_screen.dart';
@@ -917,6 +918,34 @@ class _ActorProfileScreenState extends State<ActorProfileScreen> {
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF00E5FF),
+                    side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () async {
+                    HapticFeedback.mediumImpact();
+                    await LocalCastRosterBottomSheet.show(
+                      context,
+                      slotLabel: 'Player 2',
+                      switchActiveProfile: true,
+                    );
+                    if (mounted) setState(() {});
+                  },
+                  icon: const Icon(Icons.groups_rounded, size: 18),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '🛋️ OPEN COUCH PASS & PLAY CAST ROSTER',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),

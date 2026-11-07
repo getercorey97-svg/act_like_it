@@ -509,3 +509,64 @@ test('7 Surgical Production Upgrades (Vercel Camera Headers, Founder Admin God-M
   assert.ok(ndaGateDart.includes(String.raw`\$0.00 Sandbox Store unlock!`));
   assert.ok(profileDart.includes('extraActions: ['));
 });
+
+test('Gameplay Video Audit Upgrades: UI Collision Resolution, Universal Multi-Profile Sign-In (Couch & Cross-Internet), and 5-Pillar Gemini 1.5 Pro Acting Assessment', () => {
+  const qaOverlayDart = fs.readFileSync('lib/qa/qa_overlay.dart', 'utf8');
+  const webrtcDart = fs.readFileSync('lib/webrtc_manager.dart', 'utf8');
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  const gameAppBarDart = fs.readFileSync('lib/ui/game_app_bar.dart', 'utf8');
+  const onboardingFlowDart = fs.readFileSync('lib/auth/onboarding_flow.dart', 'utf8');
+  const lobbyDart = fs.readFileSync('lib/lobby.dart', 'utf8');
+  const profileDart = fs.readFileSync('lib/profile/actor_profile_screen.dart', 'utf8');
+
+  // 1. UI Bug Fixes & Collision Resolution
+  assert.ok(qaOverlayDart.includes('Draggable<String>'));
+  assert.ok(qaOverlayDart.includes('SafeArea'));
+  assert.ok(qaOverlayDart.includes('top: clampedTop'));
+  assert.ok(qaOverlayDart.includes('right: clampedRight'));
+
+  assert.ok(webrtcDart.includes('Colors.black.withOpacity(0.4)'));
+  assert.ok(webrtcDart.includes('MediaQuery.sizeOf(context).height * 0.30'));
+  assert.ok(webrtcDart.includes('maxHeight: maxPreRollBoxHeight'));
+
+  assert.ok(judgingDart.includes("title: 'Tri-Modal Judging'"));
+  assert.ok(judgingDart.includes('FittedBox(\n                        fit: BoxFit.scaleDown'));
+  assert.ok(gameAppBarDart.includes('FittedBox(\n              fit: BoxFit.scaleDown'));
+  assert.equal(judgingDart.includes('TextOverflow.ellipsis'), false);
+  assert.equal(gameAppBarDart.includes('TextOverflow.ellipsis'), false);
+
+  // 2. Universal Multi-Profile Sign-In (Couch & Cross-Internet)
+  assert.ok(onboardingFlowDart.includes('class VipGuestOnboardingFlow'));
+  assert.ok(onboardingFlowDart.includes('VIP GUEST FAST-TRACK'));
+  assert.ok(onboardingFlowDart.includes('class LocalCastRosterBottomSheet'));
+  assert.ok(onboardingFlowDart.includes('+ Create New Local Actor'));
+  assert.ok(lobbyDart.includes('VipGuestOnboardingFlow'));
+  assert.ok(lobbyDart.includes('LocalCastRosterBottomSheet.show'));
+  assert.ok(profileDart.includes('LocalCastRosterBottomSheet.show'));
+
+  // 3. Elite Multimodal AI Acting Assessment System (Gemini 2.5 Pro / 3.8 Flash Cascade + Anti-Hallucination Grounding + 5 Pillars)
+  const offlineManagerDart = fs.readFileSync('lib/offline_manager.dart', 'utf8');
+  const lobbyRealtimeDart = fs.readFileSync('lib/ui/lobby_models_and_realtime.dart', 'utf8');
+  assert.ok(judgingDart.includes("kPrimaryGeminiModel = 'gemini-2.5-pro'"));
+  assert.ok(judgingDart.includes("'gemini-3.8-flash'"));
+  assert.ok(judgingDart.includes("'gemini-2.5-flash'"));
+  assert.ok(judgingDart.includes("'gemini-flash-latest'"));
+  assert.ok(judgingDart.includes('sanitizeAndGround('));
+  assert.ok(offlineManagerDart.includes('TriModalJudgingEngine.kGeminiModelCascade'));
+  assert.ok(offlineManagerDart.includes('.sanitizeAndGround('));
+  assert.ok(lobbyRealtimeDart.includes('_ensurePersistentDeviceUuid()'));
+  assert.ok(judgingDart.includes('Facial Kinesiology'));
+  assert.ok(judgingDart.includes('Ocular Fidelity'));
+  assert.ok(judgingDart.includes('Vocal Prosody'));
+  assert.ok(judgingDart.includes('Somatic Tension'));
+  assert.ok(judgingDart.includes('Curveball Adaptation'));
+  assert.ok(judgingDart.includes('facial_kinesiology_score'));
+  assert.ok(judgingDart.includes('ocular_fidelity_score'));
+  assert.ok(judgingDart.includes('vocal_prosody_score'));
+  assert.ok(judgingDart.includes('somatic_tension_score'));
+  assert.ok(judgingDart.includes('curveball_adaptation_score'));
+  assert.ok(judgingDart.includes('Composite AiScore'));
+  assert.ok(judgingDart.includes('[00:15.420]'));
+});
+
+
