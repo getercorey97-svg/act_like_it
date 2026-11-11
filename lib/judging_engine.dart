@@ -152,6 +152,13 @@ class AiTelemetricsReport {
         curveballAdaptationScore =
             curveballAdaptationScore ?? directorCueFidelity;
 
+  double get lineAccuracy => curveballAdaptationScore;
+  double get emotionalCommitment => somaticTensionScore;
+  double get facialExpressiveness => facialKinesiologyScore;
+  double get vocalDynamism => vocalProsodyScore;
+  List<String> get aiReceiptStamps => millisecondProofTimestamps;
+  String get directorNote => directorCritique;
+
   String get formattedScoringTierBadge {
     switch (scoringTier) {
       case '90-100_OSCAR_LEVEL':
@@ -407,10 +414,20 @@ class AiTelemetricsReport {
 class TriModalJudgingEngine extends ChangeNotifier {
   static const String storageBucket = 'performance-loops';
   static const String kPrimaryGeminiModel = 'gemini-2.5-pro';
+  static const List<String> kGeminiModelFallbackOrder = <String>[
+    'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-flash-latest',
+  ];
   static const List<String> kGeminiModelCascade = <String>[
     'gemini-2.5-pro',
     'gemini-2.5-flash',
     'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-2.5-flash-lite',
     'gemini-flash-latest',
     'gemini-1.5-pro',
   ];

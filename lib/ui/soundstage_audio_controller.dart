@@ -745,6 +745,26 @@ class SoundstageAudioController extends ChangeNotifier {
       await playSfx(SoundstageSfx.oscarTrophyChime);
     } catch (_) {}
   }
+
+  Future<void> playElevatorDing() async {
+    if (!_masterEnabled || !_interactiveSfxEnabled) return;
+    try {
+      await HapticFeedback.lightImpact();
+    } catch (_) {}
+    try {
+      await playSfx(SoundstageSfx.velvetRopeHook);
+    } catch (_) {}
+  }
+
+  Future<void> playFlashbulbWhine() async {
+    if (!_masterEnabled || !_interactiveSfxEnabled) return;
+    try {
+      await HapticFeedback.selectionClick();
+    } catch (_) {}
+    try {
+      await playSfx(SoundstageSfx.paparazziShutterFlash);
+    } catch (_) {}
+  }
 }
 
 /// Compact, high-contrast Hollywood Soundstage Audio Console Bar that can be

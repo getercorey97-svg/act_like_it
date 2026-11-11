@@ -243,6 +243,9 @@ class OfflineManager extends ChangeNotifier {
   static const String _kMatchHistoryQueuePrefsKey =
       'offline_match_history_log_v1';
 
+  static const List<String> kGeminiModelFallbackOrder =
+      TriModalJudgingEngine.kGeminiModelFallbackOrder;
+
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Database? _sqliteDb;
@@ -422,11 +425,19 @@ class OfflineManager extends ChangeNotifier {
     }
   }
 
-  /// Evaluates `List<ConnectivityResult>` from `connectivity_plus: ^7.3.0`.
-  bool _evaluateConnectivityOnline(List<ConnectivityResult> results) {
-    if (results.isEmpty) return false;
-    return !results.contains(ConnectivityResult.none) ||
-        results.any((r) => r != ConnectivityResult.none);
+  /// Evaluates connectivity status from `connectivity_plus: ^7.3.0`,
+  /// supporting both `List<ConnectivityResult>` and single `ConnectivityResult` emissions.
+  bool _evaluateConnectivityOnline(dynamic raw) {
+    if (raw == null) return false;
+    if (raw is List) {
+      if (raw.isEmpty) return false;
+      return !raw.contains(ConnectivityResult.none) ||
+          raw.any((r) => r != ConnectivityResult.none);
+    }
+    if (raw is ConnectivityResult) {
+      return raw != ConnectivityResult.none;
+    }
+    return true;
   }
 
   // --------------------------------------------------------------------------

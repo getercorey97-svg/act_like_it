@@ -109,6 +109,10 @@ begin
     drop policy if exists "scenes_late_night_anon_auth_select" on public.scenes_late_night_after_hours;
     create policy "scenes_late_night_anon_auth_select" on public.scenes_late_night_after_hours for select to anon, authenticated using (true);
   end if;
+
+  -- Performance indexes for high-frequency room lookup and player joins
+  create index if not exists idx_lobbies_room_code on public.lobbies(room_code);
+  create index if not exists idx_lobby_players_lobby_id on public.lobby_players(lobby_id);
 end $$;
 
 -- 6. Server-Side Hardware-Bound Passcode Verification RPC (SECURITY DEFINER)

@@ -410,6 +410,8 @@ SupabaseClient? get supabaseOrNull {
 /// Top-level visual Safe Boot wrapper that surfaces any initialization or
 /// runtime exceptions in an interactive diagnostic banner/modal rather than
 /// allowing a blank white screen.
+typedef SafeBootDiagnosticInterceptor = SafeBootErrorBoundary;
+
 class SafeBootErrorBoundary extends StatefulWidget {
   final Widget child;
 

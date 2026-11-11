@@ -15,6 +15,8 @@ import 'auth_service.dart';
 /// Mandatory Closed Alpha NDA, Partnership Dossier, Dedicated Founder's Admin
 /// Login Page (`admin88` / `Cg0167853!8808`), State-of-the-Art Founder Command
 /// Center Dashboard, & Device-Bound Unique Passcode Security Gate.
+typedef NdaTesterGate = OfficialClosedAlphaNdaGateWrapper;
+
 class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
   final Widget child;
 

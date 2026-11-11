@@ -79,6 +79,8 @@ enum SceneCategory {
     required this.awardFilter,
   });
 
+  String get dbKey => key;
+
   static SceneCategory fromKey(String key) {
     final normalized = key.trim();
     return SceneCategory.values.firstWhere(
@@ -89,6 +91,8 @@ enum SceneCategory {
       orElse: () => SceneCategory.era1970To1999,
     );
   }
+
+  static SceneCategory fromDbKey(String key) => fromKey(key);
 }
 
 /// Shared Element (Hero) tag registry and custom flight shuttle / route builder
