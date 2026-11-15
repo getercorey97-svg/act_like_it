@@ -70,6 +70,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   String? _detectedClipboardCode;
   String? _savedActiveRoomCode;
   int _telemetricsTokens = 25;
+  bool _isNavigatingToStage = false;
 
   @override
   void initState() {
@@ -184,11 +185,37 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   }
 
   void _onLobbyStateChanged() {
-    if (_lobbyManager.session != null) {
+    final activeSession = _lobbyManager.session;
+    if (activeSession != null) {
       // Strictly silence background music upon entering the Setup / Green Room
       SoundstageAudioController.instance.silenceMusicForSetupOrGameRoom(
-        isLiveSoundstage: false,
+        isLiveSoundstage: activeSession.status == 'performing',
       );
+      if (activeSession.status == 'performing' &&
+          !_lobbyManager.isHost &&
+          !_isNavigatingToStage &&
+          mounted) {
+        _isNavigatingToStage = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final current = _lobbyManager.session ?? activeSession;
+          Navigator.of(context)
+              .push(
+                StageSharedTransitionRoute(
+                  page: LiveKitSoundstageScreen(
+                    lobbySession: current,
+                    localUserId: _lobbyManager.localUserId,
+                    localDisplayName: _lobbyManager.localDisplayName,
+                  ),
+                ),
+              )
+              .then((_) {
+            if (mounted) {
+              _isNavigatingToStage = false;
+            }
+          });
+        });
+      }
     } else {
       SoundstageAudioController.instance.enterMusicZone(
         SoundstageMusicZone.redCarpetDashboard,
@@ -1488,7 +1515,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () {
+                        onPressed: () async {
                           SoundstageAudioController.instance
                               .silenceMusicForSetupOrGameRoom(
                             isLiveSoundstage: true,
@@ -1502,6 +1529,7 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                               : null;
                           final initialScene = session.activeScene;
                           final syncedSession = session.copyWith(
+                            status: 'performing',
                             players: currentPlayers,
                             currentPlayerIndex: 0,
                             totalLocalPlayers:
@@ -1512,7 +1540,11 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                                 ? <String>[initialScene.id]
                                 : const <String>[],
                           );
-                          Navigator.of(context).push(
+                          _isNavigatingToStage = true;
+                          await _lobbyManager
+                              .launchSynchronizedMatch(syncedSession);
+                          if (!mounted) return;
+                          await Navigator.of(context).push(
                             StageSharedTransitionRoute(
                               page: LiveKitSoundstageScreen(
                                 lobbySession: syncedSession,
@@ -1522,6 +1554,9 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                               ),
                             ),
                           );
+                          if (mounted) {
+                            _isNavigatingToStage = false;
+                          }
                         },
                         icon: const Icon(Icons.videocam, size: 18),
                         label: const Text('Step Onto Soundstage & Roll Camera'),

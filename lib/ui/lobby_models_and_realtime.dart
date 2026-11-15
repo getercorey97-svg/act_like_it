@@ -401,6 +401,20 @@ class LobbyPlayer {
       socialScore: (json['social_score'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'lobby_id': lobbyId,
+        'user_id': userId,
+        'display_name': displayName,
+        'avatar_archetype': avatarArchetypeId,
+        'is_host': isHost,
+        'is_ready': isReady,
+        'is_supporting_role': isSupportingRole,
+        'ai_telemetrics_score': aiTelemetricsScore,
+        'peer_score': peerScore,
+        'social_score': socialScore,
+      };
 }
 
 class LobbySession {
@@ -494,7 +508,7 @@ class LobbySession {
     };
 
     final bool isSupporting = nextPlayer?.isSupportingRole == true ||
-        selectedCategory == SceneCategory.bestSupportingActor;
+        selectedCategory == SceneCategory.awardsBestSupportingActor;
 
     final ScenePrompt nextScene = clampedIndex == 0 && !isSupporting
         ? reference
@@ -522,6 +536,8 @@ class LobbySession {
     ScenePrompt? fallbackScene,
     String? fallbackActorId,
     List<LobbyPlayer> players = const <LobbyPlayer>[],
+    TurnSelectionMethod? fallbackTurnMethod,
+    List<String> fallbackUsedSceneIds = const <String>[],
   }) {
     final roomCode = json['room_code']?.toString() ?? '000000';
     final rawLiveKitRoom = json['livekit_room_name']?.toString() ?? '';
@@ -538,11 +554,44 @@ class LobbySession {
         : (fallbackCategory ?? SceneCategory.era1970To1999);
 
     final rawTurnMethod = json['turn_selection_method']?.toString();
+    final resolvedTurnMethod =
+        (rawTurnMethod != null && rawTurnMethod.isNotEmpty)
+            ? TurnSelectionMethod.fromKey(rawTurnMethod)
+            : (fallbackTurnMethod ?? TurnSelectionMethod.callSheetDraw);
+
+    final resolvedHostId = json['host_id']?.toString() ?? '';
+    List<LobbyPlayer> resolvedPlayers = players;
+    final rawPlayers = json['players'];
+    if (rawPlayers is List && rawPlayers.isNotEmpty) {
+      final parsedList = <LobbyPlayer>[];
+      for (final item in rawPlayers) {
+        if (item is Map) {
+          parsedList.add(
+            LobbyPlayer.fromJson(
+              Map<String, dynamic>.from(item),
+              hostId: resolvedHostId,
+            ),
+          );
+        }
+      }
+      if (parsedList.isNotEmpty) {
+        resolvedPlayers = parsedList;
+      }
+    }
+
+    List<String> resolvedUsedIds = fallbackUsedSceneIds;
+    final rawUsed = json['used_scene_ids'];
+    if (rawUsed is List) {
+      resolvedUsedIds = rawUsed
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList(growable: false);
+    }
 
     return LobbySession(
       id: json['id']?.toString() ?? '',
       roomCode: roomCode,
-      hostId: json['host_id']?.toString() ?? '',
+      hostId: resolvedHostId,
       selectedCategory: resolvedCategory,
       status: json['status']?.toString() ?? 'waiting',
       minPlayers: (json['min_players'] as num?)?.toInt() ?? 2,
@@ -555,12 +604,13 @@ class LobbySession {
       livekitRoomName: rawLiveKitRoom.isNotEmpty
           ? rawLiveKitRoom
           : 'act_like_it_$roomCode',
-      players: players,
+      players: resolvedPlayers,
       currentPlayerIndex: (json['current_player_index'] as num?)?.toInt() ?? 0,
-      totalLocalPlayers: players.isNotEmpty
-          ? players.length
+      totalLocalPlayers: resolvedPlayers.isNotEmpty
+          ? resolvedPlayers.length
           : ((json['total_local_players'] as num?)?.toInt() ?? 1),
-      turnSelectionMethod: TurnSelectionMethod.fromKey(rawTurnMethod),
+      turnSelectionMethod: resolvedTurnMethod,
+      usedSceneIdsInMatch: resolvedUsedIds,
     );
   }
 }
@@ -1126,6 +1176,90 @@ class LobbyRealtimeManager extends ChangeNotifier {
     _notifySafely();
   }
 
+  Future<void> _broadcastLobbyStateSync(
+    LobbySession session, {
+    bool persistToSupabase = false,
+  }) async {
+    if (_isDisposed) return;
+
+    if (persistToSupabase) {
+      final client = supabaseOrNull;
+      if (client != null && _isValidUuid(session.id)) {
+        try {
+          await client.from('lobbies').update(<String, dynamic>{
+            'status': session.status,
+            'selected_category': session.selectedCategory.key,
+            'turn_selection_method': session.turnSelectionMethod.key,
+            'current_player_index': session.currentPlayerIndex,
+            'active_actor_id': _isValidUuid(session.activeActorId)
+                ? session.activeActorId
+                : null,
+            if (session.activeScene != null &&
+                _isValidUuid(session.activeScene!.id))
+              'active_scene_id': session.activeScene!.id,
+            if (session.activeScene != null)
+              'active_scene_payload': session.activeScene!.toJson(),
+            'used_scene_ids': session.usedSceneIdsInMatch,
+          }).eq('id', session.id);
+        } catch (_) {
+          // Graceful fallback if optional migration columns aren't applied yet
+          try {
+            await client.from('lobbies').update(<String, dynamic>{
+              'status': session.status,
+              if (session.activeScene != null &&
+                  _isValidUuid(session.activeScene!.id))
+                'active_scene_id': session.activeScene!.id,
+            }).eq('id', session.id);
+          } catch (_) {}
+        }
+      }
+    }
+
+    final channel = _realtimeChannel;
+    if (channel != null && !_isDisposed) {
+      try {
+        await channel.sendBroadcastMessage(
+          event: 'lobby_state_sync',
+          payload: <String, dynamic>{
+            'lobby_id': session.id,
+            'id': session.id,
+            'room_code': session.roomCode,
+            'host_id': session.hostId,
+            'selected_category': session.selectedCategory.key,
+            'status': session.status,
+            'active_actor_id': session.activeActorId ?? _localUserId,
+            if (session.activeScene != null)
+              'active_scene_payload': session.activeScene!.toJson(),
+            'livekit_room_name': session.livekitRoomName,
+            'turn_selection_method': session.turnSelectionMethod.key,
+            'current_player_index': session.currentPlayerIndex,
+            'total_local_players': session.totalLocalPlayers,
+            'used_scene_ids': session.usedSceneIdsInMatch,
+            'players':
+                session.players.map((p) => p.toJson()).toList(growable: false),
+          },
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// Synchronizes Host match launch (`status: 'performing'`, full ordered 2-8 cast,
+  /// first actor ID, initial scene, and turn order method) across Supabase DB & Realtime
+  /// so remote players on separate phones automatically transition onto the Soundstage.
+  Future<void> launchSynchronizedMatch(LobbySession syncedSession) async {
+    if (_isDisposed) return;
+    final activeSession = syncedSession.copyWith(
+      status: 'performing',
+      players: syncedSession.players.isNotEmpty
+          ? syncedSession.players
+          : List<LobbyPlayer>.unmodifiable(_players),
+    );
+    _players = List<LobbyPlayer>.from(activeSession.players);
+    _session = activeSession;
+    _notifySafely();
+    await _broadcastLobbyStateSync(activeSession, persistToSupabase: true);
+  }
+
   /// Sets the audition turn-order method (`Host Pick`, `Call Sheet Draw`, or `Audition Spin`)
   /// and re-orders the 2–8 player roster accordingly.
   void setTurnSelectionMethod(TurnSelectionMethod method) {
@@ -1151,6 +1285,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
           _players.isNotEmpty ? _players.first.userId : _session!.activeActorId,
     );
     _notifySafely();
+    unawaited(_broadcastLobbyStateSync(_session!, persistToSupabase: true));
   }
 
   /// Moves a specific player to Audition Slot #1 when `TurnSelectionMethod.hostPick` is active.
@@ -1168,6 +1303,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
       activeActorId: chosen.userId,
     );
     _notifySafely();
+    unawaited(_broadcastLobbyStateSync(_session!, persistToSupabase: true));
   }
 
   /// Toggles whether a cast member is called as a Supporting Actor / Actress
@@ -1182,6 +1318,9 @@ class LobbyRealtimeManager extends ChangeNotifier {
     );
     _players = updated;
     _notifySafely();
+    if (_session != null) {
+      unawaited(_broadcastLobbyStateSync(_session!, persistToSupabase: false));
+    }
   }
 
   /// Updates the active scene & category in the Green Room from the 90-scene drawer
@@ -1196,24 +1335,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
       activeScene: scene,
     );
     _notifySafely();
-
-    final channel = _realtimeChannel;
-    if (channel != null) {
-      try {
-        await channel.sendBroadcastMessage(
-          event: 'lobby_state_sync',
-          payload: {
-            'lobby_id': _session!.id,
-            'room_code': _session!.roomCode,
-            'selected_category': category.key,
-            'status': _session!.status,
-            'active_actor_id': _session!.activeActorId ?? _localUserId,
-            'active_scene_payload': scene.toJson(),
-            'livekit_room_name': _session!.livekitRoomName,
-          },
-        );
-      } catch (_) {}
-    }
+    await _broadcastLobbyStateSync(_session!, persistToSupabase: true);
   }
 
   Future<void> toggleReadyState() async {
@@ -1242,6 +1364,7 @@ class LobbyRealtimeManager extends ChangeNotifier {
         await channel.track({
           'user_id': _localUserId,
           'display_name': localDisplayName,
+          'avatar_archetype': AuthService.instance.currentUserAvatar,
           'is_host': isHost,
           'is_ready': nextReady,
         });
@@ -1275,43 +1398,23 @@ class LobbyRealtimeManager extends ChangeNotifier {
             Map<String, dynamic>.from(rows[random.nextInt(rows.length)] as Map),
           );
         }
-
-        final updatePayload = <String, dynamic>{
-          'status': 'performing',
-          if (_isValidUuid(chosenScene.id)) 'active_scene_id': chosenScene.id,
-        };
-        await client
-            .from('lobbies')
-            .update(updatePayload)
-            .eq('id', _session!.id);
       } catch (_) {}
     }
 
     if (_session == null || _isDisposed) return;
 
+    final firstActorId =
+        _players.isNotEmpty ? _players.first.userId : _localUserId;
     _session = _session!.copyWith(
       status: 'performing',
-      activeActorId: _localUserId,
+      activeActorId: firstActorId,
       activeScene: chosenScene,
+      currentPlayerIndex: 0,
+      players: List<LobbyPlayer>.unmodifiable(_players),
+      usedSceneIdsInMatch: <String>[chosenScene.id],
     );
 
-    final channel = _realtimeChannel;
-    if (channel != null) {
-      try {
-        await channel.sendBroadcastMessage(
-          event: 'lobby_state_sync',
-          payload: {
-            'lobby_id': _session!.id,
-            'room_code': _session!.roomCode,
-            'selected_category': _session!.selectedCategory.key,
-            'status': 'performing',
-            'active_actor_id': _localUserId,
-            'active_scene_payload': chosenScene.toJson(),
-            'livekit_room_name': _session!.livekitRoomName,
-          },
-        );
-      } catch (_) {}
-    }
+    await _broadcastLobbyStateSync(_session!, persistToSupabase: true);
 
     _setLoading(false);
   }
@@ -1455,6 +1558,9 @@ class LobbyRealtimeManager extends ChangeNotifier {
       fallbackCategory: current.selectedCategory,
       fallbackScene: resolvedScene,
       fallbackActorId: current.activeActorId,
+      players: _players,
+      fallbackTurnMethod: current.turnSelectionMethod,
+      fallbackUsedSceneIds: current.usedSceneIdsInMatch,
     );
     _notifySafely();
   }
@@ -1500,12 +1606,19 @@ class LobbyRealtimeManager extends ChangeNotifier {
           event: 'lobby_state_sync',
           callback: (payload) {
             if (_session == null || _isDisposed) return;
-            _session = LobbySession.fromJson(
+            final synced = LobbySession.fromJson(
               payload,
               fallbackCategory: _session!.selectedCategory,
               fallbackScene: _session!.activeScene,
               fallbackActorId: _session!.activeActorId,
+              players: _players,
+              fallbackTurnMethod: _session!.turnSelectionMethod,
+              fallbackUsedSceneIds: _session!.usedSceneIdsInMatch,
             );
+            if (synced.players.isNotEmpty) {
+              _players = List<LobbyPlayer>.from(synced.players);
+            }
+            _session = synced;
             _notifySafely();
           },
         )

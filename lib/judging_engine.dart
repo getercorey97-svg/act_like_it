@@ -415,8 +415,10 @@ class TriModalJudgingEngine extends ChangeNotifier {
   static const String storageBucket = 'performance-loops';
   static const String kPrimaryGeminiModel = 'gemini-2.5-pro';
   static const List<String> kGeminiModelFallbackOrder = <String>[
+    'gemini-4-hydrogen',
     'gemini-3.8-flash',
     'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.5-pro',
@@ -424,12 +426,13 @@ class TriModalJudgingEngine extends ChangeNotifier {
   ];
   static const List<String> kGeminiModelCascade = <String>[
     'gemini-2.5-pro',
+    'gemini-4-hydrogen',
     'gemini-2.5-flash',
     'gemini-3.8-flash',
     'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
     'gemini-2.5-flash-lite',
     'gemini-flash-latest',
-    'gemini-1.5-pro',
   ];
   static final RegExp _uuidRegex = RegExp(
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
@@ -1229,6 +1232,33 @@ Return strict JSON matching this exact schema:
     _safeNotifyListeners();
   }
 
+  void applyRemotePeerVote(double voteScore) {
+    if (_isDisposed) return;
+    _peerVotes.add(voteScore.clamp(0.0, 100.0));
+    _safeNotifyListeners();
+  }
+
+  Future<void> attachRemoteLoopUrl(String url) async {
+    if (_isDisposed || url.trim().isEmpty || _loopController != null) return;
+    _supabaseLoopUrl = url.trim();
+    final netCtrl = VideoPlayerController.networkUrl(Uri.parse(url.trim()));
+    try {
+      await netCtrl.initialize();
+      if (_isDisposed) {
+        await netCtrl.dispose();
+        return;
+      }
+      await netCtrl.setLooping(true);
+      await netCtrl.play();
+      _loopController = netCtrl;
+      _safeNotifyListeners();
+    } catch (_) {
+      try {
+        await netCtrl.dispose();
+      } catch (_) {}
+    }
+  }
+
   Future<void> submitPeerVote({
     required String lobbyId,
     required String performerUserId,
@@ -1493,6 +1523,8 @@ class TriModalJudgingScreen extends StatefulWidget {
   final LobbySession lobbySession;
   final String performerUserId;
   final String performerDisplayName;
+  final String? localUserId;
+  final String? localDisplayName;
   final List<TelemetricsFrameSample> capturedSamples;
   final String? localRecordedVideoPath;
   final Uint8List? recordedMp4Bytes;
@@ -1508,6 +1540,8 @@ class TriModalJudgingScreen extends StatefulWidget {
     required this.lobbySession,
     required this.performerUserId,
     required this.performerDisplayName,
+    this.localUserId,
+    this.localDisplayName,
     required this.capturedSamples,
     this.localRecordedVideoPath,
     this.recordedMp4Bytes,
@@ -1527,6 +1561,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
     with WidgetsBindingObserver {
   late final TriModalJudgingEngine _engine;
   AudioPlayer? _verdictStingPlayer;
+  RealtimeChannel? _judgingRealtimeChannel;
   double _peerSliderValue = 90.0;
   int _selectedPassAndPlayRating1To10 = 9;
   // Zero dummy peer ratings: only real cast votes submitted during judging are stored
@@ -1537,6 +1572,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   bool _lifeImprovRewardClaimed = false;
   bool _expandedDirectorTelemetryReceipt = true;
   bool _directorMegaphoneReadingAloud = false;
+  bool _hasAdvancedFromJudging = false;
 
   final GlobalKey _scorecardBoundaryKey = GlobalKey();
   final TextEditingController _aiCalibrationCommentController =
@@ -1722,17 +1758,142 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
         videoUrl: _engine.supabaseLoopUrl,
       );
     });
+    _bindJudgingRealtimeChannel();
+
     // Delay recorded video/voice loop playback by 1200ms so it never clashes with the 1.2s award fanfare sting
-    Future<void>.delayed(const Duration(milliseconds: 1200), () {
+    Future<void>.delayed(const Duration(milliseconds: 1200), () async {
       if (!mounted) return;
-      _engine.uploadAndStartSupabaseVideoLoop(
+      await _engine.uploadAndStartSupabaseVideoLoop(
         roomCode: widget.lobbySession.roomCode,
         userId: widget.performerUserId,
         roundNumber: widget.lobbySession.roundNumber,
         localFilePath: widget.localRecordedVideoPath,
         recordedMp4Bytes: widget.recordedMp4Bytes,
       );
+      final loopUrl = _engine.supabaseLoopUrl;
+      if (mounted && loopUrl != null && loopUrl.isNotEmpty) {
+        try {
+          await _judgingRealtimeChannel?.sendBroadcastMessage(
+            event: 'verdict_loop_ready',
+            payload: <String, dynamic>{
+              'performer_user_id': widget.performerUserId,
+              'video_url': loopUrl,
+            },
+          );
+        } catch (_) {}
+      }
     });
+  }
+
+  void _bindJudgingRealtimeChannel() {
+    final client = supabaseOrNull;
+    if (client == null) return;
+    try {
+      final channel = client.channel(
+        'act_like_it_hype_${widget.lobbySession.roomCode.toUpperCase()}',
+      );
+      channel
+          .onBroadcast(
+            event: 'peer_vote_cast',
+            callback: (payload) {
+              if (!mounted) return;
+              final senderId = payload['sender_id']?.toString() ?? '';
+              final localActorId = widget.localUserId ?? widget.performerUserId;
+              if (senderId.isNotEmpty && senderId == localActorId) return;
+              final score = (payload['vote_score'] as num?)?.toDouble();
+              if (score != null) {
+                _engine.applyRemotePeerVote(score);
+              }
+            },
+          )
+          .onBroadcast(
+            event: 'verdict_loop_ready',
+            callback: (payload) {
+              if (!mounted) return;
+              final url = payload['video_url']?.toString() ?? '';
+              if (url.isNotEmpty) {
+                unawaited(_engine.attachRemoteLoopUrl(url));
+              }
+            },
+          )
+          .onBroadcast(
+            event: 'advance_turn_sync',
+            callback: (payload) {
+              if (!mounted || _hasAdvancedFromJudging) return;
+              final finalizeMatch = payload['finalize_match'] == true;
+              final rawSession = payload['next_session'];
+              final updatedSession = rawSession is Map
+                  ? LobbySession.fromJson(
+                      Map<String, dynamic>.from(rawSession),
+                      fallbackCategory: widget.lobbySession.selectedCategory,
+                      fallbackScene: _scene,
+                      fallbackActorId: widget.lobbySession.activeActorId,
+                      players: widget.lobbySession.players,
+                      fallbackTurnMethod:
+                          widget.lobbySession.turnSelectionMethod,
+                      fallbackUsedSceneIds:
+                          widget.lobbySession.usedSceneIdsInMatch,
+                    )
+                  : widget.lobbySession;
+              _hasAdvancedFromJudging = true;
+              _verdictStingPlayer?.stop();
+              _engine.loopController?.pause();
+              if (finalizeMatch) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => MatchFinalizationScreen(
+                      lobbySession: updatedSession,
+                      performerUserId: widget.performerUserId,
+                      performerDisplayName: widget.performerDisplayName,
+                      leadPerformerName: widget.performerDisplayName,
+                      scene: _scene,
+                      compositeScore:
+                          (payload['final_composite'] as num?)?.toDouble() ??
+                              _engine.compositeTriModalScore,
+                      aiScore: (payload['ai_score'] as num?)?.toDouble() ??
+                          _engine.aiScore,
+                      peerScore: (payload['peer_score'] as num?)?.toDouble() ??
+                          _engine.peerScore,
+                      socialScore:
+                          (payload['social_score'] as num?)?.toDouble() ??
+                              _engine.socialScore,
+                      improvBonus: _engine.improvBonus,
+                      showstopperTitle: _engine.showstopperArchetype.title,
+                    ),
+                  ),
+                );
+              } else {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => LiveKitSoundstageScreen(
+                      lobbySession: updatedSession,
+                      localUserId: widget.localUserId ?? widget.performerUserId,
+                      localDisplayName: widget.localDisplayName ??
+                          widget.performerDisplayName,
+                    ),
+                  ),
+                );
+              }
+            },
+          )
+          .subscribe();
+      _judgingRealtimeChannel = channel;
+    } catch (_) {}
+  }
+
+  void _broadcastPeerVoteToRoom(double score) {
+    final ch = _judgingRealtimeChannel;
+    if (ch == null) return;
+    try {
+      ch.sendBroadcastMessage(
+        event: 'peer_vote_cast',
+        payload: <String, dynamic>{
+          'sender_id': widget.localUserId ?? widget.performerUserId,
+          'performer_user_id': widget.performerUserId,
+          'vote_score': score,
+        },
+      );
+    } catch (_) {}
   }
 
   Future<void> _playOneShotVerdictSting() async {
@@ -1771,6 +1932,12 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
     _aiCalibrationCommentController.dispose();
     _verdictStingPlayer?.stop();
     _verdictStingPlayer?.dispose();
+    try {
+      final ch = _judgingRealtimeChannel;
+      if (ch != null) {
+        supabaseOrNull?.removeChannel(ch);
+      }
+    } catch (_) {}
     _engine.removeListener(_onEngineUpdated);
     _engine.dispose();
     super.dispose();
@@ -2448,6 +2615,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                           performerUserId: widget.performerUserId,
                           voteScore: _peerSliderValue,
                         );
+                        _broadcastPeerVoteToRoom(_peerSliderValue);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -2495,6 +2663,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                             performerUserId: widget.performerUserId,
                             voteScore: score1To10 * 10.0,
                           );
+                          _broadcastPeerVoteToRoom(score1To10 * 10.0);
                         },
                       );
                     }),
@@ -2822,20 +2991,79 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
 
                 return GestureDetector(
                   onTap: () {
+                    if (_hasAdvancedFromJudging) return;
+                    _hasAdvancedFromJudging = true;
                     HapticFeedback.heavyImpact();
                     _verdictStingPlayer?.stop();
                     _engine.loopController?.pause();
 
+                    final updatedPlayers = widget.lobbySession.players.map((p) {
+                      if (p.userId == widget.performerUserId) {
+                        return p.copyWith(
+                          aiTelemetricsScore: _engine.aiScore,
+                          peerScore: _engine.peerScore,
+                          socialScore: _engine.socialScore,
+                        );
+                      }
+                      return p;
+                    }).toList(growable: false);
+
+                    final sessionWithScores = widget.lobbySession.copyWith(
+                      players: updatedPlayers,
+                    );
+
+                    final nextSessionPayload = hasRemainingLocalPlayers
+                        ? sessionWithScores
+                            .advanceToPlayerTurn(nextPlayerIndex)
+                            .copyWith(
+                              totalLocalPlayers: effectiveTotalPlayers,
+                            )
+                        : sessionWithScores;
+
+                    try {
+                      _judgingRealtimeChannel?.sendBroadcastMessage(
+                        event: 'advance_turn_sync',
+                        payload: <String, dynamic>{
+                          'finalize_match': !hasRemainingLocalPlayers,
+                          'final_composite': _engine.compositeTriModalScore,
+                          'ai_score': _engine.aiScore,
+                          'peer_score': _engine.peerScore,
+                          'social_score': _engine.socialScore,
+                          'next_session': <String, dynamic>{
+                            'id': nextSessionPayload.id,
+                            'room_code': nextSessionPayload.roomCode,
+                            'host_id': nextSessionPayload.hostId,
+                            'selected_category':
+                                nextSessionPayload.selectedCategory.key,
+                            'status': nextSessionPayload.status,
+                            'active_actor_id':
+                                nextSessionPayload.activeActorId,
+                            if (nextSessionPayload.activeScene != null)
+                              'active_scene_payload':
+                                  nextSessionPayload.activeScene!.toJson(),
+                            'livekit_room_name':
+                                nextSessionPayload.livekitRoomName,
+                            'turn_selection_method':
+                                nextSessionPayload.turnSelectionMethod.key,
+                            'current_player_index':
+                                nextSessionPayload.currentPlayerIndex,
+                            'total_local_players':
+                                nextSessionPayload.totalLocalPlayers,
+                            'used_scene_ids':
+                                nextSessionPayload.usedSceneIdsInMatch,
+                            'players': nextSessionPayload.players
+                                .map((p) => p.toJson())
+                                .toList(growable: false),
+                          },
+                        },
+                      );
+                    } catch (_) {}
+
                     if (hasRemainingLocalPlayers) {
-                      final nextSession = widget.lobbySession
-                          .advanceToPlayerTurn(nextPlayerIndex)
-                          .copyWith(
-                            totalLocalPlayers: effectiveTotalPlayers,
-                          );
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
                           builder: (_) => MatchHoldingRoomScreen(
-                            lobbySession: nextSession,
+                            lobbySession: nextSessionPayload,
                             nextPlayerIndex: nextPlayerIndex,
                             totalLocalPlayers: effectiveTotalPlayers,
                             nextPlayerId: nextPlayer?.userId ??
@@ -2843,6 +3071,8 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                             nextPlayerName: nextPlayerName,
                             nextPlayerAvatarId: nextPlayer?.avatarArchetypeId ??
                                 'the_leading_lady',
+                            viewerUserId: widget.localUserId,
+                            viewerDisplayName: widget.localDisplayName,
                           ),
                         ),
                       );
@@ -2852,7 +3082,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
                         builder: (_) => MatchFinalizationScreen(
-                          lobbySession: widget.lobbySession,
+                          lobbySession: sessionWithScores,
                           performerUserId: widget.performerUserId,
                           performerDisplayName: widget.performerDisplayName,
                           leadPerformerName: widget.performerDisplayName,
@@ -3794,6 +4024,8 @@ class MatchHoldingRoomScreen extends StatelessWidget {
   final String nextPlayerId;
   final String nextPlayerName;
   final String nextPlayerAvatarId;
+  final String? viewerUserId;
+  final String? viewerDisplayName;
 
   const MatchHoldingRoomScreen({
     super.key,
@@ -3803,12 +4035,24 @@ class MatchHoldingRoomScreen extends StatelessWidget {
     required this.nextPlayerId,
     required this.nextPlayerName,
     required this.nextPlayerAvatarId,
+    this.viewerUserId,
+    this.viewerDisplayName,
   });
+
+  bool get _isPassAndPlayOrAiNext =>
+      nextPlayerId.startsWith('local-player-') ||
+      nextPlayerId.startsWith('ai-costar-') ||
+      nextPlayerId.startsWith('local_p_');
 
   @override
   Widget build(BuildContext context) {
     final archetype = resolveAvatarArchetype(nextPlayerAvatarId);
     final scene = lobbySession.activeScene;
+    final resolvedLocalId =
+        _isPassAndPlayOrAiNext ? nextPlayerId : (viewerUserId ?? nextPlayerId);
+    final resolvedLocalName = _isPassAndPlayOrAiNext
+        ? nextPlayerName
+        : (viewerDisplayName ?? nextPlayerName);
 
     return Scaffold(
       backgroundColor: const Color(0xFF07090E),
@@ -3846,7 +4090,7 @@ class MatchHoldingRoomScreen extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      'COUCH CO-OP HOLDING ROOM · ACTOR ${nextPlayerIndex + 1} OF $totalLocalPlayers',
+                      '${_isPassAndPlayOrAiNext ? 'COUCH CO-OP' : 'SOUNDSTAGE'} HOLDING ROOM · ACTOR ${nextPlayerIndex + 1} OF $totalLocalPlayers',
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
@@ -3900,7 +4144,9 @@ class MatchHoldingRoomScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Pass the phone to $nextPlayerName',
+                        _isPassAndPlayOrAiNext
+                            ? 'Pass the phone to $nextPlayerName'
+                            : 'Up Next on Stage: $nextPlayerName',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 24,
@@ -3930,8 +4176,8 @@ class MatchHoldingRoomScreen extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (_) => LiveKitSoundstageScreen(
                           lobbySession: lobbySession,
-                          localUserId: nextPlayerId,
-                          localDisplayName: nextPlayerName,
+                          localUserId: resolvedLocalId,
+                          localDisplayName: resolvedLocalName,
                         ),
                       ),
                     );

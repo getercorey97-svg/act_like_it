@@ -81,8 +81,10 @@ class AppConfig {
   );
   static const String _envLiveKitUrl = String.fromEnvironment(
     'LIVEKIT_URL',
-    defaultValue: '',
+    defaultValue: 'wss://act-like-it-3nsihhbg.livekit.cloud',
   );
+  static const String defaultLiveKitCloudUrl =
+      'wss://act-like-it-3nsihhbg.livekit.cloud';
   static const String _envGeminiApiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
     defaultValue: '',
@@ -112,9 +114,11 @@ class AppConfig {
       ? _runtimeSupabaseAnonKey
       : _sanitizeDefine(_envSupabaseAnonKey);
 
-  static String get liveKitUrl => _runtimeLiveKitUrl.isNotEmpty
-      ? _runtimeLiveKitUrl
-      : _sanitizeDefine(_envLiveKitUrl);
+  static String get liveKitUrl {
+    if (_runtimeLiveKitUrl.isNotEmpty) return _runtimeLiveKitUrl;
+    final defined = _sanitizeDefine(_envLiveKitUrl);
+    return defined.isNotEmpty ? defined : defaultLiveKitCloudUrl;
+  }
 
   static String get geminiApiKey => _runtimeGeminiApiKey.isNotEmpty
       ? _runtimeGeminiApiKey

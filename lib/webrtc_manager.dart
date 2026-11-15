@@ -743,6 +743,9 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   bool _coStarSpeakingNow = false;
   bool _autoCutTriggeredAt30s = false;
 
+  // Prevent duplicate verdict navigation between auto-cut & broadcast
+  bool _isNavigatingToVerdict = false;
+
   // VU Meter Dynamic Dancing Animation
   Timer? _vuModulationTimer;
   double _vuDancingOffset = 0.0;
@@ -761,10 +764,19 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   String get _currentPerformerUserId =>
       _activeCastPlayer?.userId ?? widget.localUserId;
 
+  bool get _isPassAndPlayOrAiTurn =>
+      _currentPerformerUserId.startsWith('local-player-') ||
+      _currentPerformerUserId.startsWith('ai-costar-') ||
+      _currentPerformerUserId.startsWith('local_p_') ||
+      widget.lobbySession.players.length <= 1;
+
+  bool get _isLocalDevicePerformer =>
+      widget.localUserId == _currentPerformerUserId || _isPassAndPlayOrAiTurn;
+
   bool get _isCurrentPerformerSupportingRole =>
       _activeCastPlayer?.isSupportingRole == true ||
       widget.lobbySession.selectedCategory ==
-          SceneCategory.bestSupportingActor;
+          SceneCategory.awardsBestSupportingActor;
 
   List<String> get _directorRulesSubtitles {
     final castCount = math.max(2, widget.lobbySession.players.length);
@@ -801,11 +813,16 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   }
 
   Future<void> _initializeStageAfterPermissions() async {
+    final isPerformerRole = _isLocalDevicePerformer;
     await _stageManager.connectToSfuStage(
       roomName: widget.lobbySession.livekitRoomName,
-      participantIdentity: _currentPerformerUserId,
-      participantName: _currentPerformerDisplayName,
-      initialRole: SfuParticipantRole.activePerformer,
+      participantIdentity:
+          isPerformerRole ? _currentPerformerUserId : widget.localUserId,
+      participantName:
+          isPerformerRole ? _currentPerformerDisplayName : widget.localDisplayName,
+      initialRole: isPerformerRole
+          ? SfuParticipantRole.activePerformer
+          : SfuParticipantRole.remoteSpectator,
       targetEmotion: widget.lobbySession.activeScene?.emotionalTarget ??
           'Dramatic Intensity',
     );
@@ -880,9 +897,62 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
               );
             },
           )
+          .onBroadcast(
+            event: 'turn_verdict_ready',
+            callback: (payload) {
+              if (!mounted || _isNavigatingToVerdict) return;
+              final incomingTurnIdx =
+                  (payload['current_player_index'] as num?)?.toInt() ??
+                      widget.lobbySession.currentPlayerIndex;
+              if (incomingTurnIdx != widget.lobbySession.currentPlayerIndex) {
+                return;
+              }
+              _navigateSpectatorToVerdict(payload);
+            },
+          )
           .subscribe();
       _hypeRealtimeChannel = channel;
     } catch (_) {}
+  }
+
+  Future<void> _navigateSpectatorToVerdict(
+    Map<String, dynamic> payload,
+  ) async {
+    if (!mounted || _isNavigatingToVerdict) return;
+    _isNavigatingToVerdict = true;
+    _preRollTimer?.cancel();
+    _rulesBriefingTimer?.cancel();
+    final samplesSnapshot = List<TelemetricsFrameSample>.from(
+      _stageManager.capturedSamples,
+    );
+    await _stageManager.finishRecordingTake();
+    if (!mounted) return;
+    await BespokeTransitionEngine.navigate<void>(
+      context: context,
+      type: BespokeTransitionType.vintageFlashbulbPop,
+      destination: TriModalJudgingScreen(
+        lobbySession: widget.lobbySession,
+        performerUserId:
+            payload['performer_user_id']?.toString() ?? _currentPerformerUserId,
+        performerDisplayName: payload['performer_display_name']?.toString() ??
+            _currentPerformerDisplayName,
+        localUserId: widget.localUserId,
+        localDisplayName: widget.localDisplayName,
+        capturedSamples: samplesSnapshot,
+        improvTwistCompleted: payload['improv_twist_completed'] == true,
+        characterBrokenPenalty: payload['character_broken_penalty'] == true,
+        standingOvationCrowdCombo:
+            payload['standing_ovation_crowd_combo'] == true,
+        currentPlayerIndex: widget.lobbySession.currentPlayerIndex,
+        totalLocalPlayers: math.max(
+          widget.lobbySession.totalLocalPlayers,
+          widget.lobbySession.players.length,
+        ),
+      ),
+    );
+    if (mounted) {
+      _isNavigatingToVerdict = false;
+    }
   }
 
   void _applyStageHypeReaction({
@@ -1020,7 +1090,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         // count 2500ms (2.5 seconds) before automatically calling "CUT! SCENE COMPLETE!".
         final bool naturalLineCompletion =
             elapsed >= 24 && !_coStarSpeakingNow;
-        if ((_actorFinishedLinesHoldActive || naturalLineCompletion) &&
+        if (_isLocalDevicePerformer &&
+            (_actorFinishedLinesHoldActive || naturalLineCompletion) &&
             elapsed >= 5 &&
             !_stageManager.isFinishingTake &&
             !_autoCutTriggeredAt30s) {
@@ -1118,7 +1189,10 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   }
 
   Future<void> _finishTakeAndNavigateToVerdict() async {
-    if (_stageManager.isFinishingTake || !mounted) return;
+    if (_stageManager.isFinishingTake || _isNavigatingToVerdict || !mounted) {
+      return;
+    }
+    _isNavigatingToVerdict = true;
     _autoCutTriggeredAt30s = true;
     SoundstageAudioController.instance.playClapperSnap();
     final samplesSnapshot = List<TelemetricsFrameSample>.from(
@@ -1128,6 +1202,23 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     final hadCharacterBroken = _characterBrokenTriggered;
     final hadCrowdCombo = _standingOvationComboActive;
     final recorded = await _stageManager.finishRecordingTake();
+
+    if (_hypeRealtimeChannel != null) {
+      try {
+        await _hypeRealtimeChannel!.sendBroadcastMessage(
+          event: 'turn_verdict_ready',
+          payload: <String, dynamic>{
+            'performer_user_id': _currentPerformerUserId,
+            'performer_display_name': _currentPerformerDisplayName,
+            'improv_twist_completed': hadImprovTwist,
+            'character_broken_penalty': hadCharacterBroken,
+            'standing_ovation_crowd_combo': hadCrowdCombo,
+            'current_player_index': widget.lobbySession.currentPlayerIndex,
+          },
+        );
+      } catch (_) {}
+    }
+
     if (!mounted) return;
     await BespokeTransitionEngine.navigate<void>(
       context: context,
@@ -1136,6 +1227,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
         lobbySession: widget.lobbySession,
         performerUserId: _currentPerformerUserId,
         performerDisplayName: _currentPerformerDisplayName,
+        localUserId: widget.localUserId,
+        localDisplayName: widget.localDisplayName,
         capturedSamples: samplesSnapshot,
         localRecordedVideoPath: recorded.filePath,
         recordedMp4Bytes: recorded.bytes,
@@ -1150,6 +1243,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
       ),
     );
     if (!mounted) return;
+    _isNavigatingToVerdict = false;
     setState(() {
       _improvTwistTriggered = false;
       _activeImprovTwistPrompt = null;
@@ -1213,8 +1307,9 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
             '15s HAPTIC ESCALATION: ${dare.escalationAt15s}';
       });
     }
-    // Auto-Cut at 30s and transition directly to Tri-Modal Verdict Screen
-    if (_stageManager.isRecordingTake &&
+    // Auto-Cut at 30s on the active performer's device and transition to Judging
+    if (_isLocalDevicePerformer &&
+        _stageManager.isRecordingTake &&
         !_stageManager.isFinishingTake &&
         !_autoCutTriggeredAt30s &&
         elapsed >= 30) {
@@ -3013,6 +3108,101 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   }
 
   Widget _buildPrimaryVideoSurface() {
+    // 0. Remote Spectator Mode: display remote active performer's LiveKit video or Audience Monitor
+    if (!_isLocalDevicePerformer) {
+      RemoteVideoTrack? remotePerformerTrack;
+      for (final remote in _stageManager.remoteParticipants) {
+        for (final pub in remote.videoTrackPublications) {
+          if (pub.track is RemoteVideoTrack) {
+            remotePerformerTrack = pub.track as RemoteVideoTrack;
+            break;
+          }
+        }
+        if (remotePerformerTrack != null) break;
+      }
+
+      if (remotePerformerTrack != null) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            VideoTrackRenderer(
+              remotePerformerTrack,
+              fit: VideoViewFit.cover,
+            ),
+            Positioned(
+              top: 48,
+              left: 12,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xCC05070D),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF0CB6D4)),
+                ),
+                child: Text(
+                  'LIVE BROADCAST · ${_currentPerformerDisplayName.toUpperCase()}',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0CB6D4),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+
+      final performerArchetype = resolveAvatarArchetype(
+        _activeCastPlayer?.avatarArchetypeId ?? 'the_method_actor',
+      );
+      return Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            colors: [Color(0xFF1A0E24), Color(0xFF07090E)],
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                BoondocksCharacterRig(
+                  archetype: performerArchetype,
+                  size: 112,
+                  isSelected: true,
+                  externalPhase: _stageManager.performanceElapsedSeconds * 0.4,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'WATCHING LIVE TAKE · ${_currentPerformerDisplayName.toUpperCase()}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Swipe right to 🍿 AUDIENCE to send live Roses, Ovations, or Curveballs!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     // 1. LiveKit WebRTC Track if connected to SFU
     if (_stageManager.localVideoTrack != null &&
         _stageManager.isCameraEnabled) {

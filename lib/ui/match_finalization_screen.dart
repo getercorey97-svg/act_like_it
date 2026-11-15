@@ -647,32 +647,66 @@ Play Live: https://act-like-it.vercel.app
   }
 
   List<Widget> _buildPodiumRows(List<LobbyPlayer> players) {
-    final sorted = List<LobbyPlayer>.from(players)
-      ..sort((a, b) => b.compositeScore.compareTo(a.compositeScore));
-    final medals = <String>['🥇 1ST GOLD', '🥈 2ND SILVER', '🥉 3RD BRONZE'];
-    return List<Widget>.generate(sorted.length.clamp(0, 3), (idx) {
+    final merged = players.map((p) {
+      if (p.userId == widget.performerUserId && widget.compositeScore > 0) {
+        return p.copyWith(
+          aiTelemetricsScore: widget.aiScore,
+          peerScore: widget.peerScore,
+          socialScore: widget.socialScore,
+        );
+      }
+      return p;
+    }).toList();
+
+    final sorted = List<LobbyPlayer>.from(merged)
+      ..sort((a, b) {
+        final aScore = a.userId == widget.performerUserId
+            ? widget.compositeScore
+            : a.compositeScore;
+        final bScore = b.userId == widget.performerUserId
+            ? widget.compositeScore
+            : b.compositeScore;
+        return bScore.compareTo(aScore);
+      });
+
+    final medals = <String>[
+      '🥇 1ST GOLD',
+      '🥈 2ND SILVER',
+      '🥉 3RD BRONZE',
+    ];
+    return List<Widget>.generate(sorted.length.clamp(0, 8), (idx) {
       final p = sorted[idx];
-      final score = idx == 0 && p.userId == widget.performerUserId
+      final score = p.userId == widget.performerUserId
           ? widget.compositeScore
           : p.compositeScore;
+      final rankLabel = idx < medals.length ? medals[idx] : '#${idx + 1} CAST';
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              '${medals[idx]} · ${p.displayName}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '$rankLabel · ${p.displayName}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: idx < 3 ? Colors.white : const Color(0xFFCBD5E1),
+                  ),
+                ),
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               '${score.toStringAsFixed(1)} PTS',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w900,
-                color: Color(0xFFFFD700),
+                color: idx == 0
+                    ? const Color(0xFFFFD700)
+                    : const Color(0xFF0CB6D4),
               ),
             ),
           ],
