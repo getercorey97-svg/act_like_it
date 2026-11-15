@@ -723,11 +723,18 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   DateTime? _lastStandingOvationAt;
   Timer? _reactionClearTimer;
 
-  // Pre-Roll Countdown State (10s -> 0s)
+  // Pre-Roll Countdown State (10s -> 0s) & Studio Director Vocal Rules Start Sequence
+  bool _isRulesBriefingActive = false;
+  int _rulesBriefingStepIndex = 0;
+  Timer? _rulesBriefingTimer;
   bool _isPreRolling = true;
   bool _permissionsResolvedForPreRoll = false;
   int _preRollSecondsLeft = 10;
   Timer? _preRollTimer;
+
+  // Smart 2.5-Second End-of-Scene Auto-Cut Detector State
+  bool _actorFinishedLinesHoldActive = false;
+  int _postSpeechSilenceMs = 0;
 
   // Stage FX & AI Co-Star Vocal State
   bool _paparazziFrenzyActive = false;
@@ -740,6 +747,36 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   Timer? _vuModulationTimer;
   double _vuDancingOffset = 0.0;
 
+  LobbyPlayer? get _activeCastPlayer {
+    final roster = widget.lobbySession.players;
+    if (roster.isEmpty) return null;
+    final idx =
+        widget.lobbySession.currentPlayerIndex.clamp(0, roster.length - 1);
+    return roster[idx];
+  }
+
+  String get _currentPerformerDisplayName =>
+      _activeCastPlayer?.displayName ?? widget.localDisplayName;
+
+  String get _currentPerformerUserId =>
+      _activeCastPlayer?.userId ?? widget.localUserId;
+
+  bool get _isCurrentPerformerSupportingRole =>
+      _activeCastPlayer?.isSupportingRole == true ||
+      widget.lobbySession.selectedCategory ==
+          SceneCategory.bestSupportingActor;
+
+  List<String> get _directorRulesSubtitles {
+    final castCount = math.max(2, widget.lobbySession.players.length);
+    final turnMethodLabel = widget.lobbySession.turnSelectionMethod.label;
+    return <String>[
+      '🎙️ QUIET ON SET! Welcome to ACT LIKE IT. $castCount actors are locked in via $turnMethodLabel.',
+      '🎬 RULE 1 · LIVE TURNS & UNIQUE SCRIPTS: Each actor gets a live 30-second countdown take. Players 2–$castCount receive equal-genre unplayed scenes or Supporting Actor cues.',
+      '🎭 RULE 2 · SMART 2.5s AUTO-CUT: Deliver your lines with full facial & vocal conviction. Hold your final beat for 2.5 seconds when done and the camera automatically calls CUT!',
+      '🏆 RULE 3 · FACTUAL EKMAN FACS & PROSODY JUDGING: Real peer votes + Ekman FACS & Vocal Prosody AI Telemetrics crown the winner. Up now: $_currentPerformerDisplayName!',
+    ];
+  }
+
   static const List<String> _improvTwistDirectives = <String>[
     'NOW DELIVER THE NEXT LINE AS IF YOU\'RE HIDING A SECRET!',
     'SWITCH TO WHISPERED INTENSITY & LOCK EYES WITH THE LENS!',
@@ -751,6 +788,10 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Strictly silence all background music upon entering the Live Soundstage
+    SoundstageAudioController.instance.silenceMusicForSetupOrGameRoom(
+      isLiveSoundstage: true,
+    );
     _stageManager = WebRtcStageManager();
     _stageManager.addListener(_onStageUpdated);
 
@@ -762,8 +803,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   Future<void> _initializeStageAfterPermissions() async {
     await _stageManager.connectToSfuStage(
       roomName: widget.lobbySession.livekitRoomName,
-      participantIdentity: widget.localUserId,
-      participantName: widget.localDisplayName,
+      participantIdentity: _currentPerformerUserId,
+      participantName: _currentPerformerDisplayName,
       initialRole: SfuParticipantRole.activePerformer,
       targetEmotion: widget.lobbySession.activeScene?.emotionalTarget ??
           'Dramatic Intensity',
@@ -771,6 +812,49 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     if (!mounted) return;
     setState(() {
       _permissionsResolvedForPreRoll = true;
+    });
+    if (widget.lobbySession.currentPlayerIndex == 0) {
+      _startDirectorVocalRulesBriefing();
+    } else {
+      _startPreRollCountdown();
+    }
+  }
+
+  void _startDirectorVocalRulesBriefing() {
+    _rulesBriefingTimer?.cancel();
+    setState(() {
+      _isRulesBriefingActive = true;
+      _rulesBriefingStepIndex = 0;
+    });
+    SoundstageAudioController.instance.playSelectSweep();
+    _rulesBriefingTimer =
+        Timer.periodic(const Duration(milliseconds: 2200), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final nextStep = _rulesBriefingStepIndex + 1;
+      if (nextStep >= _directorRulesSubtitles.length) {
+        _skipVocalRulesBriefing();
+      } else {
+        HapticFeedback.selectionClick();
+        SoundstageAudioController.instance.playCountdownTick(
+          finalBeat: nextStep == _directorRulesSubtitles.length - 1,
+        );
+        setState(() {
+          _rulesBriefingStepIndex = nextStep;
+        });
+      }
+    });
+  }
+
+  void _skipVocalRulesBriefing() {
+    _rulesBriefingTimer?.cancel();
+    _rulesBriefingTimer = null;
+    if (!mounted) return;
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isRulesBriefingActive = false;
     });
     _startPreRollCountdown();
   }
@@ -869,6 +953,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     _preRollSecondsLeft = 10;
     _isPreRolling = true;
     _autoCutTriggeredAt30s = false;
+    _actorFinishedLinesHoldActive = false;
+    _postSpeechSilenceMs = 0;
     _coStarLeadBSpoken = false;
     _coStarSpeakingNow = false;
 
@@ -900,6 +986,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     setState(() {
       _isPreRolling = false;
       _preRollSecondsLeft = 0;
+      _actorFinishedLinesHoldActive = false;
+      _postSpeechSilenceMs = 0;
     });
     _stageManager.startRecordingTake(
       targetEmotion: widget.lobbySession.activeScene?.emotionalTarget ??
@@ -907,12 +995,43 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
     );
   }
 
+  void _triggerSmartEndOfSceneHold() {
+    if (_isPreRolling || !_stageManager.isRecordingTake) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _actorFinishedLinesHoldActive = !_actorFinishedLinesHoldActive;
+      if (!_actorFinishedLinesHoldActive) {
+        _postSpeechSilenceMs = 0;
+      }
+    });
+  }
+
   void _startVuMeterModulation() {
     _vuModulationTimer?.cancel();
     _vuModulationTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (!mounted) return;
       if (_stageManager.isRecordingTake) {
-        final randomJitter = (math.sin(DateTime.now().millisecondsSinceEpoch / 140.0) * 8.0);
+        final elapsed = _stageManager.performanceElapsedSeconds;
+        final randomJitter =
+            (math.sin(DateTime.now().millisecondsSinceEpoch / 140.0) * 8.0);
+        // Smart 2.5-Second End-of-Scene Auto-Cut Detection:
+        // Once the actor has performed at least 6s of their scene and either
+        // reaches the end of their teleprompter lines (>= 24s) or holds post-delivery silence,
+        // count 2500ms (2.5 seconds) before automatically calling "CUT! SCENE COMPLETE!".
+        final bool naturalLineCompletion =
+            elapsed >= 24 && !_coStarSpeakingNow;
+        if ((_actorFinishedLinesHoldActive || naturalLineCompletion) &&
+            elapsed >= 5 &&
+            !_stageManager.isFinishingTake &&
+            !_autoCutTriggeredAt30s) {
+          _postSpeechSilenceMs += 100;
+          if (_postSpeechSilenceMs >= 2500) {
+            unawaited(_finishTakeAndNavigateToVerdict());
+            return;
+          }
+        } else if (!_actorFinishedLinesHoldActive && !naturalLineCompletion) {
+          _postSpeechSilenceMs = 0;
+        }
         setState(() {
           _vuDancingOffset = randomJitter;
         });
@@ -1015,8 +1134,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
       type: BespokeTransitionType.vintageFlashbulbPop,
       destination: TriModalJudgingScreen(
         lobbySession: widget.lobbySession,
-        performerUserId: widget.localUserId,
-        performerDisplayName: widget.localDisplayName,
+        performerUserId: _currentPerformerUserId,
+        performerDisplayName: _currentPerformerDisplayName,
         capturedSamples: samplesSnapshot,
         localRecordedVideoPath: recorded.filePath,
         recordedMp4Bytes: recorded.bytes,
@@ -1037,6 +1156,8 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
       _characterBrokenTriggered = false;
       _standingOvationComboActive = false;
       _autoCutTriggeredAt30s = false;
+      _actorFinishedLinesHoldActive = false;
+      _postSpeechSilenceMs = 0;
       _coStarLeadBSpoken = false;
       _coStarSpeakingNow = false;
     });
@@ -1124,6 +1245,7 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _rulesBriefingTimer?.cancel();
     _preRollTimer?.cancel();
     _vuModulationTimer?.cancel();
     _reactionClearTimer?.cancel();
@@ -1382,16 +1504,29 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
                         decoration: BoxDecoration(
                           color: const Color(0xD9050508),
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: !_isPreRolling &&
+                                    (30 - _stageManager.performanceElapsedSeconds) <=
+                                        10
+                                ? const Color(0xFFE11D48)
+                                : const Color(0xFFF59E0B),
+                          ),
                         ),
                         child: Text(
-                          _isPreRolling
-                              ? 'STANDBY'
-                              : 'Take: ${_stageManager.performanceElapsedSeconds}s',
-                          style: const TextStyle(
+                          _isRulesBriefingActive
+                              ? '🎙️ RULES BRIEFING'
+                              : (_isPreRolling
+                                  ? 'STANDBY · TURN #${widget.lobbySession.currentPlayerIndex + 1}'
+                                  : '⏱️ COUNTDOWN: ${(30 - _stageManager.performanceElapsedSeconds).clamp(0, 30)}s'),
+                          style: TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFF59E0B),
+                            fontWeight: FontWeight.w900,
+                            color: !_isPreRolling &&
+                                    (30 - _stageManager.performanceElapsedSeconds) <=
+                                        10
+                                ? const Color(0xFFE11D48)
+                                : const Color(0xFFF59E0B),
                           ),
                         ),
                       ),
@@ -1743,64 +1878,105 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           // Teleprompter (Sleek Lower-Third Glass Card, Unblocking 70%+ of Face — shown once recording starts)
           if (scene != null && !_isPreRolling && !_stealthDimmedHudMode)
             _buildTeleprompterOverlay(scene),
-          // Floating "⏹️ CUT & JUDGE" Pill directly on STAGE tab during active take
-          if (!_isPreRolling && !_stealthDimmedHudMode)
+          // Floating "⏹️ CUT & JUDGE" + Smart 2.5s End-of-Scene Auto-Cut Pill on STAGE tab during active take
+          if (!_isPreRolling && !_isRulesBriefingActive && !_stealthDimmedHudMode)
             Positioned(
               top: 44,
               left: 12,
-              child: GestureDetector(
-                onTap: _stageManager.isFinishingTake
-                    ? null
-                    : () => _finishTakeAndNavigateToVerdict(),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE11D48), Color(0xFF9F1239)],
-                    ),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: const Color(0xFFFFD700),
-                      width: 1.8,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0xAA05070B),
-                        offset: Offset(2, 2),
-                        blurRadius: 0,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: _stageManager.isFinishingTake
+                        ? null
+                        : () => _finishTakeAndNavigateToVerdict(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.stop_circle_rounded,
-                        size: 15,
-                        color: Color(0xFFFFD700),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFE11D48), Color(0xFF9F1239)],
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0xFFFFD700),
+                          width: 1.8,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0xAA05070B),
+                            offset: Offset(2, 2),
+                            blurRadius: 0,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _stageManager.isFinishingTake
-                            ? 'CUTTING...'
-                            : '⏹️ CUT & JUDGE (${30 - _stageManager.performanceElapsedSeconds.clamp(0, 30)}s)',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.stop_circle_rounded,
+                            size: 15,
+                            color: Color(0xFFFFD700),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _stageManager.isFinishingTake
+                                ? 'CUTTING...'
+                                : '⏹️ CUT & JUDGE (${30 - _stageManager.performanceElapsedSeconds.clamp(0, 30)}s)',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _triggerSmartEndOfSceneHold,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _postSpeechSilenceMs > 0
+                            ? const Color(0xEB065F46)
+                            : const Color(0xD90B0E17),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: _postSpeechSilenceMs > 0
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFF0CB6D4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        _postSpeechSilenceMs > 0
+                            ? '🎬 SCENE BEAT HOLD · AUTO-CUT IN ${((2500 - _postSpeechSilenceMs) / 1000.0).clamp(0.0, 2.5).toStringAsFixed(1)}s'
+                            : '🎭 DONE LINES (2.5s AUTO-CUT)',
                         style: const TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
+          // Studio Director Vocal Rules Start Sequence Overlay (Before Player 1 Pre-Roll)
+          if (_isRulesBriefingActive && !_stealthDimmedHudMode)
+            _buildDirectorVocalRulesBriefingOverlay(),
           // 10-Second Pre-Roll Compact Top/Bottom HUD Overlay (Leaves 80%+ center viewfinder completely unobstructed)
-          if (_isPreRolling && !_stealthDimmedHudMode)
+          if (_isPreRolling && !_isRulesBriefingActive && !_stealthDimmedHudMode)
             _buildPreRollClapperboardOverlay(scene),
         ],
       ),
@@ -2565,6 +2741,121 @@ class _LiveKitSoundstageScreenState extends State<LiveKitSoundstageScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDirectorVocalRulesBriefingOverlay() {
+    final subtitles = _directorRulesSubtitles;
+    final safeIdx = _rulesBriefingStepIndex.clamp(0, subtitles.length - 1);
+    final currentLine = subtitles[safeIdx];
+    final maxBriefingHeight =
+        (MediaQuery.sizeOf(context).height * 0.30).clamp(130.0, 320.0);
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxBriefingHeight),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.75),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFFFD700),
+                width: 2.0,
+              ),
+            ),
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.record_voice_over_rounded,
+                            color: Color(0xFFFFD700),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'STUDIO DIRECTOR VOCAL RULES BRIEFING (${safeIdx + 1}/${subtitles.length})',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFFD700),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        _isCurrentPerformerSupportingRole
+                            ? 'SUPPORTING CUE'
+                            : 'LEAD AUDITION',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0CB6D4),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    currentLine,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.38,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFD700),
+                        backgroundColor: const Color(0xFF0B0E17),
+                        side: const BorderSide(
+                          color: Color(0xFFFFD700),
+                          width: 1.6,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                      ),
+                      onPressed: _skipVocalRulesBriefing,
+                      icon: const Icon(Icons.skip_next_rounded, size: 17),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'SKIP VOCAL RULES BRIEFING & START 10s PRE-ROLL',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

@@ -3,7 +3,9 @@ export type SoundstageZoneId =
   | 'casting_signup_set'
   | 'red_carpet_dashboard'
   | 'star_dressing_room'
-  | 'after_hours_vault';
+  | 'after_hours_vault'
+  | 'green_room_lobby'
+  | 'live_soundstage';
 
 export type SoundstageSfxId =
   | 'clapper_snap'
@@ -40,6 +42,8 @@ export interface SoundstageZoneSpec {
   basslineHz: number[];
   leadMotifHz: number[];
   hasPaparazziFlashes: boolean;
+  silenceBackgroundMusic?: boolean;
+  isSilentGameZone?: boolean;
 }
 
 export interface SoundstageSfxSpec {
@@ -56,6 +60,10 @@ export const DEFAULT_SOUNDSTAGE_AUDIO_SETTINGS: SoundstageAudioSettings = {
   interactiveSfxEnabled: true,
   masterVolume: 0.75,
 };
+
+export function isSilentGameZone(zone: SoundstageZoneId): boolean {
+  return zone === 'green_room_lobby' || zone === 'live_soundstage';
+}
 
 export const SOUNDSTAGE_ZONES: Record<SoundstageZoneId, SoundstageZoneSpec> = {
   premiere_entrance: {
@@ -74,6 +82,7 @@ export const SOUNDSTAGE_ZONES: Record<SoundstageZoneId, SoundstageZoneSpec> = {
     basslineHz: [130.81, 146.83, 174.61, 196.0],
     leadMotifHz: [523.25, 659.25, 783.99, 1046.5, 987.77, 783.99, 659.25, 783.99],
     hasPaparazziFlashes: true,
+    isSilentGameZone: false,
   },
   casting_signup_set: {
     id: 'casting_signup_set',
@@ -91,14 +100,15 @@ export const SOUNDSTAGE_ZONES: Record<SoundstageZoneId, SoundstageZoneSpec> = {
     basslineHz: [82.41, 110.0, 146.83, 123.47],
     leadMotifHz: [659.25, 587.33, 493.88, 587.33, 659.25, 739.99, 659.25, 493.88],
     hasPaparazziFlashes: false,
+    isSilentGameZone: false,
   },
   red_carpet_dashboard: {
     id: 'red_carpet_dashboard',
     title: 'Red Carpet Inspiring Anthem & Paparazzi Frenzy',
-    subtitle: 'Uplifting, motivating premiere main-stage anthem layered with live paparazzi DSLR shutters & flashbulbs',
+    subtitle: 'Uplifting, motivating premiere main-stage anthem layered with live paparazzi DSLR crowd shutters & flashbulbs',
     bpm: 124,
     musicalKey: 'A Major / F#m9 (Motivating Superstar Anthem)',
-    ambienceSummary: 'Rapid paparazzi DSLR shutter bursts, vintage flashbulb pops, capacitor recharge whines & press cheers',
+    ambienceSummary: 'Multi-camera paparazzi DSLR shutter bursts (camclick.mp3 + mirror slap), vintage flashbulb pops & press cheers',
     chordProgressionHz: [
       [220.0, 277.18, 329.63, 415.3, 493.88],  // Amaj9
       [185.0, 220.0, 277.18, 329.63, 415.3],   // F#m9
@@ -108,6 +118,7 @@ export const SOUNDSTAGE_ZONES: Record<SoundstageZoneId, SoundstageZoneSpec> = {
     basslineHz: [110.0, 92.5, 146.83, 164.81],
     leadMotifHz: [440.0, 554.37, 659.25, 880.0, 830.61, 659.25, 739.99, 880.0],
     hasPaparazziFlashes: true,
+    isSilentGameZone: false,
   },
   star_dressing_room: {
     id: 'star_dressing_room',
@@ -125,6 +136,7 @@ export const SOUNDSTAGE_ZONES: Record<SoundstageZoneId, SoundstageZoneSpec> = {
     basslineHz: [87.31, 82.41, 73.42, 98.0],
     leadMotifHz: [523.25, 440.0, 392.0, 349.23, 440.0, 523.25, 587.33, 523.25],
     hasPaparazziFlashes: false,
+    isSilentGameZone: false,
   },
   after_hours_vault: {
     id: 'after_hours_vault',
@@ -142,6 +154,35 @@ export const SOUNDSTAGE_ZONES: Record<SoundstageZoneId, SoundstageZoneSpec> = {
     basslineHz: [65.41, 103.83, 87.31, 98.0],
     leadMotifHz: [523.25, 466.16, 392.0, 311.13, 349.23, 392.0, 311.13, 261.63],
     hasPaparazziFlashes: false,
+    isSilentGameZone: false,
+  },
+  green_room_lobby: {
+    id: 'green_room_lobby',
+    title: 'Green Room Setup & Call Sheet (Quiet Set — No BGM)',
+    subtitle: 'Background music strictly silenced during room setup, cast invites & turn order draw',
+    bpm: 0,
+    musicalKey: 'Silent Studio Floor (0 dB Music)',
+    ambienceSummary: 'Clean studio acoustics for 2–8 player voice check & call-sheet draw',
+    chordProgressionHz: [],
+    basslineHz: [],
+    leadMotifHz: [],
+    hasPaparazziFlashes: false,
+    silenceBackgroundMusic: true,
+    isSilentGameZone: true,
+  },
+  live_soundstage: {
+    id: 'live_soundstage',
+    title: 'Live Soundstage Audition (Quiet Set — No BGM)',
+    subtitle: 'Background music strictly silenced for vocal rules briefing, live scene acting & FACS/Prosody judging',
+    bpm: 0,
+    musicalKey: 'Silent Soundstage Floor (0 dB Music)',
+    ambienceSummary: 'Pure microphone capture for live acting & acoustic prosody telemetry',
+    chordProgressionHz: [],
+    basslineHz: [],
+    leadMotifHz: [],
+    hasPaparazziFlashes: false,
+    silenceBackgroundMusic: true,
+    isSilentGameZone: true,
   },
 };
 
@@ -154,8 +195,8 @@ export const SOUNDSTAGE_SFX_SPECS: Record<SoundstageSfxId, SoundstageSfxSpec> = 
   },
   paparazzi_shutter_flash: {
     id: 'paparazzi_shutter_flash',
-    label: 'Paparazzi DSLR Burst & Flashbulb Pop',
-    themeContext: 'Red Carpet Camera Flash / Press Photo / Spotlight Trigger',
+    label: 'Paparazzi Crowd DSLR Burst & Flashbulb Pop',
+    themeContext: 'Red Carpet Multi-Camera Press Line / Spotlight Trigger',
     durationMs: 680,
   },
   film_reel_click: {
@@ -242,6 +283,12 @@ export function resolveZoneForScreen(params: {
     return 'casting_signup_set';
   }
   switch (params.activeTab) {
+    case 'green-room':
+    case 'setup-room':
+      return 'green_room_lobby';
+    case 'live-soundstage':
+    case 'audition-stage':
+      return 'live_soundstage';
     case 'dressing-room':
       return 'star_dressing_room';
     case 'late-night':

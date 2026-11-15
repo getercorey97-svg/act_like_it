@@ -3,6 +3,7 @@ import {
   SoundstageAudioSettings,
   SoundstageSfxId,
   SoundstageZoneId,
+  isSilentGameZone,
   shouldPlayChannel,
 } from './soundstageAudioLogic';
 
@@ -12,6 +13,8 @@ class SoundstageWebAudioEngine {
   private paparazziTimer: number | null = null;
   private stepIndex = 0;
   private currentZone: SoundstageZoneId = 'casting_signup_set';
+  private camClickBuffer: AudioBuffer | null = null;
+  private camClickLoading = false;
   private settings: SoundstageAudioSettings = {
     masterEnabled: true,
     musicEnabled: true,
@@ -35,7 +38,24 @@ class SoundstageWebAudioEngine {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
+    if (this.ctx && !this.camClickBuffer && !this.camClickLoading) {
+      this.preloadCamClickAsset(this.ctx);
+    }
     return this.ctx;
+  }
+
+  private preloadCamClickAsset(ctx: AudioContext): void {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+    this.camClickLoading = true;
+    fetch('/assets/aistudio/camclick_3327ab77.mp3')
+      .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject()))
+      .then((buf) => ctx.decodeAudioData(buf))
+      .then((decoded) => {
+        this.camClickBuffer = decoded;
+      })
+      .catch(() => {
+        this.camClickLoading = false;
+      });
   }
 
   public setPaparazziFlashListener(cb: (() => void) | null): void {
@@ -50,7 +70,12 @@ class SoundstageWebAudioEngine {
     this.currentZone = zone;
     this.settings = settings;
 
-    if (!settings.masterEnabled || settings.masterVolume <= 0) {
+    // Strictly stop all background music & ambient loops in Setup Room (green_room_lobby) & Live Soundstage (live_soundstage)
+    if (
+      isSilentGameZone(zone) ||
+      !settings.masterEnabled ||
+      settings.masterVolume <= 0
+    ) {
       this.stopLoops();
       return;
     }
@@ -76,7 +101,9 @@ class SoundstageWebAudioEngine {
 
   private restartLoops(): void {
     this.stopLoops();
+    if (isSilentGameZone(this.currentZone)) return;
     const zoneSpec = SOUNDSTAGE_ZONES[this.currentZone];
+    if (zoneSpec.silenceBackgroundMusic) return;
     const stepDurationMs = Math.round((60 / zoneSpec.bpm) * 1000 * 0.5); // 8th-note grid
 
     this.loopTimer = window.setInterval(() => {
@@ -85,6 +112,7 @@ class SoundstageWebAudioEngine {
 
     // Ambient foley & paparazzi flash timer
     this.paparazziTimer = window.setInterval(() => {
+      if (isSilentGameZone(this.currentZone)) return;
       if (!shouldPlayChannel(this.settings, 'paparazziAmbienceEnabled')) return;
       if (this.currentZone === 'red_carpet_dashboard') {
         this.playSfx('paparazzi_shutter_flash', true);
@@ -105,11 +133,13 @@ class SoundstageWebAudioEngine {
   }
 
   private playSequencerStep(): void {
+    if (isSilentGameZone(this.currentZone)) return;
     if (!shouldPlayChannel(this.settings, 'musicEnabled')) return;
     const ctx = this.ensureContext();
     if (!ctx || ctx.state !== 'running') return;
 
     const zone = SOUNDSTAGE_ZONES[this.currentZone];
+    if (zone.silenceBackgroundMusic) return;
     const step = this.stepIndex % 16;
     const barIndex = Math.floor(this.stepIndex / 4) % zone.chordProgressionHz.length;
     const vol = this.settings.masterVolume * 0.18;
@@ -199,36 +229,57 @@ class SoundstageWebAudioEngine {
     if (!ctx) return;
     const now = ctx.currentTime;
     const vol =
-      this.settings.masterVolume * (isAmbientFoley ? 0.32 : 0.55);
+      this.settings.masterVolume * (isAmbientFoley ? 0.36 : 0.62);
 
     switch (sfxId) {
       case 'paparazzi_shutter_flash': {
-        // Triple rapid DSLR mechanical shutter clicks + vintage flashbulb POP + capacitor recharge WHINE
-        [0, 0.085, 0.175].forEach((offset) => {
-          this.triggerNoiseBurst(ctx, now + offset, 0.032, 2600, vol * 0.85);
+        // Multi-photographer press crowd burst: 5 staggered camera shutters (0ms, 65ms, 140ms, 230ms, 310ms)
+        // Layering decoded camclick_3327ab77.mp3 + researched DSLR mechanical mirror slap + titanium focal-plane curtain
+        const crowdOffsets = [0, 0.065, 0.14, 0.23, 0.31];
+        const playbackRates = [1.0, 0.94, 1.07, 0.96, 1.04];
+
+        crowdOffsets.forEach((offset, idx) => {
+          const voiceGain = vol * (0.95 - idx * 0.11);
+          const rate = playbackRates[idx];
+          if (this.camClickBuffer) {
+            const src = ctx.createBufferSource();
+            src.buffer = this.camClickBuffer;
+            src.playbackRate.setValueAtTime(rate, now + offset);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(Math.max(0.001, voiceGain), now + offset);
+            src.connect(g);
+            g.connect(ctx.destination);
+            src.start(now + offset);
+          }
+          // 1st curtain + mirror up mechanical body (190Hz -> 95Hz) + titanium blade click (2.8kHz)
+          this.triggerNoiseBurst(ctx, now + offset, 0.026, 2800 * rate, voiceGain * 0.72);
           this.triggerTone(
             ctx,
             now + offset,
-            1450,
-            620,
-            0.035,
-            vol * 0.55,
-            'square'
+            215 * rate,
+            92 * rate,
+            0.028,
+            voiceGain * 0.55,
+            'triangle'
+          );
+          // 2nd curtain + mirror return slap (+18ms)
+          this.triggerNoiseBurst(
+            ctx,
+            now + offset + 0.018,
+            0.028,
+            3400 * rate,
+            voiceGain * 0.65
+          );
+          this.triggerTone(
+            ctx,
+            now + offset + 0.018,
+            168 * rate,
+            74 * rate,
+            0.032,
+            voiceGain * 0.62,
+            'sine'
           );
         });
-        // Vintage Flashbulb capacitor recharge whine (1.6kHz -> 4.3kHz)
-        const whineOsc = ctx.createOscillator();
-        const whineGain = ctx.createGain();
-        whineOsc.type = 'sine';
-        whineOsc.frequency.setValueAtTime(1600, now + 0.18);
-        whineOsc.frequency.exponentialRampToValueAtTime(4350, now + 0.65);
-        whineGain.gain.setValueAtTime(0.0001, now + 0.18);
-        whineGain.gain.linearRampToValueAtTime(vol * 0.22, now + 0.25);
-        whineGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.68);
-        whineOsc.connect(whineGain);
-        whineGain.connect(ctx.destination);
-        whineOsc.start(now + 0.18);
-        whineOsc.stop(now + 0.7);
         break;
       }
 

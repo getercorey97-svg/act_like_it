@@ -2054,37 +2054,1990 @@ const List<ScenePrompt> kLateNightAfterHoursScenes = [
   ...kFiftyNewRatedRSpeakeasyScenes,
 ];
 
-/// Complete 90-Scene General Catalog partitioned by `SceneCategory` (10 scenes per category).
-const Map<SceneCategory, List<ScenePrompt>> kParodyGeneralScenesByCategory = {
-  SceneCategory.era1970To1999: kEra1970To1999Scenes,
-  SceneCategory.era2000To2026: kEra2000To2026Scenes,
-  SceneCategory.awardsBestActor: kAwardsBestActorScenes,
-  SceneCategory.awardsBestActress: kAwardsBestActressScenes,
-  SceneCategory.awardsBestSupportingActor: kAwardsBestSupportingActorScenes,
-  SceneCategory.awardsBestVillain: kAwardsBestVillainScenes,
-  SceneCategory.awardsEmmyVault: kAwardsEmmyVaultScenes,
-  SceneCategory.specialtyCultClassics: kSpecialtyCultClassicsScenes,
-  SceneCategory.specialtyBlockbusterSciFi: kSpecialtyBlockbusterSciFiScenes,
+const List<ScenePrompt> kExpandedEra1970To1999Scenes = [
+  ScenePrompt(
+    id: 'era70_11',
+    category: SceneCategory.era1970To1999,
+    title: 'Coffee Is for Closers Only',
+    filmOrSeries: 'Brass Leads & Boiler Rooms (1992 Parody)',
+    releaseYear: 1992,
+    characterName: 'Blake Vance',
+    promptScript:
+        'Put that decaf espresso mug back on the credenza! Espresso is for closers only! You think the downtown syndicate sent me out in the rain to pat your backs? First prize in this sales contest is a gold convertible; second prize is a set of steak knives; third prize is you pack your desk!',
+    duetLeadA:
+        'Put that espresso mug down—first prize is a gold convertible, second prize is steak knives, third prize is you pack your desk!',
+    duetLeadB:
+        'The leads you gave us are five years old, Blake—nobody in this zip code is buying swamp lots over the telephone!',
+    directorCue:
+        'Tap an imaginary gold wristwatch against the lens with ruthless boardroom swagger and sharp staccato cadence.',
+    emotionalTarget: 'Ruthless High-Pressure Bravado',
+    improvTwist:
+        'TWIST AT 15s: Jingle an imaginary set of luxury car keys inches from the lens and sneer.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era70_12',
+    category: SceneCategory.era1970To1999,
+    title: 'Attica on the Sidewalk Bank Run',
+    filmOrSeries: 'Heatwave Teller (1975 Parody)',
+    releaseYear: 1975,
+    characterName: 'Sonny Wortzik-Vane',
+    promptScript:
+        'Put the bullhorns down and step back behind the police barricades! It is ninety-eight degrees in this vault, the air conditioning broke at noon, and if one cruiser inches toward that revolving door, we are bringing the whole block out to chant with us!',
+    duetLeadA:
+        'Put the bullhorns down and step back behind the barricades—the air conditioning broke at noon!',
+    duetLeadB:
+        'Sonny, there are two news helicopters overhead and the pizza delivery guy is asking who\'s tipping him!',
+    directorCue:
+        'Wipe imaginary sweat from your brow and pace the frame with frantic, sympathetic street energy.',
+    emotionalTarget: 'Sweat-Drenched Street Desperation',
+    improvTwist:
+        'TWIST AT 15s: Wave an imaginary white handkerchief and rally the crowd outside.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era70_13',
+    category: SceneCategory.era1970To1999,
+    title: 'Forget It Jake, It Is the Water District',
+    filmOrSeries: 'Mulholland Reservoir (1974 Parody)',
+    releaseYear: 1974,
+    characterName: 'Detective J.J. Gittes-Vane',
+    promptScript:
+        'You think you know why they are dumping millions of gallons of reservoir water into the ocean at midnight during a drought? Every orange grove in the valley has a silent deed attached to it, and if we ask one more question, our fedoras end up floating in the aqueduct!',
+    duetLeadA:
+        'Every orange grove in the valley has a silent deed attached to it—stop chasing the reservoir ledger!',
+    duetLeadB:
+        'I have the county surveyor\'s photographs in my glovebox, J.J., and I\'m not walking away this time!',
+    directorCue:
+        'Touch the bridge of your nose as if wearing a bandage and speak in a world-weary neo-noir baritone.',
+    emotionalTarget: 'Cynical Neo-Noir Fatalism',
+    improvTwist:
+        'TWIST AT 15s: Glance over your shoulder as if headlights just swept across the alley.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era70_14',
+    category: SceneCategory.era1970To1999,
+    title: 'Philly Museum Steps Sunrise Sprint',
+    filmOrSeries: 'Southpaw Contender (1976 Parody)',
+    releaseYear: 1976,
+    characterName: 'Rocco Balboa-Vane',
+    promptScript:
+        'Nobody in the neighborhood gave me a shot past the third round, Adrian, and maybe I can\'t out-dance the champ on points! All I gotta do is still be standing on my two feet when that fifteenth bell rings so I know I wasn\'t just another bum from the docks!',
+    duetLeadA:
+        'All I gotta do is still be standing on my two feet when that fifteenth bell rings, Adrian!',
+    duetLeadB:
+        'Win or lose tonight, Rocco, promise me you\'ll come back through that locker room door in one piece.',
+    directorCue:
+        'Deliver with humble, bruised sincerity, chin tucked slightly, building to quiet grit.',
+    emotionalTarget: 'Underdog Heart & Quiet Determination',
+    improvTwist:
+        'TWIST AT 15s: Shadow-box two quick jabs toward the camera before softening your expression.',
+    durationSeconds: 35,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'era70_15',
+    category: SceneCategory.era1970To1999,
+    title: 'Saturday Library Detention Manifesto',
+    filmOrSeries: 'The Shermer Detention Club (1985 Parody)',
+    releaseYear: 1985,
+    characterName: 'Bender & Claire',
+    promptScript:
+        'You think Principal Vernon cares who we actually are once that Monday morning bell rings in the hallway? Down here in the library we\'re a brain, an athlete, a basket case, a princess, and a criminal—and I\'m not pretending we didn\'t just change each other\'s lives!',
+    duetLeadA:
+        'You think Principal Vernon cares who we actually are once that Monday morning bell rings in the hallway?',
+    duetLeadB:
+        'If you walk past my locker on Monday without saying hello, I\'ll know everything we said today was a lie.',
+    directorCue:
+        'Lean back with rebellious 80s teen angst, then let genuine vulnerability crack through.',
+    emotionalTarget: 'Rebellious Youth &Raw Vulnerability',
+    improvTwist:
+        'TWIST AT 15s: Freeze mid-sentence as if the principal just peeked through the library door window.',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'era70_16',
+    category: SceneCategory.era1970To1999,
+    title: 'Greed Clarifies the Takeover Bid',
+    filmOrSeries: 'Ticker Tape Sharks (1987 Parody)',
+    releaseYear: 1987,
+    characterName: 'Gordon Sterling',
+    promptScript:
+        'The point is, ladies and gentlemen of the shareholder board, that ambition—for lack of a better word—is the engine that keeps this airline flying! It cuts through the bureaucratic fog and captures the essence of the evolutionary spirit!',
+    duetLeadA:
+        'Ambition cuts through the bureaucratic fog and captures the essence of the evolutionary spirit!',
+    duetLeadB:
+        'You\'re not saving the airline, Gordon—you\'re liquidating my father\'s hangar to fund a penthouse in Geneva!',
+    directorCue:
+        'Snap imaginary suspenders, slick your hair back, and command the room like a corporate emperor.',
+    emotionalTarget: 'Predatory Boardroom Charisma',
+    improvTwist:
+        'TWIST AT 15s: Answer an imaginary brick-sized 1980s cell phone and bark "Buy it all!"',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era70_17',
+    category: SceneCategory.era1970To1999,
+    title: 'Diner Pastrami Verdict',
+    filmOrSeries: 'When Autumn Met Manhattan (1989 Parody)',
+    releaseYear: 1989,
+    characterName: 'Sally & Harry',
+    promptScript:
+        'You honestly believe you can tell the difference between real romance and high-level acting across a deli table?! Watch closely—I can order a pastrami on rye with mustard and sell it so convincingly that every table in this diner asks for what I\'m having!',
+    duetLeadA:
+        'I can sell a pastrami on rye so convincingly that every table in this diner asks for what I\'m having!',
+    duetLeadB:
+        'Keep your voice down—the lady at Table Six just dropped her fork and the waiter is staring at us!',
+    directorCue:
+        'Pivot from breezy conversational banter into over-the-top theatrical bravado, then take a casual bite.',
+    emotionalTarget: 'Sparkling Rom-Com Wit & Timing',
+    improvTwist:
+        'TWIST AT 15s: Immediately drop back to deadpan calm and sip an imaginary water glass.',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'era70_18',
+    category: SceneCategory.era1970To1999,
+    title: 'Show Me the Contract Incentive',
+    filmOrSeries: 'Sports Agent Overtime (1996 Parody)',
+    releaseYear: 1996,
+    characterName: 'Jerry & Rod',
+    promptScript:
+        'Look at me on this phone line, Rod—all the other clients walked out with the agency sharks, and you are the one franchise star I am betting my entire career on! Say it with me so the stadium hears it: Show me the franchise contract!',
+    duetLeadA:
+        'You are the one franchise star I am betting my entire career on—say it with me so the stadium hears it!',
+    duetLeadB:
+        'Louder, Jerry! Say it from your diaphragm like you love football—show me the franchise contract!',
+    directorCue:
+        'Build from desperate phone-call pleading into a joyful, jumping celebratory roar.',
+    emotionalTarget: 'Desperate Hustle to Euphoric Triumph',
+    improvTwist:
+        'TWIST AT 15s: Realize the office is watching you through the glass wall and keep shouting anyway.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era70_19',
+    category: SceneCategory.era1970To1999,
+    title: 'South Boston Park Bench Breakthrough',
+    filmOrSeries: 'Chalkboard Genius (1997 Parody)',
+    releaseYear: 1997,
+    characterName: 'Dr. Sean Maguire-Vane',
+    promptScript:
+        'You can recite every textbook in the university library, kid, and solve chalkboard equations the professors took ten years to prove—but if I ask you what the ceiling of the Sistine Chapel actually smells like when you stand underneath it, you\'ve got nothing to say.',
+    duetLeadA:
+        'You can recite every textbook in the library, kid, but you\'ve never stood outside your own defenses.',
+    duetLeadB:
+        'Don\'t analyze me from a park bench, Doc—you read one file on my past and think you know my whole story.',
+    directorCue:
+        'Speak with warm, grounded mentorship, leaning forward gently with quiet emotional gravity.',
+    emotionalTarget: 'Empathetic Wisdom & Quiet Gravity',
+    improvTwist:
+        'TWIST AT 15s: Soften your voice to a gentle whisper: "It is not your fault."',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era70_20',
+    category: SceneCategory.era1970To1999,
+    title: 'Red Pill or Blue Velvet Capsule',
+    filmOrSeries: 'Mainframe Awakening (1999 Parody)',
+    releaseYear: 1999,
+    characterName: 'Captain Morpheus-Vane',
+    promptScript:
+        'This is your final boarding call out of the simulation. Take the cobalt capsule and you wake up at your cubicle desk believing whatever the algorithm feeds you; take the crimson capsule and I show you how deep the fiber-optic rabbit hole actually runs.',
+    duetLeadA:
+        'Take the crimson capsule and I show you how deep the fiber-optic rabbit hole actually runs.',
+    duetLeadB:
+        'Wait—before I swallow either one, does the real world still have decent espresso or is it all oat gruel?',
+    directorCue:
+        'Hold both palms out toward the camera lens at equal height, posture statue-still and voice resonant.',
+    emotionalTarget: 'Oracular Cyberpunk Gravitas',
+    improvTwist:
+        'TWIST AT 15s: Adjust imaginary rimless sunglasses and lean two inches closer to the lens.',
+    durationSeconds: 35,
+    difficultyTier: 3,
+  ),
+];
+
+const List<ScenePrompt> kExpandedEra2000To2026Scenes = [
+  ScenePrompt(
+    id: 'era00_11',
+    category: SceneCategory.era2000To2026,
+    title: 'Cerulean Sweater Lecture',
+    filmOrSeries: 'Runway Tyrant (2006 Parody)',
+    releaseYear: 2006,
+    characterName: 'Miranda Priestly-Vane',
+    promptScript:
+        'Oh, don\'t chuckle as if you are exempt from this magazine\'s editorial decisions! That lumpy sweater you pulled from the clearance bin is not simply blue, it is cerulean—selected for you by the very people in this showroom whom you think you are too intellectual to respect.',
+    duetLeadA:
+        'That sweater is not simply blue, it is cerulean—selected for you by the people in this very showroom.',
+    duetLeadB:
+        'I apologize, Miranda—I was just trying to say both belts looked identical on the mannequin.',
+    directorCue:
+        'Never raise your voice above a devastatingly calm purr; let a single eyebrow arch do the violence.',
+    emotionalTarget: 'Icy Haute-Couture Supremacy',
+    improvTwist:
+        'TWIST AT 15s: Dismissively wave your hand and murmur "That\'s all."',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era00_12',
+    category: SceneCategory.era2000To2026,
+    title: 'Call It in the Gas Station Coin Toss',
+    filmOrSeries: 'West Texas Coin Flip (2007 Parody)',
+    releaseYear: 2007,
+    characterName: 'Anton Chigurh-Vane',
+    promptScript:
+        'What is the most you have ever wagered on a single quarter flip at a desert gas station? This nineteen-fifty-eight coin has traveled twenty-two years across the highway just to land on your counter—call it in the air, friend.',
+    duetLeadA:
+        'This coin has traveled twenty-two years across the highway just to land on your counter—call it.',
+    duetLeadB:
+        'I didn\'t put anything up to bet, mister—I\'m just closing the register for the night!',
+    directorCue:
+        'Keep your eyelids completely unblinking and tilt your head slightly with eerie, monotone calm.',
+    emotionalTarget: 'Unblinking Existential Menace',
+    improvTwist:
+        'TWIST AT 15s:Slap an imaginary coin onto the back of your wrist and stare down at it.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'era00_13',
+    category: SceneCategory.era2000To2026,
+    title: 'Drop the "The" From the Startup Name',
+    filmOrSeries: 'Dorm Room Billionaires (2010 Parody)',
+    releaseYear: 2010,
+    characterName: 'Mark & Eduardo',
+    promptScript:
+        'You had one share dilution clause in the contract and you didn\'t even read the signature page before flying back to New York! You want to know why I locked the server room? Because we\'re not building a campus directory anymore—drop the "The," it\'s cleaner!',
+    duetLeadA:
+        'You had one dilution clause in the contract and you didn\'t even read the signature page!',
+    duetLeadB:
+        'I was your best friend and your CFO, Mark—I\'m freezing the bank account and hiring litigators tonight!',
+    directorCue:
+        'Deliver at rapid-fire Aaron Sorkin cadence with zero pauses and robotic intellectual arrogance.',
+    emotionalTarget: 'Hyper-Articulate Silicon Valley Betrayal',
+    improvTwist:
+        'TWIST AT 15s: Glance down at your laptop screen as if refreshing live user counts mid-argument.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era00_14',
+    category: SceneCategory.era2000To2026,
+    title: 'Penny Stock Microphone Rally',
+    filmOrSeries: 'Stratton Bullhorn (2013 Parody)',
+    releaseYear: 2013,
+    characterName: 'Jordan Belfort-Vane',
+    promptScript:
+        'Put the compliance subpoenas in the shredder because I am not vacating this trading floor! They want to send federal auditors to count our commissions? They\'re gonna need a battalion and a wrecking ball to drag me off this desk—pick up the phones and start dialing!',
+    duetLeadA:
+        'I am not vacating this trading floor—pick up the phones and start dialing!',
+    duetLeadB:
+        'Jordan, the SEC is in the lobby elevator right now—if you don\'t sign the settlement, we\'re all cooked!',
+    directorCue:
+        'Beat your chest rhythmically, then erupt into a feral, desk-stomping motivational roar.',
+    emotionalTarget: 'Feral Trading-Floor Euphoria',
+    improvTwist:
+        'TWIST AT 15s: Toss imaginary hundred-dollar bills toward the lens and point at the back row.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'era00_15',
+    category: SceneCategory.era2000To2026,
+    title: 'Look At Me, I Run the Bridge Now',
+    filmOrSeries: 'Freighter Standoff (2013 Parody)',
+    releaseYear: 2013,
+    characterName: 'Muse & Captain Richard',
+    promptScript:
+        'Stop staring at the radar console and look directly into my eyes! Nobody is coming over the horizon to rescue this cargo ship before nightfall—look at me, Irish, I am the captain of this bridge now!',
+    duetLeadA:
+        'Stop staring at the radar console—look at me, I am the captain of this bridge now!',
+    duetLeadB:
+        'The main engine room is flooded and the crew locked the bulkhead—if we don\'t steer into the current, we capsize!',
+    directorCue:
+        'Point two fingers toward your own eyes and hold an intense, commanding close-up gaze.',
+    emotionalTarget: 'High-Seas Command & Raw Urgency',
+    improvTwist:
+        'TWIST AT 15s: React as if the ship\'s alarm klaxon just blared across the wheelhouse.',
+    durationSeconds: 30,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era00_16',
+    category: SceneCategory.era2000To2026,
+    title: 'Tap Your Spoon on the Teacup',
+    filmOrSeries: 'Sunken Lawn Party (2017 Parody)',
+    releaseYear: 2017,
+    characterName: 'Chris & Missy',
+    promptScript:
+        'Stop tapping that silver spoon against the porcelain teacup! I know what you\'re doing in this parlor, my hands are locked to the armrests of this leather chair, and I am not falling into the floor for your garden party!',
+    duetLeadA:
+        'Stop tapping that silver spoon against the porcelain teacup—I know what you\'re doing!',
+    duetLeadB:
+        'Just breathe and listen to the silver ring, Chris—sink into the quiet floor for a moment.',
+    directorCue:
+        'Keep your head completely immobilized while letting a single tear-stained, wide-eyed panic fill your eyes.',
+    emotionalTarget: 'Paralyzed Psychological Terror',
+    improvTwist:
+        'TWIST AT 15s: Gasp sharply as if you just broke free from hypnosis and grab your car keys.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'era00_17',
+    category: SceneCategory.era2000To2026,
+    title: 'Basement Stairs Morse Code',
+    filmOrSeries: 'Subterranean Villa (2019 Parody)',
+    releaseYear: 2019,
+    characterName: 'Ki-taek & Moon-gwang',
+    promptScript:
+        'You mean to tell me there has been a concrete bunker hidden behind the peach preserves shelf for four years?! The wealthy family upstairs thinks the hallway light is a motion sensor, and you\'ve been tapping Morse code with your forehead!',
+    duetLeadA:
+        'There has been a concrete bunker hidden behind the preserves shelf for four years?!',
+    duetLeadB:
+        'Don\'t call the police—Wait! The family\'s SUV just pulled into the driveway because the rain washed out their camping trip!',
+    directorCue:
+        'Pivot from dark-comedy disbelief to sheer scramble panic as footsteps approach overhead.',
+    emotionalTarget: 'Virtuoso Genre-Shift Panic',
+    improvTwist:
+        'TWIST AT 15s: Duck below the bottom third of the camera frame as if hiding under a coffee table.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era00_18',
+    category: SceneCategory.era2000To2026,
+    title: 'Mahjong Tiles in the Emerald Lounge',
+    filmOrSeries: 'Singapore Heiress (2018 Parody)',
+    releaseYear: 2018,
+    characterName: 'Rachel & Eleanor',
+    promptScript:
+        'Look at the bamboo tiles I just discarded across the table, Eleanor! I drew the winning dragon three turns ago, and I handed it to you so your son wouldn\'t have to choose between his family crest and the woman who actually loves him.',
+    duetLeadA:
+        'I drew the winning mahjong tile three turns ago, and I handed it to you so your son wouldn\'t have to choose.',
+    duetLeadB:
+        'You may know probability theory, professor, but this family plays for centuries, not semesters.',
+    directorCue:
+        'Place an imaginary tile down with regal poise, chin lifted and eyes steady with quiet victory.',
+    emotionalTarget: 'Regal Poise & Emotional Checkmate',
+    improvTwist:
+        'TWIST AT 15s: Flash an effortless, gracious smile before standing up from the table.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era00_19',
+    category: SceneCategory.era2000To2026,
+    title: 'Fifth Gen Fighter Cockpit Dogfight',
+    filmOrSeries: 'Mach Ten Maverick (2022 Parody)',
+    releaseYear: 2022,
+    characterName: 'Captain Pete & Rooster',
+    promptScript:
+        'Don\'t look at the instrument panel, kid—it\'s not the plane, it\'s the pilot in the seat! Pull the canopy stick hard left into the canyon wall on my mark, deploy flares, and trust your wingman!',
+    duetLeadA:
+        'It\'s not the plane, it\'s the pilot in the seat—pull hard left into the canyon on my mark!',
+    duetLeadB:
+        'Missile lock warning is screaming in my helmet, Mav—if we pull nine Gs right now the wings will shear off!',
+    directorCue:
+        'Strain your neck and jaw as if fighting 9 Gs of gravitational force in a supersonic cockpit.',
+    emotionalTarget: 'Supersonic G-Force Adrenaline',
+    improvTwist:
+        'TWIST AT 15s: Look up over your shoulder to track an imaginary bandit jet passing overhead.',
+    durationSeconds: 30,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'era00_20',
+    category: SceneCategory.era2000To2026,
+    title: 'Chain Reaction in the Desert Rain',
+    filmOrSeries: 'Trinity Stopwatch (2023 Parody)',
+    releaseYear: 2023,
+    characterName: 'Dr. Julius Vane',
+    promptScript:
+        'When we pressed that ignition switch in the desert bunker, the equations said there was a near-zero probability of igniting the atmosphere—and now I stare at the ripples on the pond and wonder if the chain reaction already started.',
+    duetLeadA:
+        'I stare at the ripples on the pond and wonder if the chain reaction already started.',
+    duetLeadB:
+        'The Senate committee doesn\'t want philosophy, Doctor—they want to know whose side you\'re on.',
+    directorCue:
+        'Hold a thousand-yard stare directly through the camera lens with haunted, whispered stillness.',
+    emotionalTarget: 'Haunted Historical Weight',
+    improvTwist:
+        'TWIST AT 15s: Squint as if a blinding white flash just illuminated the soundstage.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+];
+
+const List<ScenePrompt> kExpandedAwardsBestActorScenes = [
+  ScenePrompt(
+    id: 'actor_11',
+    category: SceneCategory.awardsBestActor,
+    title: 'The Left Foot Canvas Breakthrough',
+    filmOrSeries: 'Dublin Studio Brush (1989 Parody)',
+    releaseYear: 1989,
+    characterName: 'Christy Brown-Vane',
+    promptScript:
+        'They told my mother to lock the chalk away because a boy who can\'t hold a pencil in his fingers has nothing to say to the world! Look at the word painted across that floorboards—every letter came out of my soul!',
+    duetLeadA:
+        'Look at the word painted across the floorboards—every letter came out of my soul!',
+    duetLeadB:
+        'Hold the brush steady, Christy—the gallery owner from Grafton Street is standing in the doorway right now!',
+    directorCue:
+        'Channel fierce, triumphant defiance through your eyes and jaw with explosive vocal clarity.',
+    emotionalTarget: 'Fierce Artistic Triumph',
+    improvTwist:
+        'TWIST AT 15s: Let out a sudden, joyful laugh of pure relief.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actor_12',
+    category: SceneCategory.awardsBestActor,
+    title: 'Hoo-Ah in the Prep School Assembly',
+    filmOrSeries: 'Blind Colonel Tango (1992 Parody)',
+    releaseYear: 1992,
+    characterName: 'Lt. Col. Frank Slade-Vane',
+    promptScript:
+        'I have stood at many crossroads in my life, Mr. Headmaster, and I always knew which path was the right one—without exception, I never took it, because it was too damn hard! This boy kept his integrity intact, and you will not expel his future today!',
+    duetLeadA:
+        'This boy kept his integrity intact, and you will not expel his future in this auditorium today!',
+    duetLeadB:
+        'Colonel Slade, you are out of order—sit down or campus security will escort you from the podium!',
+    directorCue:
+        'Fix your gaze slightly above the lens with thunderous military posture and gravelly baritone authority.',
+    emotionalTarget: 'Thunderous Moral Roar',
+    improvTwist:
+        'TWIST AT 15s: Slam an imaginary cane onto the floor and bark "Hoo-ah!"',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actor_13',
+    category: SceneCategory.awardsBestActor,
+    title: 'Nocturne in the Ruined Conservatory',
+    filmOrSeries: 'Warsaw Ivory Keys (2002 Parody)',
+    releaseYear: 2002,
+    characterName: 'Wladyslaw & The Officer',
+    promptScript:
+        'My fingers haven\'t touched a tuned grand piano in two winters, Captain, and the frost has stiffened my knuckles—but if you let me sit on that bench for three minutes, the music will tell you who I am.',
+    duetLeadA:
+        'If you let me sit on that bench for three minutes, the music will tell you who I am.',
+    duetLeadB:
+        'Play quietly, pianist—my command post is in the next room, and I am listening.',
+    directorCue:
+        'Shiver visibly from imaginary cold, then let serene dignity wash over your face as your hands hover over keys.',
+    emotionalTarget: 'Fragile Dignity & Transcendent Grace',
+    improvTwist:
+        'TWIST AT 15s: Close your eyes and sway to an imaginary Chopin chord.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actor_14',
+    category: SceneCategory.awardsBestActor,
+    title: 'Georgia On the Studio Rhodes',
+    filmOrSeries: 'Hit the Road Vinyl (2004 Parody)',
+    releaseYear: 2004,
+    characterName: 'Ray & Producer Ahmet',
+    promptScript:
+        'Don\'t tell me the radio stations won\'t play a six-minute gospel rhythm track just because nobody\'s tried it before! Put the tape reel on record, count the horns in on four, and watch the whole country tap their shoes!',
+    duetLeadA:
+        'Put the tape reel on record, count the horns in on four, and watch the whole country tap their shoes!',
+    duetLeadB:
+        'We only have four minutes of studio tape left on the spool, Ray—if we miss the bridge, we lose the session!',
+    directorCue:
+        'Sway side-to-side behind imaginary sunglasses with infectious rhythmic joy and gravel-warm soul.',
+    emotionalTarget: 'Infectious Soulful Genius',
+    improvTwist:
+        'TWIST AT 15s: Snap your fingers on the off-beat and grin wide at the control booth.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'actor_15',
+    category: SceneCategory.awardsBestActor,
+    title: 'The Royal Microphone Stammer',
+    filmOrSeries: 'Broadcast to the Empire (2010 Parody)',
+    releaseYear: 2010,
+    characterName: 'Bertie & Lionel',
+    promptScript:
+        'That red BBC indicator lamp is blinking like an executioner\'s eye, Lionel, and forty million listeners are waiting for a steady voice! Don\'t leave the booth—conduct me through the first sentence like an orchestra!',
+    duetLeadA:
+        'That red indicator lamp is blinking—conduct me through the first sentence like an orchestra!',
+    duetLeadB:
+        'Forget the forty million people, Your Majesty—just speak the words to me, one breath at a time.',
+    directorCue:
+        'Show tight jaw and throat tension before exhaling into a resonant, hard-won vocal release.',
+    emotionalTarget: 'Vulnerability Conquering Fear',
+    improvTwist:
+        'TWIST AT 15s: Sing two words of the line melodically to break the vocal block, then finish strong.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actor_16',
+    category: SceneCategory.awardsBestActor,
+    title: 'January Thaw on the House Floor',
+    filmOrSeries: 'Telegraph & Gavel (2012 Parody)',
+    releaseYear: 2012,
+    characterName: 'President Abraham & Thaddeus',
+    promptScript:
+        'A compass, I learned when I was surveying the prairie, will point you true north from where you stand, but it has no advice about the swamps and chasms you must cross on the way! We need two more votes before the gavel falls at sundown!',
+    duetLeadA:
+        'A compass points true north, but it has no advice about the swamps—we need two more votes by sundown!',
+    duetLeadB:
+        'If I soften my speech on the floor today, Mr. President, the gallery will think we flinched!',
+    directorCue:
+        'Adopt a folksy, high-tenor storyteller cadence that suddenly snaps into thunderous executive command.',
+    emotionalTarget: 'Folksy Gravity & Historic Command',
+    improvTwist:
+        'TWIST AT 15s: Slap the table sharply and lean forward with piercing eyes.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actor_17',
+    category: SceneCategory.awardsBestActor,
+    title: 'Cashed-Out Rodeo Buyer\'s Club',
+    filmOrSeries: 'Smuggled Vials (2013 Parody)',
+    releaseYear: 2013,
+    characterName: 'Ron Woodroof-Vane',
+    promptScript:
+        'The hospital board gave me thirty days on a clipboard two years ago, doc, and I\'m still standing here in my boots with a trunk full of life-saving medicine! Sign the customs release or step out of my driveway!',
+    duetLeadA:
+        'The hospital gave me thirty days two years ago, doc—sign the release or step out of my driveway!',
+    duetLeadB:
+        'The FDA marshals are parked across the street, Ron—if you open that trunk right now they\'ll seize every box!',
+    directorCue:
+        'Tip an imaginary cowboy hat back and deliver with wiry, outlaw Texas swagger.',
+    emotionalTarget: 'Outlaw Grit & Survival Defiance',
+    improvTwist:
+        'TWIST AT 15s: Flash a rascal wink and pull a backup manifest from your boot.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'actor_18',
+    category: SceneCategory.awardsBestActor,
+    title: 'Frozen River Bear-Claw Crawl',
+    filmOrSeries: 'Frontier Revenant (2015 Parody)',
+    releaseYear: 2015,
+    characterName: 'Hugh Glass-Vane',
+    promptScript:
+        'You left me in a shallow trench under two feet of Dakota snow with an empty canteen and a broken ankle! I crawled two hundred miles across frozen river ice just to look you in the eye when the wind stops blowing.',
+    duetLeadA:
+        'I crawled two hundred miles across frozen river ice just to look you in the eye.',
+    duetLeadB:
+        'The blizzard was closing the pass, Glass—nobody could have carried you over that ridge alive!',
+    directorCue:
+        'Breathe in ragged, frosty rasps and channel primal, elemental endurance.',
+    emotionalTarget: 'Primal Elemental Vengeance',
+    improvTwist:
+        'TWIST AT 15s: Shiver violently and clench your jaw until your voice drops to a lethal growl.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actor_19',
+    category: SceneCategory.awardsBestActor,
+    title: 'Harbor Hardware Shovel Grief',
+    filmOrSeries: 'Winter Harbor (2016 Parody)',
+    releaseYear: 2016,
+    characterName: 'Lee & Patrick',
+    promptScript:
+        'I understand you want to stay on the boat and keep your friends at the high school, kid, and I\'m trying to make the numbers work—I just can\'t beat it. I can\'t stay in this town another winter.',
+    duetLeadA:
+        'I\'m trying to make the numbers work, kid—I just can\'t beat it. I can\'t stay in this town.',
+    duetLeadB:
+        'We can rent the spare room above the garage, Uncle Lee—you don\'t have to run back to Boston!',
+    directorCue:
+        'Avoid direct eye contact at first, speaking in understated, devastatingly quiet New England restraint.',
+    emotionalTarget: 'Understated Heartbreak & Restraint',
+    improvTwist:
+        'TWIST AT 15s: Catch your breath mid-word and look away from the lens to hide the crack in your voice.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actor_20',
+    category: SceneCategory.awardsBestActor,
+    title: 'Underground Bunker War Cabinet',
+    filmOrSeries: 'Whitehall Blitz (2017 Parody)',
+    releaseYear: 2017,
+    characterName: 'Prime Minister Winston-Vane',
+    promptScript:
+        'You ask what our policy is while the map of Europe goes dark? We shall never parley, we shall never negotiate with tyranny from a position of fear—we will defend every street, every harbor, and every hill until the New World steps forth!',
+    duetLeadA:
+        'We shall never parley—we will defend every street, every harbor, and every hill!',
+    duetLeadB:
+        'Prime Minister, the fleet at the channel needs an order in ten minutes—are we launching the civilian boats?',
+    directorCue:
+        'Jut your lower jaw forward, grip imaginary coat lapels, and roll every consonant like distant thunder.',
+    emotionalTarget: 'Oratorical Thunder & Iron Resolve',
+    improvTwist:
+        'TWIST AT 15s: Flash a defiant two-finger victory sign directly into the lens.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+];
+
+const List<ScenePrompt> kExpandedAwardsBestActressScenes = [
+  ScenePrompt(
+    id: 'actress_11',
+    category: SceneCategory.awardsBestActress,
+    title: 'Brainerd Diner Coffee Refill',
+    filmOrSeries: 'Snowplow Alibi (1996 Parody)',
+    releaseYear: 1996,
+    characterName: 'Chief Marge Gunderson-Vane',
+    promptScript:
+        'So you got the tan sedan in the lot, you got three people missing since Tuesday, and all for a little bit of money—there\'s more to life than a suitcase of cash, don\'tcha know, and it\'s a beautiful day in Minnesota!',
+    duetLeadA:
+        'There\'s more to life than a suitcase of cash, don\'tcha know—and you\'re coming in the squad car.',
+    duetLeadB:
+        'Chief, my lawyer in Minneapolis said I don\'t have to answer a single question about the dealership!',
+    directorCue:
+        'Deliver with cheerful, sing-song Midwest warmth while never losing sharp detective authority.',
+    emotionalTarget: 'Warm Midwest Decency & Iron Resolve',
+    improvTwist:
+        'TWIST AT 15s: Tip an imaginary fur-lined police cap and smile politely while reading rights.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'actress_12',
+    category: SceneCategory.awardsBestActress,
+    title: 'Hexavalent Water Glass Challenge',
+    filmOrSeries: 'Desert Filing Cabinet (2000 Parody)',
+    releaseYear: 2000,
+    characterName: 'Erin & Corporate Counsel',
+    promptScript:
+        'By the way, that pitcher of water on the conference table was drawn this morning from a well right next to your cooling towers—so go ahead, counselor, take a big refreshing gulp before you tell these families the water is safe!',
+    duetLeadA:
+        'That pitcher of water came from the well next to your cooling towers—take a big sip, counselor!',
+    duetLeadB:
+        'Let\'s not get theatrical, Miss Brockovich—we are here to discuss preliminary settlement figures.',
+    directorCue:
+        'Slide an imaginary glass across the table, cross your arms, and lock eyes with triumphant working-class fire.',
+    emotionalTarget: 'Fierce Working-Class Vindication',
+    improvTwist:
+        'TWIST AT 15s: Arch your eyebrow as the lawyer pushes the glass away and smirk.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'actress_13',
+    category: SceneCategory.awardsBestActress,
+    title: 'La Vie En Rose Spotlight Curtain',
+    filmOrSeries: 'Parisian Sparrow (2007 Parody)',
+    releaseYear: 2007,
+    characterName: 'Edith & Stage Manager Bruno',
+    promptScript:
+        'If you cancel tonight\'s Olympia concert because my hands are trembling, Bruno, you may as well lock me in a museum! Give me the black dress, turn the footlights up, and let me sing until the balcony weeps!',
+    duetLeadA:
+        'Give me the black dress, turn the footlights up, and let me sing until the balcony weeps!',
+    duetLeadB:
+        'The doctor said one more three-hour encore will wreck your vocal cords, Edith—the crowd is already standing!',
+    directorCue:
+        'Start frail and hunched, then straighten into incandescent theatrical command as the spotlight hits.',
+    emotionalTarget: 'Incandescent Tragic Grandeur',
+    improvTwist:
+        'TWIST AT 15s: Throw both arms wide to embrace an imaginary sold-out opera house.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actress_14',
+    category: SceneCategory.awardsBestActress,
+    title: 'The Black Feather Coda',
+    filmOrSeries: 'Mirror Lake Ballet (2010 Parody)',
+    releaseYear: 2010,
+    characterName: 'Nina & Thomas',
+    promptScript:
+        'You told me the White Swan only needed technical precision, Thomas, and that I was too timid to let the dark twin out of the mirror! Watch the thirty-two fouettés tonight—I didn\'t just dance the role, I became it.',
+    duetLeadA:
+        'Watch the thirty-two fouettés tonight, Thomas—I didn\'t just dance the role, I became it.',
+    duetLeadB:
+        'The curtain goes up on Act Three in ninety seconds, Nina—don\'t lose yourself out there!',
+    directorCue:
+        'Breathe rapidly after an imaginary dance leap, eyes wide with feverish, perfectionist ecstasy.',
+    emotionalTarget: 'Feverish Perfectionist Ecstasy',
+    improvTwist:
+        'TWIST AT 15s: Whisper "It was perfect" with a haunting, serene smile.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actress_15',
+    category: SceneCategory.awardsBestActress,
+    title: 'Park Avenue Stoli Martini Breakdown',
+    filmOrSeries: 'San Francisco Socialite (2013 Parody)',
+    releaseYear: 2013,
+    characterName: 'Jasmine & Ginger',
+    promptScript:
+        'I am taking an online interior-design course, Ginger, and as soon as my nervous system stops humming like a high-voltage wire, I will be back in Manhattan hosting charity galas—pass me the Stoli with a twist!',
+    duetLeadA:
+        'As soon as my nervous system stops humming like a wire, I\'ll be back hosting galas in Manhattan!',
+    duetLeadB:
+        'Jasmine, you flew first-class on a maxed-out card and you\'re talking to yourself at the bus stop!',
+    directorCue:
+        'Fan your face with a trembling hand while maintaining brittle, upper-crust denial.',
+    emotionalTarget: 'Brittle Aristocratic Unraveling',
+    improvTwist:
+        'TWIST AT 15s: Snap out of a mid-sentence daydream and ask "Wait, who are you calling?"',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actress_16',
+    category: SceneCategory.awardsBestActress,
+    title: 'Here\'s to the Dreamers Audition',
+    filmOrSeries: 'Griffith Park Twilight (2016 Parody)',
+    releaseYear: 2016,
+    characterName: 'Mia & Casting Director',
+    promptScript:
+        'My aunt used to jump into the freezing river in Paris barefoot without looking down—she said even if we look foolish to the people on the bridge, here\'s to the mess we make while we\'re chasing the dream.',
+    duetLeadA:
+        'Even if we look foolish to the people on the bridge, here\'s to the mess we make chasing the dream.',
+    duetLeadB:
+        'Don\'t read from the sides, Mia—just tell us the story in your own voice, the room is yours.',
+    directorCue:
+        'Begin conversational and bare, letting luminous nostalgia and quiet courage fill your voice.',
+    emotionalTarget: 'Luminous Bittersweet Nostalgia',
+    improvTwist:
+        'TWIST AT 15s: Smile softly through glistening eyes as if remembering an old melody.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'actress_17',
+    category: SceneCategory.awardsBestActress,
+    title: 'Three Highway Signs Outside Town',
+    filmOrSeries: 'County Line Billboards (2017 Parody)',
+    releaseYear: 2017,
+    characterName: 'Mildred & Chief Willoughby',
+    promptScript:
+        'I rented all three rotting billboards on the old county road for a whole year, Chief, because the weeds were growing over the case file and somebody in this station needs to look up every morning when they drive to work!',
+    duetLeadA:
+        'I rented all three billboards on the county road so somebody in this station looks up every morning!',
+    duetLeadB:
+        'Mildred, every deputy on my force has searched that highway—putting my name in ten-foot letters won\'t manufacture a witness!',
+    directorCue:
+        'Hands on hips, jaw set like granite, delivering dry, unsentimental fury.',
+    emotionalTarget: 'Granite Grief & Unyielding Fury',
+    improvTwist:
+        'TWIST AT 15s: Soften for a fraction of a second before snapping your armor right back into place.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actress_18',
+    category: SceneCategory.awardsBestActress,
+    title: 'Seventeen Rabbits in the Queen\'s Bedchamber',
+    filmOrSeries: 'Candlelight Court Intrigue (2018 Parody)',
+    releaseYear: 2018,
+    characterName: 'Queen Anne & Lady Sarah',
+    promptScript:
+        'Do you think because my legs ache with gout that I am blind to the whispers in the corridor, Sarah?! Play the harpsichord if you wish, or leave the bedchamber—I am still the monarch of this palace!',
+    duetLeadA:
+        'Do you think I am blind to the whispers in the corridor?! I am still the monarch of this palace!',
+    duetLeadB:
+        'I am the only person in this court who tells you the truth when your wig is crooked, Anne!',
+    directorCue:
+        'Oscillate wildly between petulant royal tantrum and heartbreakingly lonely vulnerability.',
+    emotionalTarget: 'Tragicomic Royal Volatility',
+    improvTwist:
+        'TWIST AT 15s: Feign a sudden fainting spell just to test who rushes to your side.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'actress_19',
+    category: SceneCategory.awardsBestActress,
+    title: 'Metronome Five-Four Berlin Rehearsal',
+    filmOrSeries: 'Philharmonic Podium (2022 Parody)',
+    releaseYear: 2022,
+    characterName: 'Maestro Lydia Vane',
+    promptScript:
+        'Time is the essential piece of interpretation—you cannot start the Mahler Fifth without my downbeat! Do not blame the first-chair oboe when it is my right hand that controls the clock of this entire concert hall!',
+    duetLeadA:
+        'You cannot start the symphony without my downbeat—my right hand controls the clock of this hall!',
+    duetLeadB:
+        'The board of directors already locked your studio office, Maestro—a guest conductor is on the podium.',
+    directorCue:
+        'Slash the air with an imaginary conductor\'s baton with razor-sharp intellectual dominance.',
+    emotionalTarget: 'Imperial Artistic Obsession',
+    improvTwist:
+        'TWIST AT 15s: Freeze mid-gesture as if hearing a phantom metronome ticking off-screen.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'actress_20',
+    category: SceneCategory.awardsBestActress,
+    title: 'Googly Eyes in the Laundromat Tax Audit',
+    filmOrSeries: 'Omniverse Bagel (2022 Parody)',
+    releaseYear: 2022,
+    characterName: 'Evelyn & Waymond',
+    promptScript:
+        'In another universe we owned a glamorous cinema and wore tailored suits, and in this one we are drowning in laundry receipts at the IRS office—yet even with every timeline collapsing, I would still choose to do taxes with you!',
+    duetLeadA:
+        'Even with every timeline collapsing at once, I would still choose to do laundry and taxes with you!',
+    duetLeadB:
+        'Please, Evelyn—be kind, especially when we have no idea what is happening in the multiverse!',
+    directorCue:
+        'Shift from overwhelmed comedic exhaustion to open-hearted, tearful cosmic warmth.',
+    emotionalTarget: 'Cosmic Empathy & Joyful Chaos',
+    improvTwist:
+        'TWIST AT 15s: Stick an imaginary googly eye onto your forehead and beam with pride.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+];
+
+const List<ScenePrompt> kExpandedAwardsBestSupportingActorScenes = [
+  ScenePrompt(
+    id: 'supp_11',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Does It Look Like I Am Kidding at the Copacabana?',
+    filmOrSeries: 'Bamboo Lounge Wise Guys (1990 Parody)',
+    releaseYear: 1990,
+    characterName: 'Tommy DeVito-Vane (Supporting Scene-Stealer)',
+    promptScript:
+        'You said I\'m a riot? Funny how—like a circus clown here to amuse the VIP table?! Tell me what\'s so funny right now before the waiter brings the veal, or wait—am I just busting your chops, Henry?!',
+    duetLeadA:
+        'Funny how—like a circus clown here to amuse the VIP table?! Tell me what\'s so funny right now!',
+    duetLeadB:
+        'Come on, Tommy, you know what I meant—the way you told the story about the precinct captain!',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Drop the room temperature to absolute zero with a dead-eyed stare, then explode into uproarious laughter.',
+    emotionalTarget: 'Hair-Trigger Supporting Menace & Wit',
+    improvTwist:
+        'TWIST AT 15s: Slam the table laughing: "I almost had you going, didn\'t I?!"',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'supp_12',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Check the Barn Loft, Marshal',
+    filmOrSeries: 'Runaway Fugitive Train (1993 Parody)',
+    releaseYear: 1993,
+    characterName: 'Deputy Marshal Samuel Gerard-Vane',
+    promptScript:
+        'Listen up, ladies and gentlemen: our target did not sprout wings in that drainage tunnel! I want roadblocks on every county bridge, checkpoints at every hospital, every courthouse, every doghouse, and every outhouse in a fifteen-mile radius!',
+    duetLeadA:
+        'I want checkpoints at every hospital, every courthouse, every doghouse, and every outhouse in fifteen miles!',
+    duetLeadB:
+        'Marshal, the river current drops sixty feet over that dam—nobody survives that jump!',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Bark rapid-fire tactical orders while chewing imaginary gum with relentless authority.',
+    emotionalTarget: 'Relentless Tactical Authority',
+    improvTwist:
+        'TWIST AT 15s: Point directly at the camera: "I don\'t care—find him!"',
+    durationSeconds: 30,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'supp_13',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Forty Years Before the Parole Stamp',
+    filmOrSeries: 'Zihuatanejo Postcard (1994 Parody)',
+    releaseYear: 1994,
+    characterName: 'Ellis "Red" Boyd-Vane (Supporting Anchor)',
+    promptScript:
+        'Rehabilitated? That\'s just a politician\'s word so young fellas in suits can wear a badge and check a box! Keep your rubber stamp, sonny—to tell you the truth, I don\'t give a hoot whether you sign that paper or not.',
+    duetLeadA:
+        'Rehabilitated is just a politician\'s word—keep your rubber stamp, sonny, I\'m done begging.',
+    duetLeadB:
+        'Forty years is a long time, Ellis—do you feel ready to rejoin society on the outside?',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Sit back with calm, weathered dignity and a wry, unhurried cadence.',
+    emotionalTarget: 'Weathered Soulful Honesty',
+    improvTwist:
+        'TWIST AT 15s: Look up as if surprised when the green APPROVED stamp hits the desk.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'supp_14',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'The Greatest Trick in the Precinct Office',
+    filmOrSeries: 'Kobayashi Coffee Mug (1995 Parody)',
+    releaseYear: 1995,
+    characterName: 'Verbal Kint-Vane (Supporting Chameleon)',
+    promptScript:
+        'You think a guy like me was calling the shots on that harbor boat, Agent Kujan? The greatest trick the phantom ever pulled was convincing the entire precinct that he was just a nervous clerk reading names off a bulletin board!',
+    duetLeadA:
+        'The greatest trick the phantom ever pulled was convincing the precinct he was just a nervous clerk!',
+    duetLeadB:
+        'Wait a second—look at the bottom of that porcelain coffee mug! Guard, stop him at the elevator!',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Begin meek and hunched, then straighten your posture into smooth, chilling confidence.',
+    emotionalTarget: 'Chameleon Deception to Ice-Cold Reveal',
+    improvTwist:
+        'TWIST AT 15s: Drop the nervous stutter completely and flash a razor-thin smile.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'supp_15',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Wicked Smart Harvard Bar Roast',
+    filmOrSeries: 'Cambridge Apple Cart (1997 Parody)',
+    releaseYear: 1997,
+    characterName: 'Chuckie Sullivan-Vane (Best Supporting Friend)',
+    promptScript:
+        'You\'re sitting on a winning lottery ticket in that head of yours, Will, and you\'re too scared to cash it in! The best part of my morning is walking up your front steps hoping you\'re gone—not a goodbye, just gone onto bigger things!',
+    duetLeadA:
+        'The best part of my morning is walking up your steps hoping you finally left for bigger things!',
+    duetLeadB:
+        'We grew up on the same block, Chuckie—why are you pushing me out of the neighborhood?',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Deliver with blue-collar Boston loyalty and fierce brotherly tough love.',
+    emotionalTarget: 'Selfless Brotherly Tough Love',
+    improvTwist:
+        'TWIST AT 15s: Clap an imaginary shoulder and grin: "How do you like them apples?"',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'supp_16',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Are You Rushing or Dragging the Downbeat?',
+    filmOrSeries: 'Conservatory Cymbal (2014 Parody)',
+    releaseYear: 2014,
+    characterName: 'Maestro Terence Fletcher-Vane',
+    promptScript:
+        'Stop the band! Were you rushing or were you dragging on bar seventeen, Neiman?! There are no two words in the English language more harmful to jazz history than "good job"—now count my tempo or pack your drumsticks!',
+    duetLeadA:
+        'Were you rushing or were you dragging on bar seventeen?! Count my tempo or pack your drumsticks!',
+    duetLeadB:
+        'I was right on the metronome click, Fletcher—give me the solo again and watch!',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Snap from terrifying whispered precision into a vein-popping tempo count.',
+    emotionalTarget: 'Volcanic Conservatory Intensity',
+    improvTwist:
+        'TWIST AT 15s: Freeze your fist in mid-air to cut the band off on a dime.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'supp_17',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'You Are the Only One Who Sees Me, Juan',
+    filmOrSeries: 'Miami Ocean Lesson (2016 Parody)',
+    releaseYear: 2016,
+    characterName: 'Juan (Supporting Mentor)',
+    promptScript:
+        'Let your head rest back in the ocean water, Little—I\'ve got you right here in my hands, the waves won\'t pull you under. At some point you gotta decide for yourself who you\'re gonna be, and nobody in this world can make that choice for you.',
+    duetLeadA:
+        'At some point you gotta decide for yourself who you\'re gonna be—nobody can make that choice for you.',
+    duetLeadB:
+        'How do I know which way to swim when everyone on the block keeps shouting different names?',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Speak with deep, protective warmth and unhurried coastal stillness.',
+    emotionalTarget: 'Protective Grace & Quiet Tenderness',
+    improvTwist:
+        'TWIST AT 15s: Nod encouragingly and lower your voice to a comforting hush.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'supp_18',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Eight Whiskey Sours in the Western Trailer',
+    filmOrSeries: 'Sunset Stunt Double (2019 Parody)',
+    releaseYear: 2019,
+    characterName: 'Cliff Booth-Vane (Supporting Stuntman)',
+    promptScript:
+        'Hey, don\'t cry in front of the stunt crew, Rick—you\'re the leading man on the call sheet! Put on the sunglasses, walk out onto the western street set, and show that nine-year-old method actress why your name is above the title!',
+    duetLeadA:
+        'Put on the sunglasses, walk out onto the set, and show them why your name is above the title!',
+    duetLeadB:
+        'I forgot half my monologue in the saloon, Cliff—if I blow Take Three, my career is toast!',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Lean back with effortless, sun-baked Hollywood stuntman cool and a reassuring grin.',
+    emotionalTarget: 'Effortless Loyal Stuntman Cool',
+    improvTwist:
+        'TWIST AT 15s: Slide imaginary aviators onto your nose and give a two-finger salute.',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'supp_19',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Never Mistake Kindness for Weakness',
+    filmOrSeries: 'Fanny Pack Dojo (2022 Parody)',
+    releaseYear: 2022,
+    characterName: 'Waymond Wang-Vane (Supporting Heart)',
+    promptScript:
+        'You think because I hand out cookies and put silly stickers on the filing folders that I don\'t see how hard the world is?! When I choose to see the good side of things, that is not naive—it is strategic, and it is how I survive!',
+    duetLeadA:
+        'When I choose to see the good side of things, that is not naive—it is how we survive!',
+    duetLeadB:
+        'Waymond, the multiverse auditors are coming up the elevator—how can you still be smiling?!',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Combine gentle, earnest pleading with sudden martial-arts poise.',
+    emotionalTarget: 'Radical Kindness & Heroic Heart',
+    improvTwist:
+        'TWIST AT 15s: Adjust your imaginary tie like a Hong Kong romance lead in the rain.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'supp_20',
+    category: SceneCategory.awardsBestSupportingActor,
+    title: 'Amateur Hour at the Senate Confirmation',
+    filmOrSeries: 'Capitol Dossier (2023 Parody)',
+    releaseYear: 2023,
+    characterName: 'Chairman Lewis Strauss-Vane (Supporting Antagonist)',
+    promptScript:
+        'You thought I was just the modest shoe salesman carrying your briefcase into the physics institute?! Every question on that committee prosecutor\'s legal pad was typed in my office at midnight—because amateurs seek the spotlight, while power works in the shadow!',
+    duetLeadA:
+        'Every question on that prosecutor\'s pad was typed in my office—amateurs seek the spotlight!',
+    duetLeadB:
+        'Careful, Mr. Chairman—a young senator from Massachusetts just voted against your confirmation!',
+    directorCue:
+        'SUPPORTING ACTOR MASTERCLASS: Watch your smooth political smile curdle into bitter, vindictive obsession.',
+    emotionalTarget: 'Calculated Vindictive Ambition',
+    improvTwist:
+        'TWIST AT 15s: Straighten your glasses and demand a recount of the Senate roll call.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+];
+
+const List<ScenePrompt> kExpandedAwardsBestVillainScenes = [
+  ScenePrompt(
+    id: 'villain_11',
+    category: SceneCategory.awardsBestVillain,
+    title: 'A Census Taker Tried to Test Me',
+    filmOrSeries: 'Glass Cellar Consultation (1991 Parody)',
+    releaseYear: 1991,
+    characterName: 'Dr. Hannibal Vane',
+    promptScript:
+        'You flew all the way from the academy in a cheap polyester suit hoping I would profile your case for free, Agent Starling? Tell me what the lambs were whispering when you woke up at 3 AM, and I\'ll give you the first clue.',
+    duetLeadA:
+        'Tell me what the lambs were whispering at 3 AM, Agent, and I\'ll give you the first clue.',
+    duetLeadB:
+        'Keep your eyes on the questionnaire, Doctor—you\'re behind tempered glass for a reason.',
+    directorCue:
+        'Stand dead-center in the frame, chin slightly raised, speaking with cultivated, aristocratic stillness.',
+    emotionalTarget: 'Aristocratic Psychological Menace',
+    improvTwist:
+        'TWIST AT 15s: Inhale deeply through your nose as if identifying their perfume through the glass.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_12',
+    category: SceneCategory.awardsBestVillain,
+    title: 'What\'s in the Cardboard Delivery Box?',
+    filmOrSeries: 'Desert Pylon Finale (1995 Parody)',
+    releaseYear: 1995,
+    characterName: 'John Doe-Vane',
+    promptScript:
+        'Don\'t listen to the captain, Detective—walk over to the delivery van and see what I scheduled for 7 PM sharp! You thought you were hunting a madman in the rain, when you were actually the final chapter of my masterpiece!',
+    duetLeadA:
+        'You thought you were hunting a madman, when you were actually the final chapter of my masterpiece!',
+    duetLeadB:
+        'Keep your hands where I can see them and stay on your knees—don\'t say another word!',
+    directorCue:
+        'Speak with eerie,serene conviction as if calmly explaining a mathematical proof.',
+    emotionalTarget: 'Serene Fanatical Provocation',
+    improvTwist:
+        'TWIST AT 15s: Tilt your head toward the sky and whisper "Become vengeance."',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_13',
+    category: SceneCategory.awardsBestVillain,
+    title: 'I Am Your Number One Fan in the Cabin',
+    filmOrSeries: 'Blizzard Typewriter (1990 Parody)',
+    releaseYear: 1990,
+    characterName: 'Annie Wilkes-Vane',
+    promptScript:
+        'I bought a whole ream of corrasable bond paper in town, Paul, and then I read chapter twelve and realized you let my favorite heroine perish in a cockadoodie carriage wreck! Nobody leaves this guest room until you type a rewrite!',
+    duetLeadA:
+        'Nobody leaves this snowed-in guest room until you type a proper rewrite of chapter twelve!',
+    duetLeadB:
+        'The phone lines are down and the roads are plowed, Annie—my publisher in New York is expecting me!',
+    directorCue:
+        'Snap from sweet, dimpled fangirl glee into terrifying, wide-eyed cabin rage in a single breath.',
+    emotionalTarget: 'Whiplash Sweet-to-Terrifying Rage',
+    improvTwist:
+        'TWIST AT 15s: Clasp your hands over your heart and beam: "Oh Paul, it\'s going to be our best book yet!"',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_14',
+    category: SceneCategory.awardsBestVillain,
+    title: 'Thumbs Down in the Colosseum Box',
+    filmOrSeries: 'Imperial Sand & Marble (2000 Parody)',
+    releaseYear: 2000,
+    characterName: 'Emperor Commodus-Vane',
+    promptScript:
+        'Am I not merciful to the senate and the people of Rome?! All I ever asked from my father was one nod of approval, and instead he handed the legion\'s signet ring to a general who refuses to kneel in the arena!',
+    duetLeadA:
+        'Am I not merciful?! All I ever asked was one nod of approval from the throne!',
+    duetLeadB:
+        'The crowd in the upper tiers is chanting the gladiator\'s name, Caesar—you cannot silence fifty thousand voices.',
+    directorCue:
+        'Tremble with wounded imperial pride, extending your thumb slowly in front of the camera.',
+    emotionalTarget: 'Wounded Imperial Narcissism',
+    improvTwist:
+        'TWIST AT 15s: Whisper "Am I not merciful?!" inches from the lens before turning your thumb down.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_15',
+    category: SceneCategory.awardsBestVillain,
+    title: 'Ten-Year-Old Scotch on the Precinct Roof',
+    filmOrSeries: 'Training Day Badge (2001 Parody)',
+    releaseYear: 2001,
+    characterName: 'Detective Alonzo Harris-Vane',
+    promptScript:
+        'You think you can lock me in a cell with a rookie report, Jake?! I built the cases on this block, I run this boulevard, and King Kong ain\'t got nothing on my badge!',
+    duetLeadA:
+        'I built the cases on this block, I run this boulevard, and King Kong ain\'t got nothing on me!',
+    duetLeadB:
+        'The neighborhood is watching from the balconies, Alonzo, and I\'m taking the evidence bag downtown.',
+    directorCue:
+        'Spread both arms wide, chest puffed out, projecting explosive alpha swagger and desperation.',
+    emotionalTarget: 'Explosive Alpha Defiance',
+    improvTwist:
+        'TWIST AT 15s: Laugh darkly and tap your chest twice with both hands.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_16',
+    category: SceneCategory.awardsBestVillain,
+    title: 'Bill the Butcher\'s Five Points Cleaver',
+    filmOrSeries: 'Cobblestone Tammany (2002 Parody)',
+    releaseYear: 2002,
+    characterName: 'William Cutting-Vane',
+    promptScript:
+        'You see this glass eye staring across the tavern, Amsterdam? I tapped it with a silver spoon the night your father fell in the square, because a true rival deserves to be remembered in iron and blood!',
+    duetLeadA:
+        'I tapped this glass eye with a silver spoon because a true rival deserves to be remembered!',
+    duetLeadB:
+        'The bells of the old church are ringing, Bill—the square belongs to the new generation tonight.',
+    directorCue:
+        'Twirl an imaginary handlebar mustache and speak with operatic 19th-century theatricality.',
+    emotionalTarget: 'Operatic Street-Boss Grandeur',
+    improvTwist:
+        'TWIST AT 15s: Tap the cheekbone below your eye twice and bare your teeth in a grin.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'villain_17',
+    category: SceneCategory.awardsBestVillain,
+    title: 'Why So Serious at the Mob Bank Table?',
+    filmOrSeries: 'Gotham Pencil Trick (2008 Parody)',
+    releaseYear: 2008,
+    characterName: 'The Painted Anarchist',
+    promptScript:
+        'You mob bosses had plans, the commissioner had plans, the schemers had spreadsheets to control their little worlds—introduce a tiny drop of anarchy into the equation and suddenly everyone loses their minds!',
+    duetLeadA:
+        'Introduce a tiny drop of anarchy into the equation and suddenly everyone loses their minds!',
+    duetLeadB:
+        'Security! Get this guy in the purple suit out of our boardroom before the cops trace the vault!',
+    directorCue:
+        'Lick the corner of your lip, tilt your head unpredictably, and vary your pitch from high giggle to gravelly drop.',
+    emotionalTarget: 'Unpredictable Anarchic Glee',
+    improvTwist:
+        'TWIST AT 15s: Slam your palm onto the desk: "Ta-da! The pencil is gone!"',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_18',
+    category: SceneCategory.awardsBestVillain,
+    title: 'A Glass of Fresh Farmhouse Milk',
+    filmOrSeries: 'Chateau Strudel (2009 Parody)',
+    releaseYear: 2009,
+    characterName: 'Colonel Hans Landa-Vane',
+    promptScript:
+        'Monsieur, your dairy cows produce the finest cream in the province, and your hospitality is impeccable—so before I sign my ledger and depart, let us drop the polite charade and discuss who is hiding beneath your floorboards.',
+    duetLeadA:
+        'Your hospitality is impeccable—now let us drop the charade and discuss who is beneath the floorboards.',
+    duetLeadB:
+        'There is nobody on this farm but my daughters, Colonel—you have already inspected the barn.',
+    directorCue:
+        'Begin with exaggerated, courtly European politeness, then let your smile vanish in a single frame.',
+    emotionalTarget: 'Courtly Charm to Ice-Cold Dread',
+    improvTwist:
+        'TWIST AT 15s: Wait for the cream before taking a bite of imaginary strudel.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_19',
+    category: SceneCategory.awardsBestVillain,
+    title: 'Wait for the Cream in the Parlor',
+    filmOrSeries: 'Candyland Plantation Dinner (2012 Parody)',
+    releaseYear: 2012,
+    characterName: 'Calvin Candie-Vane',
+    promptScript:
+        'You came into my dining room wearing valet velvet, drank my finest Kentucky bourbon, and thought you could buy my prized champion for pennies on the dollar?! Bring out the white cake and lock the parlor doors!',
+    duetLeadA:
+        'You drank my finest bourbon and thought you could hoodwink me in my own parlor?!',
+    duetLeadB:
+        'Put the hammer down and sign the bill of sale—we came to do business, not make speeches.',
+    directorCue:
+        'Lean across the table with Southern gothic flamboyance that suddenly erupts into table-pounding fury.',
+    emotionalTarget: 'Flamboyant Southern Gothic Fury',
+    improvTwist:
+        'TWIST AT 15s: Wipe your hand with a silk handkerchief and flash a venomous smile.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'villain_20',
+    category: SceneCategory.awardsBestVillain,
+    title: 'Ancestral Throne in the Waterfall Arena',
+    filmOrSeries: 'Vibranium Crown (2018 Parody)',
+    releaseYear: 2018,
+    characterName: 'Erik Killmonger-Vane',
+    promptScript:
+        'You sat behind a holographic cloaking shield in the mountains while the rest of the world burned outside your borders! I didn\'t come here to ask the council for a tour—I came here to claim the throne!',
+    duetLeadA:
+        'I didn\'t come here to ask the council for a tour—I came here to claim the throne!',
+    duetLeadB:
+        'A king who rules only through vengeance will burn his own kingdom to ash before sunrise.',
+    directorCue:
+        'Walk in a slow circle with swaggering righteous heat, chin high and arms spread.',
+    emotionalTarget: 'Righteous Fire & Tragic Fury',
+    improvTwist:
+        'TWIST AT 15s: Look out over an imaginary sunset horizon and soften your voice.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+];
+
+const List<ScenePrompt> kExpandedAwardsEmmyVaultScenes = [
+  ScenePrompt(
+    id: 'emmy_11',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'The Ducks Left the Backyard Pool',
+    filmOrSeries: 'North Jersey Espresso (1999 Parody)',
+    releaseYear: 1999,
+    characterName: 'Tony & Dr. Melfi',
+    promptScript:
+        'Whatever happened to the strong, silent type in this country, Doc?! Nowadays everybody\'s crying on a velvet sofa about their childhood while my waste-management captains are folding under federal subpoenas!',
+    duetLeadA:
+        'Whatever happened to the strong, silent type, Doc?! My captains are folding under subpoenas!',
+    duetLeadB:
+        'You\'re not angry about history, Tony—you\'re panicked because the ducks flew out of your pool.',
+    directorCue:
+        'Breathe heavily through your nose, jabbing an imaginary cigar in the air with Jersey boss frustration.',
+    emotionalTarget: 'Conflicted Mob-Boss Vulnerability',
+    improvTwist:
+        'TWIST AT 15s: Rub your forehead and admit quietly: "I miss those damn ducks."',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'emmy_12',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'A Man Must Have a Code on the Corner',
+    filmOrSeries: 'Baltimore Wiretap (2002 Parody)',
+    releaseYear: 2002,
+    characterName: 'Omar & Detective Bunk',
+    promptScript:
+        'You can wave that gold detective badge in my face all afternoon, Bunk, but out on those west-side rowhouses a man has got to have a code—and I never pointed my piece at a taxpayer who wasn\'t in the game.',
+    duetLeadA:
+        'Out on those rowhouses a man has got to have a code—I never touched a citizen outside the game.',
+    duetLeadB:
+        'Makes me sick, Omar, how far we done fell from the old neighborhood we grew up in.',
+    directorCue:
+        'Whistle two notes of "The Farmer in the Dell," then speak with cool, philosophical street poise.',
+    emotionalTarget: 'Street-Poet Honor & Cool Poise',
+    improvTwist:
+        'TWIST AT 15s: Arch a scarred eyebrow and say "Indeed."',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'emmy_13',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'The Carousel Nostalgia Pitch',
+    filmOrSeries: 'Madison Avenue Martini (2007 Parody)',
+    releaseYear: 2007,
+    characterName: 'Don Draper-Vane',
+    promptScript:
+        'Technology is a glittering lure, gentlemen, but nostalgia literally means the pain from an old wound! This slide projector is not a spaceship—it is a time machine that takes us backwards to a place where we know we are loved.',
+    duetLeadA:
+        'This projector is not a spaceship—it is a time machine that takes us back to where we are loved.',
+    duetLeadB:
+        'Don, the client in the corner is literally wiping tears off his glasses—close the account right now!',
+    directorCue:
+        'Click an imaginary slide remote every four seconds, voice rich, smoky, and mesmerizing.',
+    emotionalTarget: 'Mesmerizing Poetic Melancholy',
+    improvTwist:
+        'TWIST AT 15s: Pause in silhouette as the imaginary projector beam hits your face.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'emmy_14',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'Tread Lightly in the Garage',
+    filmOrSeries: 'Albuquerque Blue Crystal (2013 Parody)',
+    releaseYear: 2013,
+    characterName: 'Walter & Hank',
+    promptScript:
+        'You closed the garage door and found a poetry book in my bathroom, Hank, and now you think you\'re looking at the harmless high-school teacher you used to tease at family barbecues? If that\'s true, if you don\'t know who I am, then tread lightly.',
+    duetLeadA:
+        'If you truly don\'t know who you are talking to right now, Hank, then I suggest you tread lightly.',
+    duetLeadB:
+        'I don\'t know who you are anymore, Walt—you\'re the smartest guy I ever met, and you\'re a monster.',
+    directorCue:
+        'Take off imaginary glasses slowly and drop your voice a full octave into a lethal whisper.',
+    emotionalTarget: 'Quiet Domestic Transformation to Menace',
+    improvTwist:
+        'TWIST AT 15s: Step two inches closer to the lens without blinking.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'emmy_15',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'I Demand a Trial by Combat in the Throne Room',
+    filmOrSeries: 'Iron Crown Tribunal (2014 Parody)',
+    releaseYear: 2014,
+    characterName: 'Lord Tyrion-Vane',
+    promptScript:
+        'I did not poison your royal goblet, but I wish that I had! Watching this ungrateful court point fingers at me after I saved your city walls from burning gives me more relief than a thousand lying witnesses!',
+    duetLeadA:
+        'I did not poison your royal goblet—I am on trial for refusing to bow to hypocrites!',
+    duetLeadB:
+        'Confess to the High Septon now and my father will let you take the black at the northern wall!',
+    directorCue:
+        'Wrathful Shakespearean projection, eyes blazing as you glare around an imaginary packed gallery.',
+    emotionalTarget: 'Shakespearean Scorn & Righteous Rage',
+    improvTwist:
+        'TWIST AT 15s: Clench both fists as if chained and roar "I demand a trial by combat!"',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'emmy_16',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'Chicanery with the Breast-Pocket Battery',
+    filmOrSeries: 'Albuquerque Bar Hearing (2017 Parody)',
+    releaseYear: 2017,
+    characterName: 'Chuck & Jimmy McGill-Vane',
+    promptScript:
+        'I am not crazy! I know he swapped those address numbers—1216, one year after Magna Carta, as if I could ever make such a mistake! You think a billboard lawyer with a degree from a correspondence school belongs at the bar?!',
+    duetLeadA:
+        'I am not crazy! I know he swapped those address numbers—one year after Magna Carta!',
+    duetLeadB:
+        'Reach into your inside suit pocket, Chuck—huell slipped a fully charged cell phone battery in there an hour ago.',
+    directorCue:
+        'Rant with pedantic legal fury, then freeze in horrified silence as the courtroom goes pin-drop quiet.',
+    emotionalTarget: 'Pedantic Fury to Shattered Pride',
+    improvTwist:
+        'TWIST AT 15s: Pull an imaginary battery from your coat pocket and drop it like hot coal.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'emmy_17',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'Boar on the Floor in the Hunting Lodge',
+    filmOrSeries: 'Waystar Helicopter (2019 Parody)',
+    releaseYear: 2019,
+    characterName: 'Logan & Kendall Roy-Vane',
+    promptScript:
+        'You flew to Hungary on my corporate jet, drank my vintage Bordeaux, and one of you executives leaked our takeover bid to the press! Nobody touches their dessert until the mole steps forward—you are not serious people!',
+    duetLeadA:
+        'One of you leaked our takeover bid to the press—look at me, you are not serious people!',
+    duetLeadB:
+        'The stock price is up four points, Dad—the board thinks your dinosaur media empire needs a reboot!',
+    directorCue:
+        'Growl like a billionaire patriarch who owns the oxygen in the room.',
+    emotionalTarget: 'Patriarchal Billionaire Contempt',
+    improvTwist:
+        'TWIST AT 15s: Wave everyone off with disgust and bark "Make your own pile!"',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'emmy_18',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'Fourth-Wall Kneel in the Confessional',
+    filmOrSeries: 'London Guinea Pig Cafe (2019 Parody)',
+    releaseYear: 2019,
+    characterName: 'Fleabag & The Priest',
+    promptScript:
+        'I just want someone to tell me what to wear in the morning, what to believe in, and how to stop glancing at the camera every time a conversation gets too honest!Wait—how did you just see me look over there?!',
+    duetLeadA:
+        'Wait a second—where did you just go when you glanced over at the corner of the room?!',
+    duetLeadB:
+        'Nowhere, Father—I was just thinking about foxes and gin-in-a-tin!',
+    directorCue:
+        'Deliver a conspiratorial aside directly to the camera lens, then startle when your co-star catches you.',
+    emotionalTarget: 'Witty Fourth-Wall Intimacy & Yearning',
+    improvTwist:
+        'TWIST AT 15s: Flash a guilty, knowing wink directly at the lens.',
+    durationSeconds: 30,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'emmy_19',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'Every Second Counts on the Expo Line',
+    filmOrSeries: 'Chicago Beef Brigade (2022 Parody)',
+    releaseYear: 2022,
+    characterName: 'Chef Carmy & Sydney',
+    promptScript:
+        'Hands at the pass right now! Why are there seventy-two pre-order tickets printing off the machine at 10:58 AM when the fennel isn\'t even julienned?! Say "Heard, Chef!" or get off my line!',
+    duetLeadA:
+        'Why are there seventy-two tickets printing off the machine at 10:58 AM?! Say "Heard, Chef!"',
+    duetLeadB:
+        'You forgot to turn off the online pre-order toggle on the tablet, Chef—the whole block is outside!',
+    directorCue:
+        'Chop imaginary herbs at machine-gun speed while your voice climbs into pressure-cooker kitchen panic.',
+    emotionalTarget: 'Kitchen Pressure-Cooker Intensity',
+    improvTwist:
+        'TWIST AT 15s: Take a sharp deep breath, touch your apron, and say "Corner, behind!"',
+    durationSeconds: 30,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'emmy_20',
+    category: SceneCategory.awardsEmmyVault,
+    title: 'Twenty Years in the Strawberry Patch',
+    filmOrSeries: 'Cordyceps Highway (2023 Parody)',
+    releaseYear: 2023,
+    characterName: 'Bill & Frank',
+    promptScript:
+        'I used to pray for the world to end so I could finally have the town to myself, Frank—and then you fell into my perimeter trap, planted strawberries in the yard, and gave me the only thing worth guarding.',
+    duetLeadA:
+        'You planted strawberries in the yard and gave me the only thing left in the world worth guarding.',
+    duetLeadB:
+        'Pour the Beaujolais from the cellar, Bill—today we wear our Sunday suits and eat like kings.',
+    directorCue:
+        'Let gruff survivalist armor melt into deeply earned, tender devotion.',
+    emotionalTarget: 'Gruff Tenderness & Devoted Grace',
+    improvTwist:
+        'TWIST AT 15s: Laugh softly through tears at the taste of an imaginary fresh strawberry.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+];
+
+const List<ScenePrompt> kExpandedSpecialtyCultClassicsScenes = [
+  ScenePrompt(
+    id: 'cult_11',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'That Persian Rug Tied the Living Room Together',
+    filmOrSeries: 'Bowling Alley White Russian (1998 Parody)',
+    releaseYear: 1998,
+    characterName: 'The Dude & Walter',
+    promptScript:
+        'Look, man, you got the wrong Lebowski—I\'m the Dude, so that\'s what you call me! Your thugs came into my bungalow, ruined a vintage rug that really tied the room together, and spilled my half-and-half!',
+    duetLeadA:
+        'That rug really tied the bungalow together, man, and this aggression will not stand!',
+    duetLeadB:
+        'Forget the rug, Dude—we have league playoffs on Wednesday and Smokey stepped over the foul line!',
+    directorCue:
+        'Slouch in an imaginary bathrobe, swirling a glass of ice with laid-back California indignation.',
+    emotionalTarget: 'Zen Slacker Indignation',
+    improvTwist:
+        'TWIST AT 15s: Shrug Philosophically: "Yeah, well, that\'s just, like, your opinion, man."',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'cult_12',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'First Rule of the Basement Soap Club',
+    filmOrSeries: 'Paper Street Underground (1999 Parody)',
+    releaseYear: 1999,
+    characterName: 'Tyler Durden-Vane',
+    promptScript:
+        'Look around this basement—we are working jobs we hate to buy designer Swedish coffee tables we don\'t need! We are the middle children of history, and tonight the first rule of this club is nobody tweets about the basement!',
+    duetLeadA:
+        'We are working jobs we hate to buy Swedish coffee tables we don\'t need—welcome to the basement!',
+    duetLeadB:
+        'Wait—if we\'re not allowed to talk about the club, how did forty new guys show up in parking lot B?!',
+    directorCue:
+        'Point directly at the lens with charismatic underground-prophet swagger and a crooked grin.',
+    emotionalTarget: 'Subversive Charismatic Swagger',
+    improvTwist:
+        'TWIST AT 15s: Point to your own jaw: "Hit me as hard as you can!"',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'cult_13',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'Why Are You Wearing That Giant Bunny Suit?',
+    filmOrSeries: 'Tangent Universe 28 Days (2001 Parody)',
+    releaseYear: 2001,
+    characterName: 'Donnie & Frank the Rabbit',
+    promptScript:
+        'A jet engine just fell through my bedroom ceiling from a plane nobody has on radar, and you\'re standing on the golf course in a six-foot silver rabbit costume telling me the world ends in twenty-eight days?!',
+    duetLeadA:
+        'Why are you wearing that six-foot silver rabbit costume on the golf course at 2 AM?!',
+    duetLeadB:
+        'Twenty-eight days, six hours, forty-two minutes, and twelve seconds—why are you wearing that human suit?',
+    directorCue:
+        'Walk forward as if sleepwalking in a trance, blinking into an eerie blue spotlight.',
+    emotionalTarget: 'Surreal Sleepwalking Dread',
+    improvTwist:
+        'TWIST AT 15s: Flash a haunted, knowing half-smile at the ceiling.',
+    durationSeconds: 30,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'cult_14',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'Where Is My Supersuit, Honey?!',
+    filmOrSeries: 'Metroville Freeze (2004 Parody)',
+    releaseYear: 2004,
+    characterName: 'Lucius & Honey',
+    promptScript:
+        'A giant robot is rolling down Main Street right outside our apartment window, Honey—where is my supersuit?! Don\'t tell me you packed it away before dinner, the city is in danger!',
+    duetLeadA:
+        'A giant robot is rolling down Main Street—tell me where you put my supersuit, woman!',
+    duetLeadB:
+        'Your evening is in danger! We have been planning this anniversary dinner for two months, Lucius!',
+    directorCue:
+        'Fling open imaginary closet doors in frantic, rhythmic back-and-forth domestic comedy.',
+    emotionalTarget: 'High-Energy Domestic Superhero Comedy',
+    improvTwist:
+        'TWIST AT 15s: Freeze mid-pose as if sliding across an icy living-room floor.',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'cult_15',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'Five-Point Palm Exploding Heart Technique',
+    filmOrSeries: 'Yellow Tracksuit Vengeance (2003 Parody)',
+    releaseYear: 2003,
+    characterName: 'Beatrix & Pai Mei',
+    promptScript:
+        'You locked me inside a wooden coffin six feet underground with nothing but a flashlight and a three-inch punch! Tell the Crazy Eighty-Eight to clear the restaurant floor, because I came for the top of the list!',
+    duetLeadA:
+        'You locked me six feet underground with a three-inch punch—now I came for the top of the list!',
+    duetLeadB:
+        'Wiggle your big toe first, Kiddo—the bride in the yellow tracksuit never leaves a debt unpaid.',
+    directorCue:
+        'Drop into a sharp martial-arts stance, brushing dust off your shoulder with pulp-cinema intensity.',
+    emotionalTarget: 'Stylized Pulp-Action Vengeance',
+    improvTwist:
+        'TWIST AT 15s: Strike an iconic crane-style finger pose at the camera.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'cult_16',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'Take Car, Go to Mum\'s, Have a Pint at the Winchester',
+    filmOrSeries: 'North London Zombie Pub (2004 Parody)',
+    releaseYear: 2004,
+    characterName: 'Shaun & Ed',
+    promptScript:
+        'Alright, here is the master tactical plan: we take the red coupe, we rescue Mum, we pick up Liz, we head down to the Winchester tavern, have a nice cold pint, and wait for this whole apocalypse to blow over!',
+    duetLeadA:
+        'We head down to the Winchester, have a nice cold pint, and wait for this whole apocalypse to blow over!',
+    duetLeadB:
+        'Brilliant plan, mate—except the zombies are already in the garden and don\'t throw my vintage vinyl records at them!',
+    directorCue:
+        'Adjustment an imaginary red necktie with deadpan British optimism while chaos unfolds around you.',
+    emotionalTarget: 'Deadpan British Pub Optimism',
+    improvTwist:
+        'TWIST AT 15s: Raise an imaginary pint glass and wink: "How\'s that for a slice of fried gold?"',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'cult_17',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'I Did Not Hit Her, Oh Hi Mark!',
+    filmOrSeries: 'San Francisco Rooftop Green Screen (2003 Parody)',
+    releaseYear: 2003,
+    characterName: 'Johnny & Mark',
+    promptScript:
+        'It is not true, don\'t even ask—it is complete fabrication, I did not do it, I did not! ...Oh, hi Mark! Anyway, how is your weekend going, let\'s toss this football in tuxedos from three feet away!',
+    duetLeadA:
+        'It is complete fabrication, I did not do it! ...Oh, hi Mark! Let\'s toss the football in tuxedos!',
+    duetLeadB:
+        'Johnny, why are we wearing rented formalwear on a rooftop at two in the afternoon?',
+    directorCue:
+        'Drop from melodramatic rage to a completely flat, cheerful "Oh hi Mark!" in zero milliseconds.',
+    emotionalTarget: 'Gloriously Bizarre Cult Melodrama',
+    improvTwist:
+        'TWIST AT 15s: Toss an imaginary water bottle over your shoulder and laugh inexplicably.',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'cult_18',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'Vote for Pedro at the High School Assembly',
+    filmOrSeries: 'Preston Idaho Tater Tots (2004 Parody)',
+    releaseYear: 2004,
+    characterName: 'Napoleon & Pedro',
+    promptScript:
+        'Gosh! Nobody in this school has any bowstaff skills or numchuck skills, and if you vote for Pedro today, all of your wildest dreams will come true—now watch this freestyle dance routine!',
+    duetLeadA:
+        'If you vote for Pedro today, all of your wildest dreams will come true—gosh!',
+    duetLeadB:
+        'Napoleon, give me some of your tater tots from your cargo pocket before the bell rings.',
+    directorCue:
+        'Sigh heavily through your mouth with awkward deadpan commitment, then bust two sharp dance moves.',
+    emotionalTarget: 'Awkward Deadpan Triumph',
+    improvTwist:
+        'TWIST AT 15s: Guard your imaginary cargo pocket and snap "Get your own tots!"',
+    durationSeconds: 30,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'cult_19',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'Lobby Concierge Perfume Defense',
+    filmOrSeries: 'Alpine Pink Hotel (2014 Parody)',
+    releaseYear: 2014,
+    characterName: 'Monsieur Gustave & Zero',
+    promptScript:
+        'Keep your hands off my lobby boy, you uncultured troopers! There are still faint glimmers of civilization left in this Alpine slaughterhouse, and I never check out of a suite without my bottle of L\'Air de Panache!',
+    duetLeadA:
+        'Keep your hands off my lobby boy—I never depart a suite without my bottle of L\'Air de Panache!',
+    duetLeadB:
+        'Monsieur Gustave, the cable car is leaving in thirty seconds and the guards have the painting!',
+    directorCue:
+        'Stand in symmetrical, Wes Anderson posture and deliver rapid, poetic aristocratic wit.',
+    emotionalTarget: 'Dapper Symmetrical Wit & Gallantry',
+    improvTwist:
+        'TWIST AT 15s: Spritz imaginary cologne on both wrists before bolting.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'cult_20',
+    category: SceneCategory.specialtyCultClassics,
+    title: 'Hark Triton on the Lighthouse Rock',
+    filmOrSeries: 'New England Foghorn (2019 Parody)',
+    releaseYear: 2019,
+    characterName: 'Thomas Wake & Winslow',
+    promptScript:
+        'Why\'d you spill your beans, lad—and don\'t tell me you weren\'t fond of me lobster! Let Neptune strike ye down with tempest waves if you touch that brass lantern in the top of my tower!',
+    duetLeadA:
+        'Don\'t tell me you weren\'t fond of me lobster—let Neptune strike ye down with tempest waves!',
+    duetLeadB:
+        'We\'ve been stranded on this rock for four weeks, old man, and I\'m going up those stairs to see the light!',
+    directorCue:
+        'Scowl under an imaginary sea-captain cap, roaring in 19th-century maritime cadence.',
+    emotionalTarget: 'Tempestuous Maritime Madness',
+    improvTwist:
+        'TWIST AT 15s: Glare at an imaginary seagull and shout "Bad luck to shoo a gull!"',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+];
+
+const List<ScenePrompt> kExpandedSpecialtyBlockbusterSciFiScenes = [
+  ScenePrompt(
+    id: 'scifi_11',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Welcome to the Dinosaur Paddock',
+    filmOrSeries: 'Amber Mosquito Island (1993 Parody)',
+    releaseYear: 1993,
+    characterName: 'Dr. Ian Malcolm & Dr. Grant',
+    promptScript:
+        'Your genetic engineers were so preoccupied with whether or not they could clone a sixty-ton reptile that they never stopped to ask if they should! Look at the water cup trembling on the dashboard—life finds a way!',
+    duetLeadA:
+        'Your scientists were so preoccupied with whether they could that they never stopped to ask if they should!',
+    duetLeadB:
+        'Nobody move a muscle—its vision is based on movement and the perimeter fence just lost power!',
+    directorCue:
+        'Adjust imaginary black-framed glasses and point at a vibrating water cup on the dashboard.',
+    emotionalTarget: 'Chaos-Theory Wit & Sudden Awe',
+    improvTwist:
+        'TWIST AT 15s: Freeze completely still as a shadow passes over the lens.',
+    durationSeconds: 35,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'scifi_12',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Today We Cancel the Alien Apocalypse',
+    filmOrSeries: 'Area 51 Hangar Speech (1996 Parody)',
+    releaseYear: 1996,
+    characterName: 'President Thomas Whitmore-Vane',
+    promptScript:
+        'In less than an hour, fighter squadrons from here will join pilots from across the globe in the largest aerial battle in the history of mankind! We will not go quietly into the night—today we celebrate our Independence Day!',
+    duetLeadA:
+        'We will not go quietly into the night—today we celebrate our Independence Day!',
+    duetLeadB:
+        'The virus upload is at ninety-eight percent, Mr. President—fire the main payload now!',
+    directorCue:
+        'Stand on an imaginary truck bed with an imaginary megaphone, building to a stadium-sized crescendo.',
+    emotionalTarget: 'Rousing Blockbuster Heroism',
+    improvTwist:
+        'TWIST AT 15s: Salute the squadron and pull down an imaginary flight helmet visor.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'scifi_13',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'One Does Not Simply Walk Into the Volcano',
+    filmOrSeries: 'Council of the Golden Ring (2001 Parody)',
+    releaseYear: 2001,
+    characterName: 'Boromir & Aragorn',
+    promptScript:
+        'One does not simply stroll past the black gates of the volcano after breakfast! Its obsidian towers are guarded by more than goblins—there is a lidless fiery eye up there that never blinks!',
+    duetLeadA:
+        'One does not simply stroll past the obsidian gates—there is a fiery eye up there that never blinks!',
+    duetLeadB:
+        'You have my sword, my bow, and my axe—we ride at dawn whether the eye blinks or not!',
+    directorCue:
+        'Touch your thumb and index finger together in the classic meme gesture with solemn fantasy gravitas.',
+    emotionalTarget: 'Epic High-Fantasy Gravitas',
+    improvTwist:
+        'TWIST AT 15s: Draw an imaginary broadsword and pledge your allegiance.',
+    durationSeconds: 35,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'scifi_14',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Why Do We Fall, Master Bruce?',
+    filmOrSeries: 'Wayne Manor Bat-Cave (2005 Parody)',
+    releaseYear: 2005,
+    characterName: 'Alfred & Bruce',
+    promptScript:
+        'You can armor the suit in kevlar and carbon fiber, Master Bruce, and prowl the rooftops until dawn, but some men aren\'t looking for anything logical like money—some men just want to watch the world burn.',
+    duetLeadA:
+        'Some men aren\'t looking for anything logical like money—some men just want to watch the world burn.',
+    duetLeadB:
+        'Then fire up the Bat-computer, Alfred—tonight we become more than a man, we become a symbol.',
+    directorCue:
+        'Speak in a warm, gravelly Cockney butler cadence with deep paternal concern.',
+    emotionalTarget: 'Paternal Gravitas & Warning',
+    improvTwist:
+        'TWIST AT 15s: Set down an imaginary silver breakfast tray and bow your head.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'scifi_15',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Spinning Top in the Dream Hotel',
+    filmOrSeries: 'Subconscious Paradox (2010 Parody)',
+    releaseYear: 2010,
+    characterName: 'Cobb & Ariadne',
+    promptScript:
+        'We are three dream layers deep inside a zero-gravity hotel corridor, Ariadne, and the freight train just crashed through the lobby! Don\'t touch my spinning pewter totem—Wait for the kick on the music cue!',
+    duetLeadA:
+        'We are three dream layers deep in a zero-gravity corridor—wait for the kick on the music cue!',
+    duetLeadB:
+        'The projections know we\'re architects, Cobb—if we don\'t wake up before the bridge blows, we drop into Limbo!',
+    directorCue:
+        'Spin an imaginary top on the desk and stare at it as the room tilts.',
+    emotionalTarget: 'Mind-Bending Sci-Fi Urgency',
+    improvTwist:
+        'TWIST AT 15s: Lean sideways at a 45-degree angle as if gravity just flipped.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'scifi_16',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Do Not Go Gentle Into the Wormhole',
+    filmOrSeries: 'Gargantua Event Horizon (2014 Parody)',
+    releaseYear: 2014,
+    characterName: 'Cooper & TARS',
+    promptScript:
+        'One hour on this tidal ocean planet costs us seven years back on Earth, Brand, and my daughter is already my age on the video relay! It\'s not possible to dock with a spinning station at sixty RPM—no, it\'s necessary!',
+    duetLeadA:
+        'It\'s not possible to dock with a spinning station at sixty RPM—no, it\'s necessary!',
+    duetLeadB:
+        'Cooper, the airlock clamps are sheared—if you match the station\'s spin manually, you\'ll black out!',
+    directorCue:
+        'Grip the flight stick with white-knuckle intensity while tears well in your eyes.',
+    emotionalTarget: 'Relativistic Heartbreak & Heroism',
+    improvTwist:
+        'TWIST AT 15s: Tap an imaginary bookshelf from behind to send a message across time.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'scifi_17',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Witness Me on the Chrome War Rig!',
+    filmOrSeries: 'Fury Desert Citadel (2015 Parody)',
+    releaseYear: 2015,
+    characterName: 'Imperator Furiosa & Nux',
+    promptScript:
+        'We are not turning this sixteen-wheel tanker back into the dust storm for the Citadel warlord! Open the twin superchargers, haul on the steering wheel, and witness me on the Fury Highway!',
+    duetLeadA:
+        'Open the twin superchargers, haul on the wheel, and witness me on the Fury Highway!',
+    duetLeadB:
+        'The guitar player on the bungee rig is still shredding flames behind us—hard right into the canyon!',
+    directorCue:
+        'Roar over imaginary V8 engines with wild-eyed, high-octane desert intensity.',
+    emotionalTarget: 'High-Octane Apocalyptic Ferocity',
+    improvTwist:
+        'TWIST AT 15s: Point two fingers at your eyes and shout "Witness!"',
+    durationSeconds: 30,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'scifi_18',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Heptapod Ink Circle on the Glass',
+    filmOrSeries: 'First Contact Lexicon (2016 Parody)',
+    releaseYear: 2016,
+    characterName: 'Dr. Louise Banks-Vane',
+    promptScript:
+        'If you fire on that obsidian shell hovering above the Montana valley, General, you will never understand why they gave us their language! Time is not a straight line—their circular ink sentences mean I already remember the future.',
+    duetLeadA:
+        'Time is not a straight line, General—their circular sentences mean I already remember the future.',
+    duetLeadB:
+        'Twelve nations just cut their comms feed, Doctor—you have three minutes to translate "Use Weapon"!',
+    directorCue:
+        'Place your palm flat against an imaginary glass barrier, eyes luminous with wonder.',
+    emotionalTarget: 'Transcendent Linguistic Wonder',
+    improvTwist:
+        'TWIST AT 15s: Trace a slow circle in the air in front of the camera.',
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'scifi_19',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Baseline Interrogation in the Orange Dust',
+    filmOrSeries: 'Replicant Baseline 2049 (2017 Parody)',
+    releaseYear: 2017,
+    characterName: 'Officer K & Joshi',
+    promptScript:
+        'Cells interlinked within cells interlinked within one stem! You told me this wooden horse memory was just an implant from the archive, Lieutenant—then why did I find it carved under the furnace in the ruins?!',
+    duetLeadA:
+        'You told me this memory was an implant—then why did I find the wooden horse carved under the furnace?!',
+    duetLeadB:
+        'Recite your baseline and bury the case file, K—the world is built on a wall that separates kind.',
+    directorCue:
+        'Begin in a flat, robotic baseline recitation before letting human anguish crack your composure.',
+    emotionalTarget: 'Stoic Android Awakening to Soul',
+    improvTwist:
+        'TWIST AT 15s: Snap "Interlinked!" three times before your voice breaks.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'scifi_20',
+    category: SceneCategory.specialtyBlockbusterSciFi,
+    title: 'Fear Is the Mind-Killer in the Sandstorm',
+    filmOrSeries: 'Spice Harvester Prophecy (2024 Parody)',
+    releaseYear: 2024,
+    characterName: 'Paul Muad\'Dib & Chani',
+    promptScript:
+        'Silence in the council chamber! I have walked the golden path through the spice storm where the Reverend Mothers dare not look—plant the thumper in the dune and lead them to paradise!',
+    duetLeadA:
+        'I have walked the golden path where the Reverend Mothers dare not look—plant the thumper in the dune!',
+    duetLeadB:
+        'You swore you wouldn\'t use the southern prophecy on our people, Usul—stay who you were in the desert!',
+    directorCue:
+        'Project with dual-layered "Voice" resonance, eyes wide as if glowing spice-blue.',
+    emotionalTarget: 'Messianic Desert Command',
+    improvTwist:
+        'TWIST AT 15s: Whisper "Fear is the mind-killer" before raising an imaginary crysknife.',
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+];
+
+/// Complete 180-Scene General Catalog partitioned by `SceneCategory` (20 scenes per category: 10 original + 10 expanded).
+final Map<SceneCategory, List<ScenePrompt>> kParodyGeneralScenesByCategory = {
+  SceneCategory.era1970To1999: <ScenePrompt>[
+    ...kEra1970To1999Scenes,
+    ...kExpandedEra1970To1999Scenes,
+  ],
+  SceneCategory.era2000To2026: <ScenePrompt>[
+    ...kEra2000To2026Scenes,
+    ...kExpandedEra2000To2026Scenes,
+  ],
+  SceneCategory.awardsBestActor: <ScenePrompt>[
+    ...kAwardsBestActorScenes,
+    ...kExpandedAwardsBestActorScenes,
+  ],
+  SceneCategory.awardsBestActress: <ScenePrompt>[
+    ...kAwardsBestActressScenes,
+    ...kExpandedAwardsBestActressScenes,
+  ],
+  SceneCategory.awardsBestSupportingActor: <ScenePrompt>[
+    ...kAwardsBestSupportingActorScenes,
+    ...kExpandedAwardsBestSupportingActorScenes,
+  ],
+  SceneCategory.awardsBestVillain: <ScenePrompt>[
+    ...kAwardsBestVillainScenes,
+    ...kExpandedAwardsBestVillainScenes,
+  ],
+  SceneCategory.awardsEmmyVault: <ScenePrompt>[
+    ...kAwardsEmmyVaultScenes,
+    ...kExpandedAwardsEmmyVaultScenes,
+  ],
+  SceneCategory.specialtyCultClassics: <ScenePrompt>[
+    ...kSpecialtyCultClassicsScenes,
+    ...kExpandedSpecialtyCultClassicsScenes,
+  ],
+  SceneCategory.specialtyBlockbusterSciFi: <ScenePrompt>[
+    ...kSpecialtyBlockbusterSciFiScenes,
+    ...kExpandedSpecialtyBlockbusterSciFiScenes,
+  ],
 };
 
-/// Combined list of all 150 original parody scenes (90 general + 60 18+ After-Hours).
+/// Combined list of all 250 original parody scenes (180 general + 70 18+ After-Hours).
 final List<ScenePrompt> kAll100ParodyScenes = <ScenePrompt>[
   ...kEra1970To1999Scenes,
+  ...kExpandedEra1970To1999Scenes,
   ...kEra2000To2026Scenes,
+  ...kExpandedEra2000To2026Scenes,
   ...kAwardsBestActorScenes,
+  ...kExpandedAwardsBestActorScenes,
   ...kAwardsBestActressScenes,
+  ...kExpandedAwardsBestActressScenes,
   ...kAwardsBestSupportingActorScenes,
+  ...kExpandedAwardsBestSupportingActorScenes,
   ...kAwardsBestVillainScenes,
+  ...kExpandedAwardsBestVillainScenes,
   ...kAwardsEmmyVaultScenes,
+  ...kExpandedAwardsEmmyVaultScenes,
   ...kSpecialtyCultClassicsScenes,
+  ...kExpandedSpecialtyCultClassicsScenes,
   ...kSpecialtyBlockbusterSciFiScenes,
+  ...kExpandedSpecialtyBlockbusterSciFiScenes,
   ...kLateNightAfterHoursScenes,
 ];
 
 /// Dynamic runtime list of custom scenes generated in The Writer's Room (Fixture #13).
 final List<ScenePrompt> kWritersRoomCustomScenes = <ScenePrompt>[];
 
-/// Dynamic elastic count of all general scenes (90 base + custom Writer's Room scenes).
+/// Dynamic elastic count of all general scenes (180 base + custom Writer's Room scenes).
 int get totalGeneralSceneCount {
   int baseCount = 0;
   for (final list in kParodyGeneralScenesByCategory.values) {
@@ -2093,11 +4046,109 @@ int get totalGeneralSceneCount {
   return baseCount + kWritersRoomCustomScenes.length;
 }
 
-/// Dynamic elastic count of all catalog scenes (90 general + 60 18+ + custom scenes).
+/// Dynamic elastic count of all catalog scenes (180 general + 70 18+ + custom scenes).
 int get totalCatalogSceneCount =>
     kAll100ParodyScenes.length + kWritersRoomCustomScenes.length;
 
 typedef OriginalParodySceneEntry = ScenePrompt;
+
+/// Selects a non-repeating scene of equal genre, difficulty tier, and acting
+/// delivery method for Players 2 through 8 in a live multiplayer match so
+/// subsequent players NEVER have to perform the exact same scene as Player 1.
+/// If [isSupportingActor] is true, selects from the iconic Supporting Actor
+/// vault or adapts the scene into a historical Supporting Actor counter-cue.
+ScenePrompt selectEqualGenreUnplayedScene({
+  required ScenePrompt referenceScene,
+  required Set<String> usedSceneIds,
+  bool isSupportingActor = false,
+  int playerTurnIndex = 1,
+}) {
+  final Set<String> blockedIds = <String>{
+    ...usedSceneIds,
+    referenceScene.id,
+  };
+
+  List<ScenePrompt> candidatePool;
+  if (referenceScene.is18Plus) {
+    final targetTier = getSpiceTierForSceneId(referenceScene.id);
+    candidatePool = kLateNightAfterHoursScenes
+        .where((s) =>
+            !blockedIds.contains(s.id) &&
+            getSpiceTierForSceneId(s.id) == targetTier)
+        .toList();
+    if (candidatePool.isEmpty) {
+      candidatePool = kLateNightAfterHoursScenes
+          .where((s) => !blockedIds.contains(s.id))
+          .toList();
+    }
+  } else if (isSupportingActor) {
+    final supportingList = kParodyGeneralScenesByCategory[
+            SceneCategory.awardsBestSupportingActor] ??
+        kAwardsBestSupportingActorScenes;
+    candidatePool =
+        supportingList.where((s) => !blockedIds.contains(s.id)).toList();
+    if (candidatePool.isEmpty) {
+      candidatePool = supportingList;
+    }
+  } else {
+    final categoryList =
+        kParodyGeneralScenesByCategory[referenceScene.category] ??
+            kEra1970To1999Scenes;
+    // Match closest difficulty tier and acting delivery style within the same genre
+    candidatePool = categoryList
+        .where((s) =>
+            !blockedIds.contains(s.id) &&
+            (s.difficultyTier - referenceScene.difficultyTier).abs() <= 1)
+        .toList();
+    if (candidatePool.isEmpty) {
+      candidatePool =
+          categoryList.where((s) => !blockedIds.contains(s.id)).toList();
+    }
+    if (candidatePool.isEmpty) {
+      candidatePool = kAll100ParodyScenes
+          .where((s) => !s.is18Plus && !blockedIds.contains(s.id))
+          .toList();
+    }
+  }
+
+  final ScenePrompt picked = candidatePool.isEmpty
+      ? referenceScene
+      : candidatePool[playerTurnIndex % candidatePool.length];
+
+  if (isSupportingActor) {
+    return adaptSceneForSupportingActor(picked, playerTurnIndex: playerTurnIndex);
+  }
+  return picked;
+}
+
+/// Adapts a scene into an authentic Supporting Actor / Supporting Actress
+/// audition cue with historical parody spin and supporting counter-dialogue.
+ScenePrompt adaptSceneForSupportingActor(
+  ScenePrompt base, {
+  int playerTurnIndex = 1,
+}) {
+  final String supportingScript = base.duetLeadB.trim().isNotEmpty
+      ? '${base.duetLeadB} And let the record show: without the supporting anchor in this room, your lead monologue wouldn\'t survive the first cut!'
+      : base.promptScript;
+  return ScenePrompt(
+    id: '${base.id}_supp_turn$playerTurnIndex',
+    category: base.category,
+    title: '${base.title} [SUPPORTING STEAL]',
+    filmOrSeries: '${base.filmOrSeries} · Supporting Counter-Cue',
+    releaseYear: base.releaseYear,
+    characterName: '${base.characterName} (Supporting Anchor)',
+    promptScript: supportingScript,
+    duetLeadA: base.duetLeadA,
+    duetLeadB: supportingScript,
+    directorCue:
+        'SUPPORTING ACTOR CALL: Deliver the historical counter-line with scene-stealing reaction beats. ${base.directorCue}',
+    emotionalTarget: 'Supporting Scene-Stealer · ${base.emotionalTarget}',
+    improvTwist: base.improvTwist,
+    is18Plus: base.is18Plus,
+    durationSeconds: base.durationSeconds,
+    difficultyTier: base.difficultyTier,
+  );
+}
 
 /// Deterministic 24-Hour Global Challenge ("Cyborg-Director's Daily Cattle Call" — Fixture #3).
 class DailyCattleCallChallenge {

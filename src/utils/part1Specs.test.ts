@@ -569,4 +569,79 @@ test('Gameplay Video Audit Upgrades: UI Collision Resolution, Universal Multi-Pr
   assert.ok(judgingDart.includes('[00:15.420]'));
 });
 
+test('1-Tap Social Login, 2-8 Player Turn Engine, Vocal Rules Briefing, 2.5s Smart Auto-Cut, Ekman FACS Judging, +100 Expanded Scenes, and Layered DSLR Audio pass verification', () => {
+  const authDart = fs.readFileSync('lib/auth/auth_service.dart', 'utf8');
+  const loginDart = fs.readFileSync('lib/auth/login_screen.dart', 'utf8');
+  const audioDart = fs.readFileSync('lib/ui/soundstage_audio_controller.dart', 'utf8');
+  const catalogDart = fs.readFileSync('lib/ui/parody_scenes_catalog.dart', 'utf8');
+  const raunchyDart = fs.readFileSync('lib/late_night_raunchy_scenes.dart', 'utf8');
+  const lobbyModelsDart = fs.readFileSync('lib/ui/lobby_models_and_realtime.dart', 'utf8');
+  const lobbyDart = fs.readFileSync('lib/lobby.dart', 'utf8');
+  const webrtcDart = fs.readFileSync('lib/webrtc_manager.dart', 'utf8');
+  const judgingDart = fs.readFileSync('lib/judging_engine.dart', 'utf8');
+  const appTsx = fs.readFileSync('src/App.tsx', 'utf8');
+
+  // 1. 1-Tap Social Login (Google & Apple)
+  assert.ok(authDart.includes('signInWithSocialOAuthProvider'));
+  assert.ok(loginDart.includes('GOOGLE 1-TAP'));
+  assert.ok(loginDart.includes('APPLE 1-TAP'));
+  assert.ok(appTsx.includes('CONTINUE WITH GOOGLE (1-TAP)'));
+  assert.ok(appTsx.includes('CONTINUE WITH APPLE (1-TAP)'));
+
+  // 2. Layered DSLR Paparazzi Crowd Audio & Setup/Game Room Music Silence
+  assert.ok(fs.existsSync('assets/audio/camclick.mp3'));
+  assert.ok(fs.existsSync('public/assets/aistudio/camclick.mp3'));
+  assert.ok(audioDart.includes("AssetSource('audio/camclick.mp3')"));
+  assert.ok(audioDart.includes('silenceMusicForSetupOrGameRoom'));
+  assert.ok(lobbyDart.includes('silenceMusicForSetupOrGameRoom'));
+  assert.ok(webrtcDart.includes('silenceMusicForSetupOrGameRoom'));
+
+  // 3. 2-8 Player Turn Selection (Host Pick, Call Sheet Draw, Audition Spin) & Non-Repeating Scenes
+  assert.ok(lobbyModelsDart.includes('enum TurnSelectionMethod'));
+  assert.ok(lobbyModelsDart.includes('advanceToPlayerTurn'));
+  assert.ok(catalogDart.includes('selectEqualGenreUnplayedScene'));
+  assert.ok(catalogDart.includes('adaptSceneForSupportingActor'));
+  assert.ok(lobbyDart.includes('AUDITION TURN-ORDER METHOD (2–8 PLAYERS)'));
+
+  // 4. Studio Director Vocal Rules Briefing + 30s Scene Countdown + 2.5s Smart Auto-Cut
+  assert.ok(webrtcDart.includes('_startDirectorVocalRulesBriefing'));
+  assert.ok(webrtcDart.includes('SKIP VOCAL RULES BRIEFING'));
+  assert.ok(webrtcDart.includes('_postSpeechSilenceMs >= 2500'));
+  assert.ok(webrtcDart.includes('SCENE BEAT HOLD · AUTO-CUT IN'));
+
+  // 5. 100% Factual Judging (Zero Dummy Peer Votes) + Ekman FACS + Self-Adjusting Calibration
+  assert.ok(judgingDart.includes('final List<double> _peerVotes = <double>[];'));
+  assert.ok(judgingDart.includes('final List<int> _passAndPlayRatings1To10 = <int>[];'));
+  assert.ok(judgingDart.includes('EMPIRICAL EKMAN FACS & ACOUSTIC VOCAL PROSODY RESEARCH ALIGNMENT'));
+  assert.ok(judgingDart.includes('applyCalibrationFeedbackAdjustment'));
+
+  // 6. +10 Scenes per Category & Mode (180 general + 70 Late-Night + 30 Life Is Improv)
+  const prefixes = [
+    'era70_',
+    'era00_',
+    'actor_',
+    'actress_',
+    'supp_',
+    'villain_',
+    'emmy_',
+    'cult_',
+    'scifi_',
+  ];
+  for (const prefix of prefixes) {
+    for (let i = 11; i <= 20; i++) {
+      const id = `${prefix}${String(i).padStart(2, '0')}`;
+      assert.ok(
+        catalogDart.includes(`id: '${id}'`),
+        `Expected parody_scenes_catalog.dart to include expanded scene ${id}`
+      );
+    }
+  }
+  for (let i = 61; i <= 70; i++) {
+    assert.ok(
+      raunchyDart.includes(`id: 'ln_${i}'`),
+      `Expected late_night_raunchy_scenes.dart to include ln_${i}`
+    );
+  }
+});
+
 

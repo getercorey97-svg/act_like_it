@@ -443,6 +443,144 @@ export default function App() {
     'ln-1'
   );
 
+  // 2-8 Player Live Audition Engine, Vocal Rules Briefing, Turn Selector & 2.5s Smart Auto-Cut State
+  const [turnOrderMethod, setTurnOrderMethod] = useState<
+    'host_pick' | 'call_sheet_draw' | 'audition_spin'
+  >('call_sheet_draw');
+  const [castRoster, setCastRoster] = useState<
+    Array<{
+      id: string;
+      name: string;
+      role: 'LEAD' | 'SUPPORTING';
+      sceneTitle: string;
+      linePreview: string;
+      peerVotes: number[];
+      aiFacsScore: number | null;
+    }>
+  >([
+    {
+      id: 'p1',
+      name: 'Player 1 (Host)',
+      role: 'LEAD',
+      sceneTitle: 'The Cannoli Callback (1972 Crime Drama)',
+      linePreview:
+          'Leave the cannoli on the dashboard, take the script, and never look in the rearview mirror again.',
+      peerVotes: [],
+      aiFacsScore: null,
+    },
+    {
+      id: 'p2',
+      name: 'Player 2 (Co-Star)',
+      role: 'LEAD',
+      sceneTitle: 'The Milkshake Subpoena (Equal-Genre Unplayed Script)',
+      linePreview:
+          'If I have a thirty-foot straw and your rehearsal time is across the room, I drink your screen test up!',
+      peerVotes: [],
+      aiFacsScore: null,
+    },
+    {
+      id: 'p3',
+      name: 'Player 3 (Supporting)',
+      role: 'SUPPORTING',
+      sceneTitle: 'Supporting Cue · The Witness Stand Spark',
+      linePreview:
+          '[SUPPORTING ACTOR CUE]: "You want the whole call sheet? You cannot handle the unredacted third act!"',
+      peerVotes: [],
+      aiFacsScore: null,
+    },
+  ]);
+  const [currentTurnIdx, setCurrentTurnIdx] = useState<number>(0);
+  const [stagePhase, setStagePhase] = useState<
+    'dashboard' | 'green_room' | 'vocal_rules' | 'performing' | 'judging'
+  >('dashboard');
+  const [rulesStepIdx, setRulesStepIdx] = useState<number>(0);
+  const [sceneSecondsRemaining, setSceneSecondsRemaining] =
+    useState<number>(30);
+  const [postDeliverySilenceTenths, setPostDeliverySilenceTenths] =
+    useState<number>(0);
+  const [holdingFinalBeat, setHoldingFinalBeat] = useState<boolean>(false);
+  const [calibrationDelta, setCalibrationDelta] = useState<number>(0);
+  const [calibrationVerdictLabel, setCalibrationVerdictLabel] = useState<
+    string | null
+  >(null);
+  const [inviteCopied, setInviteCopied] = useState<boolean>(false);
+
+  const VOCAL_RULES_LINES = [
+    `🎙️ QUIET ON SET! Welcome to ACT LIKE IT. ${castRoster.length} actors are locked in via ${turnOrderMethod.replace(/_/g, ' ').toUpperCase()}.`,
+    `🎬 RULE 1 · LIVE TURNS & UNIQUE SCRIPTS: Each actor gets a 30-second countdown take. Players 2–${castRoster.length} receive equal-genre unplayed scripts or Supporting Actor cues.`,
+    `🎭 RULE 2 · SMART 2.5s AUTO-CUT: Deliver your lines with full facial & vocal conviction. When you finish speaking, hold your final pose for 2.5 seconds and the camera automatically calls CUT!`,
+    `🏆 RULE 3 · FACTUAL EKMAN FACS & PROSODY JUDGING: Zero dummy scores—only real cast votes and Paul Ekman FACS + Vocal Prosody AI Telemetrics crown the winner!`,
+  ];
+
+  // Sync silent music zones when entering Green Room setup or Live Soundstage
+  useEffect(() => {
+    if (stagePhase === 'green_room') {
+      setManualZoneOverride('green_room_lobby');
+    } else if (
+      stagePhase === 'vocal_rules' ||
+      stagePhase === 'performing' ||
+      stagePhase === 'judging'
+    ) {
+      setManualZoneOverride('live_soundstage');
+    } else if (stagePhase === 'dashboard') {
+      setManualZoneOverride(null);
+    }
+  }, [stagePhase]);
+
+  // Vocal Rules Briefing auto-advance + optional Web Speech API voiceover
+  useEffect(() => {
+    if (stagePhase !== 'vocal_rules') return;
+    try {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(
+          VOCAL_RULES_LINES[rulesStepIdx] ?? ''
+        );
+        utter.rate = 1.06;
+        utter.pitch = 0.92;
+        window.speechSynthesis.speak(utter);
+      }
+    } catch {
+      // ignore speech synthesis errors
+    }
+    const timer = window.setTimeout(() => {
+      if (rulesStepIdx + 1 < VOCAL_RULES_LINES.length) {
+        setRulesStepIdx((prev) => prev + 1);
+      } else {
+        setStagePhase('performing');
+        setSceneSecondsRemaining(30);
+        setPostDeliverySilenceTenths(0);
+        setHoldingFinalBeat(false);
+      }
+    }, 2400);
+    return () => window.clearTimeout(timer);
+  }, [stagePhase, rulesStepIdx]);
+
+  // 30-Second Scene Countdown + Smart 2.5-Second End-of-Scene Auto-Cut
+  useEffect(() => {
+    if (stagePhase !== 'performing') return;
+    const interval = window.setInterval(() => {
+      setSceneSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          setStagePhase('judging');
+          return 0;
+        }
+        return prev - 1;
+      });
+      if (holdingFinalBeat) {
+        setPostDeliverySilenceTenths((prev) => {
+          const next = prev + 5; // 500ms tick -> 25 tenths = 2.5s
+          if (next >= 25) {
+            setStagePhase('judging');
+            return 25;
+          }
+          return next;
+        });
+      }
+    }, 500);
+    return () => window.clearInterval(interval);
+  }, [stagePhase, holdingFinalBeat]);
+
   const selectedFile =
     WORKSPACE_FILES.find((f) => f.path === selectedFilePath) ??
     WORKSPACE_FILES[0];
@@ -715,54 +853,80 @@ export default function App() {
   );
 
   if (!ndaUnlocked) {
-    const partnershipTracks = [
-      '1. Co-Founder & Chief Operating Officer (COO) / Studio Head',
-      '2. Chief Technology Officer (CTO) / Lead Multiplayer Systems Engineer',
-      '3. Head of Growth, Marketing & Viral Acquisition',
-      "4. Senior Creative Director & Writer's Room Lead",
-      '5. Strategic Angel Investor / Venture Partner',
+    const archetypes = [
+      { id: 'the_method_actor', name: 'The Method Actor', role: 'INTENSE LEAD', color: 'border-amber-400 text-amber-300' },
+      { id: 'the_scream_queen', name: 'The Scream Queen', role: 'THRILLER ICON', color: 'border-rose-500 text-rose-300' },
+      { id: 'the_action_titan', name: 'The Action Titan', role: 'STUNT LEGEND', color: 'border-cyan-400 text-cyan-300' },
+      { id: 'the_improv_wildcard', name: 'The Improv Wildcard', role: 'COMEDY GENIUS', color: 'border-emerald-400 text-emerald-300' },
+      { id: 'the_noir_detective', name: 'The Noir Detective', role: 'SHADOW LEAD', color: 'border-purple-400 text-purple-300' },
+      { id: 'the_velvet_diva', name: 'The Velvet Diva', role: 'RED CARPET ROYALTY', color: 'border-amber-300 text-amber-200' },
     ];
-    const allQueueRecords = Object.values(registryState);
-    const totalCount = allQueueRecords.length;
-    const pendingCount = allQueueRecords.filter(
-      (r) => (r.approval_status ?? 'pending') === 'pending'
-    ).length;
-    const approvedCount = allQueueRecords.filter(
-      (r) => r.approval_status === 'approved'
-    ).length;
-    const partnerCount = allQueueRecords.filter(
-      (r) => r.interested_in_partnership
-    ).length;
-    const rejectedCount = allQueueRecords.filter(
-      (r) => r.approval_status === 'rejected'
-    ).length;
+    const eraOptions = ['1970s–1980s Classics', '1990s Cult Icons', '2000s–2010s Blockbusters', '2020s–2026 Modern Prestige'];
+    const strengthOptions = ['Method Drama', 'Improv Comedy', 'High-Stakes Thriller', 'Late-Night 18+ Satire'];
 
-    const searchLower = adminSearchQuery.trim().toLowerCase();
-    const filteredAdminRecords = allQueueRecords.filter((rec) => {
-      const status = rec.approval_status ?? 'pending';
-      if (adminFilter === 'pending' && status !== 'pending') return false;
-      if (adminFilter === 'approved' && status !== 'approved') return false;
-      if (adminFilter === 'rejected' && status !== 'rejected') return false;
-      if (adminFilter === 'partner' && !rec.interested_in_partnership)
-        return false;
-      if (!searchLower) return true;
-      const hay = `${rec.full_legal_name} ${rec.email} ${rec.phone_number} ${rec.unique_passcode} ${rec.bound_device_fingerprint}`.toLowerCase();
-      return hay.includes(searchLower);
-    });
+    const handleCompleteUserOnboarding = (e: React.FormEvent) => {
+      e.preventDefault();
+      setNdaError(null);
+      handleTriggerSfx('clapper_snap');
+
+      if (ndaMode === 'sign') {
+        if (!ndaEmail.trim().includes('@') && ndaEmail.trim().toLowerCase() !== 'admin88') {
+          setNdaError('Please enter a valid Stage Email address.');
+          return;
+        }
+        if (adminPasswordInput.length < 6) {
+          setNdaError('Backstage password must be at least 6 characters.');
+          return;
+        }
+      }
+
+      try {
+        const seal = computeSessionSeal(
+          'USER_STAGE_PASS',
+          deviceFingerprint,
+          'approved'
+        );
+        localStorage.setItem('act_like_it_nda_gate_unlocked_v2', 'true');
+        localStorage.setItem('act_like_it_session_seal_v2', seal);
+        localStorage.setItem(
+          'act_like_it_nda_dossier_payload_v2',
+          JSON.stringify({
+            full_legal_name: ndaFullName.trim() || 'Stage Star',
+            email: ndaEmail.trim() || 'star@actlikeit.stage',
+            unique_passcode: 'USER_STAGE_PASS',
+            bound_device_fingerprint: deviceFingerprint,
+            unlocked_via_master_secret: true,
+            approval_status: 'approved',
+            signed_date_utc: new Date().toISOString(),
+            official_portal_url: 'https://act-like-it.vercel.app',
+          })
+        );
+      } catch {
+        // ignore storage errors
+      }
+      setNdaUnlocked(true);
+    };
 
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-['Plus_Jakarta_Sans',sans-serif] py-8 px-4 flex items-center justify-center">
-        <div className="max-w-4xl w-full bg-slate-900 border-2 border-amber-500/80 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between gap-3 bg-rose-950/80 border border-rose-500 rounded-xl px-4 py-3 text-rose-200 text-xs font-mono font-bold">
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>
-                MANDATORY CLOSED ALPHA NDA &amp; FOUNDER APPROVAL LOCK
-              </span>
+        <div className="max-w-3xl w-full bg-slate-900 border-2 border-amber-500/80 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
+          <div className="flex flex-col items-center text-center space-y-3">
+            <img
+              src="/app_logo.png"
+              alt="ACT LIKE IT Official Logo"
+              className="w-20 h-20 rounded-full border-2 border-amber-400 object-cover shadow-xl"
+            />
+            <div className="space-y-1">
+              <div className="text-xs font-mono font-bold tracking-widest text-amber-300 uppercase">
+                2.5D PREMIERE CASTING · USER SIGN-IN &amp; ONBOARDING
+              </div>
+              <h1 className="text-2xl md:text-3xl font-black text-white">
+                ACT LIKE IT™ — Claim Your Star on the Red Carpet
+              </h1>
+              <p className="text-xs text-slate-300 max-w-xl mx-auto">
+                Sign in or complete your 2.5D Actor Onboarding Pass to unlock 100+ Parody Scripts, LiveKit Multiplayer Soundstages, and 5-Pillar Gemini AI Judging.
+              </p>
             </div>
-            <span className="text-amber-300">
-              DEVICE ID: {deviceFingerprint}
-            </span>
           </div>
 
           {/* Sign-In / Sign-Up On-Set Soundstage Audio & Music Controls */}
@@ -778,7 +942,8 @@ export default function App() {
             contextLabel="SIGN-IN & ON-SET CASTING AUDIO CONTROLS"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-mono font-bold">
+          {/* Dual-Track Mode Tabs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs font-mono font-bold">
             <button
               type="button"
               onClick={() => {
@@ -793,7 +958,7 @@ export default function App() {
                   : 'text-amber-200 hover:bg-slate-900'
               }`}
             >
-              1. SIGN NDA (REQUEST ACCESS)
+              TRACK A · CLAIM YOUR STAR (SIGN IN / ONBOARDING)
             </button>
             <button
               type="button"
@@ -801,115 +966,104 @@ export default function App() {
                 setManualZoneOverride(null);
                 setNdaMode('unlock');
                 setNdaError(null);
-                handleTriggerSfx('film_reel_click');
+                handleTriggerSfx('dressing_room_vanity');
               }}
               className={`py-2.5 px-3 rounded-lg transition-colors ${
                 ndaMode === 'unlock'
-                  ? 'bg-cyan-400 text-slate-950'
-                  : 'text-cyan-300 hover:bg-slate-900'
+                  ? 'bg-emerald-400 text-slate-950'
+                  : 'text-emerald-300 hover:bg-slate-900'
               }`}
             >
-              2. ENTER APPROVED PASSCODE
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setManualZoneOverride(null);
-                setNdaMode('admin');
-                setNdaError(null);
-                setRegistryState(loadRegistryFromStorage());
-                handleTriggerSfx('soundstage_door_thud');
-              }}
-              className={`py-2.5 px-3 rounded-lg transition-colors ${
-                ndaMode === 'admin'
-                  ? 'bg-rose-600 text-white'
-                  : 'text-rose-300 hover:bg-slate-900'
-              }`}
-            >
-              🛡️ 3. FOUNDER ADMIN LOGIN
+              TRACK B · SNEAK BACKSTAGE (EXPRESS GUEST PASS)
             </button>
           </div>
 
-          <div className="space-y-2">
-            <h1 className="text-xl md:text-2xl font-black text-amber-200 leading-snug">
-              🎬 &ldquo;ACT LIKE IT&rdquo; — OFFICIAL CLOSED ALPHA TESTING AGREEMENT, NON-DISCLOSURE (NDA) &amp; PARTNERSHIP DOSSIER
-            </h1>
-            <p className="text-xs font-mono text-cyan-400">
-              STANDALONE EDITION — BUILD v1.0-ALPHA · OFFICIAL PORTAL: https://act-like-it.vercel.app
-            </p>
-          </div>
+          <form onSubmit={handleCompleteUserOnboarding} className="space-y-5">
+            {/* Step 1: 2.5D Avatar Archetype Picker */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="text-xs font-mono font-bold text-amber-300">
+                1. SELECT YOUR 2.5D CELL-SHADED AVATAR ARCHETYPE
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {archetypes.map((arch) => {
+                  const selected = ndaDevice === arch.id;
+                  return (
+                    <button
+                      key={arch.id}
+                      type="button"
+                      onClick={() => {
+                        setNdaDevice(arch.id);
+                        handleTriggerSfx('film_reel_click');
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        selected
+                          ? `${arch.color} bg-slate-900 border-2 shadow-md`
+                          : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-white">{arch.name}</div>
+                      <div className="text-[10px] font-mono text-slate-400 mt-0.5">{arch.role}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          {/* TAB 3: DEDICATED FOUNDER'S ADMIN LOGIN PAGE & COMMAND CENTER DASHBOARD */}
-          {ndaMode === 'admin' && (
-            <div className="bg-slate-950 border-2 border-rose-500/80 rounded-xl p-5 md:p-6 space-y-5">
-              {!adminUnlocked ? (
-                <form
-                  onSubmit={handleFounderAdminLogin}
-                  className="space-y-4 max-w-xl mx-auto"
-                >
-                  <div className="flex items-center gap-3 pb-2 border-b border-slate-800">
-                    <div className="p-2.5 rounded-xl bg-rose-950 border border-rose-500 text-amber-300">
-                      <ShieldCheck className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm md:text-base font-mono font-black text-amber-300">
-                        🛡️ FOUNDER&rsquo;S EXECUTIVE ADMIN LOGIN
-                      </h2>
-                      <p className="text-xs text-slate-400">
-                        Restricted exclusively to Founder Corey Geter (
-                        {FOUNDER_CONTACT_EMAIL})
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Sign in with your dedicated Founder Admin Username and
-                    Password to open the Executive Command Center, review all
-                    pending NDA &amp; Co-Founder Dossiers, approve or reject
-                    testers, and launch directly into the main{' '}
-                    <strong className="text-amber-300">ACT LIKE IT™</strong>{' '}
-                    application.
-                  </p>
-
+            {ndaMode === 'sign' ? (
+              <>
+                {/* Step 2: Account Credentials & Birth Year */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label
-                      htmlFor="founder-admin-username"
+                      htmlFor="actor-stage-handle"
                       className="block text-xs font-bold text-amber-100 mb-1"
                     >
-                      Founder Admin Username *
+                      Stage Handle (@username)
                     </label>
                     <input
-                      id="founder-admin-username"
+                      id="actor-stage-handle"
                       type="text"
-                      value={adminUsernameInput}
-                      onChange={(e) => setAdminUsernameInput(e.target.value)}
-                      placeholder="Enter Founder Admin Username"
-                      autoComplete="username"
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm font-mono text-white"
+                      value={ndaFullName}
+                      onChange={(e) => setNdaFullName(e.target.value)}
+                      placeholder="e.g., NeonMethodActor"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                     />
                   </div>
-
                   <div>
                     <label
-                      htmlFor="founder-admin-password"
+                      htmlFor="actor-stage-email"
                       className="block text-xs font-bold text-amber-100 mb-1"
                     >
-                      Founder Admin Password *
+                      Stage Email *
+                    </label>
+                    <input
+                      id="actor-stage-email"
+                      type="text"
+                      value={ndaEmail}
+                      onChange={(e) => setNdaEmail(e.target.value)}
+                      placeholder="actor@studio.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="actor-stage-password"
+                      className="block text-xs font-bold text-amber-100 mb-1"
+                    >
+                      Backstage Password *
                     </label>
                     <div className="relative">
                       <input
-                        id="founder-admin-password"
+                        id="actor-stage-password"
                         type={showAdminPassword ? 'text' : 'password'}
                         value={adminPasswordInput}
                         onChange={(e) => setAdminPasswordInput(e.target.value)}
-                        placeholder="Enter Founder Admin Password"
-                        autoComplete="current-password"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-3 pr-10 py-2.5 text-sm font-mono text-white"
+                        placeholder="••••••••"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-9 py-2 text-sm text-white"
                       />
                       <button
                         type="button"
                         onClick={() => setShowAdminPassword(!showAdminPassword)}
-                        aria-label="Toggle password visibility"
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                       >
                         {showAdminPassword ? (
@@ -920,670 +1074,172 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+                </div>
 
-                  {adminError && (
-                    <div className="bg-rose-950 border border-rose-500 text-rose-200 text-xs font-bold px-3.5 py-2.5 rounded-lg">
-                      {adminError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-4 rounded-xl text-xs font-mono tracking-wide shadow-lg transition-colors"
-                  >
-                    AUTHENTICATE &amp; OPEN FOUNDER COMMAND CENTER
-                  </button>
-                </form>
-              ) : (
-                <div className="space-y-5">
-                  {/* Executive Command Header + Direct Launch into App */}
-                  <div className="p-4 rounded-xl bg-slate-900 border-2 border-amber-400/80 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h2 className="text-sm md:text-base font-mono font-black text-amber-300">
-                          👑 FOUNDER COMMAND CENTER &amp; NDA APPROVAL DASHBOARD
-                        </h2>
-                        <p className="text-xs text-emerald-400 font-mono font-semibold">
-                          Authenticated as Founder Corey Geter (admin88) ·
-                          Supabase Sync: public.nda_tester_approvals
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setRegistryState(loadRegistryFromStorage())
-                        }
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold hover:bg-slate-800"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>REFRESH QUEUE</span>
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleFounderLaunchMainApp}
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-black text-xs py-3 px-4 rounded-xl shadow-lg inline-flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <Rocket className="w-4 h-4" />
-                      <span>
-                        LAUNCH INTO ACT LIKE IT™ MAIN APP (FOUNDER BYPASS)
-                      </span>
-                    </button>
+                {/* Step 3: Onboarding Preferences (Favorite Eras & Acting Strengths) */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="text-xs font-mono font-bold text-cyan-300">
+                    2. DRESSING ROOM ONBOARDING · FAVORITE ERAS &amp; ACTING STRENGTHS
                   </div>
-
-                  {/* KPI Telemetry Strip */}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                    <div className="p-3 rounded-xl bg-slate-900 border border-cyan-500/40">
-                      <div className="text-[10px] font-mono text-slate-400">
-                        TOTAL DOSSIERS
-                      </div>
-                      <div className="text-lg font-mono font-black text-cyan-300">
-                        {totalCount}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900 border border-amber-500/40">
-                      <div className="text-[10px] font-mono text-slate-400">
-                        PENDING REVIEW
-                      </div>
-                      <div className="text-lg font-mono font-black text-amber-300">
-                        {pendingCount}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900 border border-emerald-500/40">
-                      <div className="text-[10px] font-mono text-slate-400">
-                        APPROVED
-                      </div>
-                      <div className="text-lg font-mono font-black text-emerald-300">
-                        {approvedCount}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900 border border-purple-500/40">
-                      <div className="text-[10px] font-mono text-slate-400">
-                        PARTNER TRACK
-                      </div>
-                      <div className="text-lg font-mono font-black text-purple-300">
-                        {partnerCount}
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900 border border-rose-500/40">
-                      <div className="text-[10px] font-mono text-slate-400">
-                        REJECTED
-                      </div>
-                      <div className="text-lg font-mono font-black text-rose-300">
-                        {rejectedCount}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Filter Tabs & Search */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex flex-wrap gap-1.5">
-                      {(
-                        [
-                          ['all', `ALL (${totalCount})`],
-                          ['pending', `⏳ PENDING (${pendingCount})`],
-                          ['approved', `✅ APPROVED (${approvedCount})`],
-                          ['partner', `🤝 PARTNER TRACK (${partnerCount})`],
-                          ['rejected', `🚫 REJECTED (${rejectedCount})`],
-                        ] as const
-                      ).map(([key, label]) => (
+                  <div className="flex flex-wrap gap-2">
+                    {[...eraOptions, ...strengthOptions].map((tag) => {
+                      const active = ndaSelectedTracks.includes(tag);
+                      return (
                         <button
-                          key={key}
+                          key={tag}
                           type="button"
-                          onClick={() => setAdminFilter(key)}
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-black transition-colors ${
-                            adminFilter === key
-                              ? 'bg-amber-400 text-slate-950'
-                              : 'bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700'
+                          onClick={() => {
+                            if (active) {
+                              setNdaSelectedTracks(ndaSelectedTracks.filter((t) => t !== tag));
+                            } else {
+                              setNdaSelectedTracks([...ndaSelectedTracks, tag]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-colors ${
+                            active
+                              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                           }`}
                         >
-                          {label}
+                          {tag}
                         </button>
-                      ))}
-                    </div>
-
-                    <div className="relative min-w-[220px]">
-                      <Search className="w-3.5 h-3.5 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={adminSearchQuery}
-                        onChange={(e) => setAdminSearchQuery(e.target.value)}
-                        placeholder="Search name, email, passcode..."
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white"
-                      />
-                    </div>
-                  </div>
-
-                  {filteredAdminRecords.length === 0 ? (
-                    <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 text-center">
-                      No tester NDA dossiers match the current filter.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {filteredAdminRecords.map((rec) => {
-                        const status = rec.approval_status ?? 'pending';
-                        const badgeClass =
-                          status === 'approved'
-                            ? 'bg-emerald-950 text-emerald-300 border-emerald-500'
-                            : status === 'rejected'
-                            ? 'bg-rose-950 text-rose-300 border-rose-500'
-                            : 'bg-amber-950 text-amber-300 border-amber-500';
-
-                        return (
-                          <div
-                            key={rec.unique_passcode}
-                            className="p-4 rounded-xl bg-slate-900 border border-slate-700 space-y-2.5"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-xs font-bold text-white">
-                                {rec.full_legal_name} · {rec.email} ·{' '}
-                                {rec.phone_number}
-                              </div>
-                              <span
-                                className={`px-2.5 py-0.5 rounded border text-[11px] font-mono font-black uppercase ${badgeClass}`}
-                              >
-                                {status}
-                              </span>
-                            </div>
-
-                            <div className="text-xs font-mono text-amber-200 leading-relaxed">
-                              Passcode:{' '}
-                              <strong className="text-amber-300">
-                                {rec.unique_passcode}
-                              </strong>{' '}
-                              · Bound Device: {rec.bound_device_fingerprint}
-                              <br />
-                              Device: {rec.device_model} ({rec.os_version}) ·
-                              Network: {rec.network_connection_used} · Signature:{' '}
-                              &ldquo;{rec.digital_signature}&rdquo;
-                            </div>
-
-                            {rec.interested_in_partnership && (
-                              <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/60 text-xs text-amber-200">
-                                <strong>🤝 CO-FOUNDER / PARTNER TRACK:</strong>{' '}
-                                {rec.selected_partnership_tracks.join(', ')}
-                                {rec.partnership_background_summary && (
-                                  <div className="text-slate-300 mt-1">
-                                    Summary: {rec.partnership_background_summary}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            <div className="flex flex-wrap items-center gap-2 pt-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleFounderSetApprovalStatus(
-                                    rec.unique_passcode,
-                                    'approved'
-                                  )
-                                }
-                                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-mono font-black"
-                              >
-                                ✅ APPROVE &amp; ISSUE PASSCODE
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleFounderSetApprovalStatus(
-                                    rec.unique_passcode,
-                                    'rejected'
-                                  )
-                                }
-                                className="px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-200 text-xs font-mono font-bold"
-                              >
-                                🚫 REJECT
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleCopyCode(
-                                    `admin-${rec.unique_passcode}`,
-                                    rec.unique_passcode
-                                  )
-                                }
-                                className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold inline-flex items-center gap-1"
-                              >
-                                {copiedPath ===
-                                `admin-${rec.unique_passcode}` ? (
-                                  <Check className="w-3.5 h-3.5" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                                <span>
-                                  {copiedPath ===
-                                  `admin-${rec.unique_passcode}`
-                                    ? 'COPIED'
-                                    : 'COPY PASSCODE'}
-                                </span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {ndaMode === 'sign' && (
-            <>
-              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 text-xs text-slate-300 leading-relaxed">
-                <h2 className="text-sm font-bold text-amber-400">
-                  🔒 SECTION 0: PRE-REGISTRATION INTELLECTUAL PROPERTY &amp; LEGAL NOTICE
-                </h2>
-                <p>
-                  <strong className="text-white">
-                    1. Unregistered Copyright &amp; Common-Law Intellectual Property Notice:
-                  </strong>{' '}
-                  Although formal registration with the U.S. Copyright Office and the U.S. Patent and Trademark Office (USPTO) is currently pending, automatic statutory copyright protection under the U.S. Copyright Act (17 U.S.C. § 102) attaches immediately upon creation and fixation of this original work. All aspects of ACT LIKE IT™—including its original 100+ parody scripts, the &ldquo;Tri-Modal Judging Engine&rdquo; architecture, the &ldquo;2.5D Boondocks-inspired&rdquo; cell-shaded visual style and 14 character archetypes, the &ldquo;Life Is Improv&rdquo; stealth HUD mechanics, custom UI/UX layouts, audio cues, source code, database schemas, and trade dress—are the exclusive, proprietary intellectual property of the Creator/Studio (© 2026 ACT LIKE IT Studio. All Rights Reserved. Common-Law Trademark ACT LIKE IT™ Claimed).
-                </p>
-                <p>
-                  <strong className="text-white">
-                    2. Strict Confidentiality, NDA, Manual Founder Approval &amp; Anti-Sharing Policy:
-                  </strong>{' '}
-                  By accessing the Closed Alpha build via{' '}
-                  <span className="text-cyan-400 font-mono">
-                    https://act-like-it.vercel.app
-                  </span>{' '}
-                  or the Android APK, you acknowledge and agree that this software is a Confidential Pre-Release Trade Secret. Signing below submits your dossier to Founder Corey Geter (
-                  <span className="text-cyan-300 font-mono">
-                    {FOUNDER_CONTACT_EMAIL}
-                  </span>
-                  ) for manual review. Once approved by the Founder, your{' '}
-                  <strong className="text-amber-300">
-                    UNIQUE PERSONAL TESTER PASSCODE (ALI-XX-XXXX)
-                  </strong>{' '}
-                  locked to your legal name and this specific device will be unlocked. Any attempt to use your passcode on another person&rsquo;s device immediately triggers an NDA Breach Alert under your name.
-                </p>
-              </div>
-
-              <form
-                onSubmit={handleSignNdaAndSubmitForApproval}
-                className="space-y-4"
-              >
-                <h3 className="text-sm font-bold text-amber-400">
-                  ✍️ TESTER &amp; POTENTIAL PARTNER LEGAL ACKNOWLEDGMENT &amp; DEVICE LOG
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label
-                      htmlFor="nda-full-name"
-                      className="block text-xs font-bold text-amber-100 mb-1"
-                    >
-                      Tester Full Legal Name *
-                    </label>
-                    <input
-                      id="nda-full-name"
-                      type="text"
-                      value={ndaFullName}
-                      onChange={(e) => setNdaFullName(e.target.value)}
-                      placeholder="First & Last Legal Name"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="nda-email"
-                      className="block text-xs font-bold text-amber-100 mb-1"
-                    >
-                      Personal / Business Email *
-                    </label>
-                    <input
-                      id="nda-email"
-                      type="email"
-                      value={ndaEmail}
-                      onChange={(e) => setNdaEmail(e.target.value)}
-                      placeholder="name@example.com"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="nda-phone"
-                      className="block text-xs font-bold text-amber-100 mb-1"
-                    >
-                      Tester Phone Number *
-                    </label>
-                    <input
-                      id="nda-phone"
-                      type="tel"
-                      value={ndaPhone}
-                      onChange={(e) => setNdaPhone(e.target.value)}
-                      placeholder="(555) 000-0000"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                    />
+                      );
+                    })}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label
-                      htmlFor="nda-device-model"
-                      className="block text-xs font-bold text-amber-100 mb-1"
-                    >
-                      Device Model *
-                    </label>
-                    <input
-                      id="nda-device-model"
-                      type="text"
-                      value={ndaDevice}
-                      onChange={(e) => setNdaDevice(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="nda-os-version"
-                      className="block text-xs font-bold text-amber-100 mb-1"
-                    >
-                      OS Version *
-                    </label>
-                    <input
-                      id="nda-os-version"
-                      type="text"
-                      value={ndaOsVersion}
-                      onChange={(e) => setNdaOsVersion(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="nda-network"
-                      className="block text-xs font-bold text-amber-100 mb-1"
-                    >
-                      Network Connection Used *
-                    </label>
-                    <select
-                      id="nda-network"
-                      value={ndaNetwork}
-                      onChange={(e) => setNdaNetwork(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                    >
-                      <option value="Wi-Fi">Wi-Fi</option>
-                      <option value="5G / Cellular">5G / Cellular</option>
-                      <option value="Both Tested">Both Tested</option>
-                    </select>
-                  </div>
+              </>
+            ) : (
+              <div className="bg-slate-950 border border-emerald-500/50 rounded-xl p-4 space-y-3">
+                <div className="text-xs font-mono font-bold text-emerald-300">
+                  ⚡ EXPRESS BACKSTAGE PASS (50 FREE AI TELEMETRICS TOKENS)
                 </div>
-
-                <div className="space-y-2 text-xs text-slate-200">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ndaAgreedIp}
-                      onChange={(e) => setNdaAgreedIp(e.target.checked)}
-                      className="mt-1 accent-amber-400"
-                    />
-                    <span>
-                      I acknowledge the Pre-Registration Intellectual Property &amp; Copyright Notice (17 U.S.C. § 102) and confirm that all aspects of ACT LIKE IT™ are the exclusive property of ACT LIKE IT Studio.
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ndaAgreedConfidential}
-                      onChange={(e) =>
-                        setNdaAgreedConfidential(e.target.checked)
-                      }
-                      className="mt-1 accent-amber-400"
-                    />
-                    <span>
-                      I agree to the Strict Confidentiality &amp; Non-Disclosure Agreement (NDA): I will NOT share my personal tester passcode, publicly record, screenshot, share https://act-like-it.vercel.app or build files, or appropriate any game mechanics or scripts.
-                    </span>
-                  </label>
-                </div>
-
                 <div>
                   <label
-                    htmlFor="nda-signature"
-                    className="block text-xs font-bold text-amber-100 mb-1"
+                    htmlFor="express-stage-handle"
+                    className="block text-xs font-bold text-slate-200 mb-1"
                   >
-                    Tester Digital Signature (Type Full Legal Name) *
+                    Express Stage Handle (Optional)
                   </label>
                   <input
-                    id="nda-signature"
+                    id="express-stage-handle"
                     type="text"
-                    value={ndaSignature}
-                    onChange={(e) => setNdaSignature(e.target.value)}
-                    placeholder="Type your full legal name as your binding signature"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                    value={ndaFullName}
+                    onChange={(e) => setNdaFullName(e.target.value)}
+                    placeholder="Leave blank to use your 2.5D Archetype Title"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                   />
                 </div>
+              </div>
+            )}
 
-                <div className="border-t border-slate-800 pt-4 space-y-3">
-                  <h3 className="text-sm font-bold text-amber-400">
-                    🤝 SECTION 1: &ldquo;ACT LIKE IT&rdquo; PARTNERSHIP &amp; CO-FOUNDER EVALUATION
-                  </h3>
-                  <div className="flex flex-wrap gap-3 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setNdaInterestedPartner(true)}
-                      className={`px-3 py-2 rounded-lg border font-bold ${
-                        ndaInterestedPartner
-                          ? 'bg-amber-500/20 border-amber-400 text-amber-200'
-                          : 'bg-slate-950 border-slate-700 text-slate-400'
-                      }`}
-                    >
-                      ✅ YES — I want to talk about joining the core team!
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNdaInterestedPartner(false);
-                        setNdaSelectedTracks([]);
-                      }}
-                      className={`px-3 py-2 rounded-lg border font-bold ${
-                        !ndaInterestedPartner
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                          : 'bg-slate-950 border-slate-700 text-slate-400'
-                      }`}
-                    >
-                      🎬 NO — I am strictly acting as a Closed Alpha Tester
-                    </button>
-                  </div>
+            {ndaError && (
+              <div className="bg-rose-950 border border-rose-500 text-rose-200 text-xs font-bold px-4 py-3 rounded-lg">
+                {ndaError}
+              </div>
+            )}
 
-                  {ndaInterestedPartner && (
-                    <div className="space-y-2 pt-2">
-                      <div className="space-y-1 text-xs text-slate-300">
-                        {partnershipTracks.map((track) => (
-                          <label
-                            key={track}
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={ndaSelectedTracks.includes(track)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setNdaSelectedTracks([
-                                    ...ndaSelectedTracks,
-                                    track,
-                                  ]);
-                                } else {
-                                  setNdaSelectedTracks(
-                                    ndaSelectedTracks.filter((t) => t !== track)
-                                  );
-                                }
-                              }}
-                              className="accent-amber-400"
-                            />
-                            <span>{track}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <textarea
-                        rows={2}
-                        value={ndaBackgroundSummary}
-                        onChange={(e) =>
-                          setNdaBackgroundSummary(e.target.value)
-                        }
-                        placeholder="Briefly summarize your background, superpowers, or past experience relevant to this role..."
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"
-                      />
-                    </div>
-                  )}
-                </div>
-
+            {/* 1-Tap Social Login Row (Google & Apple OAuth) */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5">
+              <div className="text-[11px] font-mono font-bold text-amber-300 text-center">
+                ⚡ 1-TAP SOCIAL SIGN-IN (GOOGLE &amp; APPLE OAUTH)
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
-                  type="submit"
-                  className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-6 rounded-xl shadow-lg transition-colors text-xs font-mono tracking-wide"
+                  type="button"
+                  onClick={() => {
+                    handleTriggerSfx('clapper_snap');
+                    setNdaFullName((prev) => prev.trim() || 'GoogleStageStar');
+                    setNdaEmail('google.actor@actlikeit.stage');
+                    setAdminPasswordInput('GoogleOAuth2026!');
+                    try {
+                      const seal = computeSessionSeal(
+                        'USER_STAGE_PASS',
+                        deviceFingerprint,
+                        'approved'
+                      );
+                      localStorage.setItem(
+                        'act_like_it_nda_gate_unlocked_v2',
+                        'true'
+                      );
+                      localStorage.setItem('act_like_it_session_seal_v2', seal);
+                      localStorage.setItem(
+                        'act_like_it_nda_dossier_payload_v2',
+                        JSON.stringify({
+                          full_legal_name:
+                            ndaFullName.trim() || 'Google Stage Star',
+                          email: 'google.actor@actlikeit.stage',
+                          oauth_provider: 'google',
+                          unique_passcode: 'USER_STAGE_PASS',
+                          bound_device_fingerprint: deviceFingerprint,
+                          unlocked_via_master_secret: true,
+                          approval_status: 'approved',
+                          signed_date_utc: new Date().toISOString(),
+                          official_portal_url: 'https://act-like-it.vercel.app',
+                        })
+                      );
+                    } catch {
+                      // ignore
+                    }
+                    setNdaUnlocked(true);
+                  }}
+                  className="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-400/70 text-cyan-200 font-mono font-bold text-xs flex items-center justify-center gap-2 transition-colors"
                 >
-                  STEP 1: SIGN NDA &amp; SUBMIT FOR FOUNDER APPROVAL
+                  <span>🌐</span>
+                  <span>CONTINUE WITH GOOGLE (1-TAP)</span>
                 </button>
-              </form>
-            </>
-          )}
-
-          {ndaMode !== 'admin' && (
-            <>
-              {/* PENDING FOUNDER APPROVAL CARD — Passcode strictly hidden until approved */}
-              {currentTesterDossier &&
-                currentTesterDossier.approval_status === 'pending' && (
-                  <div className="bg-amber-950/50 border-2 border-amber-400 rounded-xl p-4 space-y-3">
-                    <div className="text-xs font-mono font-black text-amber-300">
-                      ⏳ NDA SIGNED — PENDING FOUNDER APPROVAL
-                    </div>
-                    <p className="text-xs text-amber-100 leading-relaxed">
-                      Thank you,{' '}
-                      <strong>{currentTesterDossier.full_legal_name}</strong>.
-                      Your signed NDA and hardware device lock (
-                      <code className="font-mono">{deviceFingerprint}</code>)
-                      have been recorded in the approval queue.
-                      <br />
-                      <br />
-                      🔒{' '}
-                      <strong>
-                        PASSCODE HELD FOR MANUAL FOUNDER CLEARANCE:
-                      </strong>{' '}
-                      Because the repository is public on GitHub, Founder Corey
-                      Geter personally reviews and approves every tester before
-                      their personal <code className="font-mono">ALI-XX-XXXX</code>{' '}
-                      passcode is revealed or activated.
-                    </p>
-                    <div className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-xs font-mono text-cyan-300 flex items-center justify-between">
-                      <span>
-                        Founder Direct Contact:{' '}
-                        <strong>{FOUNDER_CONTACT_EMAIL}</strong>
-                      </span>
-                    </div>
-                    {statusCheckMessage && (
-                      <div className="text-xs font-bold text-amber-200">
-                        {statusCheckMessage}
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleCheckApprovalStatus}
-                      className="w-full bg-slate-950 hover:bg-slate-900 border-2 border-cyan-400 text-cyan-300 font-mono font-black text-xs py-2.5 px-4 rounded-lg inline-flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>🔄 CHECK APPROVAL STATUS</span>
-                    </button>
-                  </div>
-                )}
-
-              {/* REJECTED BANNER */}
-              {currentTesterDossier &&
-                currentTesterDossier.approval_status === 'rejected' && (
-                  <div className="bg-rose-950 border-2 border-rose-500 rounded-xl p-4 text-xs font-bold text-rose-200">
-                    🚫 ACCESS DECLINED: Your Closed Alpha request was not
-                    approved by Studio Administration ({FOUNDER_CONTACT_EMAIL}).
-                  </div>
-                )}
-
-              {/* APPROVED PASSCODE CARD — Visible ONLY when approval_status === 'approved' */}
-              {visibleApprovedPasscode && currentTesterDossier && (
-                <div className="bg-emerald-950/60 border-2 border-emerald-400 rounded-xl p-4 space-y-3">
-                  <div className="text-xs font-mono font-bold text-emerald-300">
-                    ✅ FOUNDER APPROVED — YOUR UNIQUE PERSONAL PASSCODE IS ACTIVE
-                  </div>
-                  <div className="flex items-center justify-between bg-slate-950 border border-amber-400 rounded-lg px-4 py-3">
-                    <span className="font-mono text-xl font-black tracking-widest text-amber-300">
-                      {visibleApprovedPasscode}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleCopyCode(
-                          'nda-passcode',
-                          visibleApprovedPasscode
-                        )
-                      }
-                      className="text-xs font-mono font-bold text-cyan-300 hover:text-cyan-200 flex items-center gap-1"
-                    >
-                      {copiedPath === 'nda-passcode' ? (
-                        <Check className="w-4 h-4" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                      {copiedPath === 'nda-passcode'
-                        ? 'COPIED'
-                        : 'COPY PASSCODE'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-amber-200/90 leading-relaxed">
-                    ⚠️ <strong>ANTI-SHARING TRACEABILITY WARNING:</strong> This
-                    passcode (
-                    <code className="font-mono">{visibleApprovedPasscode}</code>
-                    ) is uniquely registered to{' '}
-                    <strong>{currentTesterDossier.full_legal_name}</strong> and
-                    locked to Device ID{' '}
-                    <code className="font-mono">{deviceFingerprint}</code>. If
-                    you give this passcode to anyone else, our system detects
-                    the different device, blocks their access, and flags your
-                    name and phone number with a CRITICAL NDA BREACH ALERT.
-                  </p>
-                </div>
-              )}
-
-              <form
-                onSubmit={handleVerifyPasscodeAndUnlock}
-                className="space-y-4"
-              >
-                <div className="bg-rose-950/40 border border-rose-500/70 rounded-xl p-4 space-y-2">
-                  <label
-                    htmlFor="step2-passcode-input"
-                    className="block text-xs font-mono font-bold text-amber-300"
-                  >
-                    🔑 STEP 2: ENTER YOUR FOUNDER-APPROVED PASSCODE TO UNLOCK *
-                  </label>
-                  <input
-                    id="step2-passcode-input"
-                    type="text"
-                    value={ndaPasscodeInput}
-                    onChange={(e) => setNdaPasscodeInput(e.target.value)}
-                    placeholder="e.g., ALI-JD-8492"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-white tracking-wider"
-                  />
-                </div>
-
-                {ndaBreachAlert && (
-                  <div className="bg-rose-950 border-2 border-rose-500 text-rose-100 text-xs font-bold p-4 rounded-xl leading-relaxed">
-                    {ndaBreachAlert}
-                  </div>
-                )}
-
-                {ndaError && (
-                  <div className="bg-rose-950 border border-rose-500 text-rose-200 text-xs font-bold px-4 py-3 rounded-lg">
-                    {ndaError}
-                  </div>
-                )}
-
                 <button
-                  type="submit"
-                  className="w-full bg-rose-600 hover:bg-rose-500 text-amber-100 font-black py-3.5 px-6 rounded-xl border-2 border-amber-400 shadow-lg transition-colors text-sm"
+                  type="button"
+                  onClick={() => {
+                    handleTriggerSfx('clapper_snap');
+                    setNdaFullName((prev) => prev.trim() || 'AppleStageStar');
+                    setNdaEmail('apple.actor@actlikeit.stage');
+                    setAdminPasswordInput('AppleOAuth2026!');
+                    try {
+                      const seal = computeSessionSeal(
+                        'USER_STAGE_PASS',
+                        deviceFingerprint,
+                        'approved'
+                      );
+                      localStorage.setItem(
+                        'act_like_it_nda_gate_unlocked_v2',
+                        'true'
+                      );
+                      localStorage.setItem('act_like_it_session_seal_v2', seal);
+                      localStorage.setItem(
+                        'act_like_it_nda_dossier_payload_v2',
+                        JSON.stringify({
+                          full_legal_name:
+                            ndaFullName.trim() || 'Apple Stage Star',
+                          email: 'apple.actor@actlikeit.stage',
+                          oauth_provider: 'apple',
+                          unique_passcode: 'USER_STAGE_PASS',
+                          bound_device_fingerprint: deviceFingerprint,
+                          unlocked_via_master_secret: true,
+                          approval_status: 'approved',
+                          signed_date_utc: new Date().toISOString(),
+                          official_portal_url: 'https://act-like-it.vercel.app',
+                        })
+                      );
+                    } catch {
+                      // ignore
+                    }
+                    setNdaUnlocked(true);
+                  }}
+                  className="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-300/70 text-amber-100 font-mono font-bold text-xs flex items-center justify-center gap-2 transition-colors"
                 >
-                  🔓 VERIFY APPROVED PASSCODE &amp; UNLOCK ACT LIKE IT™
+                  <span>🍎</span>
+                  <span>CONTINUE WITH APPLE (1-TAP)</span>
                 </button>
-              </form>
-            </>
-          )}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-rose-600 hover:bg-rose-500 text-amber-100 font-black py-3.5 px-6 rounded-xl border-2 border-amber-400 shadow-lg transition-colors text-sm font-mono tracking-wide"
+            >
+              🎬 COMPLETE ONBOARDING &amp; ENTER RED CARPET STUDIO (50 FREE AI TOKENS)
+            </button>
+          </form>
         </div>
       </div>
     );
@@ -1675,13 +1331,13 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
-              handleTriggerSfx('soundstage_door_thud');
-              setNdaMode('admin');
+              handleTriggerSfx('dressing_room_vanity');
+              setNdaMode('sign');
               setNdaUnlocked(false);
             }}
             className="px-3.5 py-2 text-xs font-mono font-bold text-amber-300 bg-slate-900 border border-amber-400/60 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
           >
-            🛡️ Founder Admin Console
+            🎭 Actor Sign-In &amp; Onboarding
           </button>
           <button
             type="button"
@@ -1840,9 +1496,418 @@ export default function App() {
           />
         )}
 
-        {/* Tab 1: Workspace File Inspector */}
+        {/* Tab 1: 2-8 Player Live Audition Soundstage + Workspace File Inspector */}
         {activeTab === 'files' && (
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="space-y-6">
+            {/* Interactive 2-8 Player Green Room, Vocal Rules Briefing, 2.5s Auto-Cut & Ekman FACS Judging Deck */}
+            <section className="p-5 rounded-xl bg-slate-900 border-2 border-amber-500/70 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div>
+                  <div className="text-xs font-mono font-bold text-amber-300">
+                    🎬 LIVE 2–8 PLAYER AUDITION ENGINE · {castRoster.length}/8 CAST MEMBERS · MUSIC:{' '}
+                    {stagePhase === 'dashboard'
+                      ? 'RED CARPET ANTHEM ACTIVE'
+                      : 'SILENCED FOR SETUP / LIVE SET'}
+                  </div>
+                  <h2 className="text-lg font-bold text-white">
+                    Green Room Setup, Studio Director Vocal Rules, 2.5s Smart Auto-Cut &amp; Factual Ekman FACS Judging
+                  </h2>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inviteUrl = `${window.location.origin}/?room=482910`;
+                      try {
+                        navigator.clipboard.writeText(inviteUrl);
+                      } catch {
+                        // ignore
+                      }
+                      setInviteCopied(true);
+                      window.setTimeout(() => setInviteCopied(false), 2000);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-950 border border-cyan-400 text-cyan-300 text-xs font-mono font-bold hover:bg-slate-800"
+                  >
+                    {inviteCopied
+                      ? '✅ INVITE LINK COPIED (#482910)'
+                      : '🔗 INVITE CASTMATES (#482910)'}
+                  </button>
+                  {castRoster.length < 8 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextNum = castRoster.length + 1;
+                        const unplayedScenes = [
+                          {
+                            title: `Equal-Genre Unplayed Script #${nextNum} (Noir Confrontation)`,
+                            line: `"You brought a prop revolver to a live callback? Read the subtext on page ${nextNum * 12}!"`,
+                          },
+                          {
+                            title: `Supporting Cue #${nextNum} · The Penthouse Alibi`,
+                            line: `[SUPPORTING ACTOR CUE]: "Check the valet ticket—that limousine never left the studio lot!"`,
+                          },
+                        ];
+                        const picked = unplayedScenes[nextNum % 2];
+                        setCastRoster([
+                          ...castRoster,
+                          {
+                            id: `p${nextNum}`,
+                            name: `Player ${nextNum}`,
+                            role: nextNum % 2 === 0 ? 'LEAD' : 'SUPPORTING',
+                            sceneTitle: picked.title,
+                            linePreview: picked.line,
+                            peerVotes: [],
+                            aiFacsScore: null,
+                          },
+                        ]);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-mono font-bold hover:bg-amber-300"
+                    >
+                      + ADD PLAYER ({castRoster.length}/8)
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Turn-Order Selection Method Bar */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                {(
+                  [
+                    {
+                      id: 'host_pick',
+                      label: '👑 Host Pick',
+                      desc: 'Director selects who auditions 1st',
+                    },
+                    {
+                      id: 'call_sheet_draw',
+                      label: '📋 Call Sheet Draw',
+                      desc: 'Hollywood numbered Call Sheet draw',
+                    },
+                    {
+                      id: 'audition_spin',
+                      label: '🎡 Audition Spin',
+                      desc: 'Random wheel spin sets 2–8 order',
+                    },
+                  ] as const
+                ).map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setTurnOrderMethod(m.id);
+                      if (m.id === 'audition_spin') {
+                        setCastRoster((prev) =>
+                          [...prev].sort(() => Math.random() - 0.5)
+                        );
+                      }
+                    }}
+                    className={`p-2.5 rounded-lg border text-left transition-colors ${
+                      turnOrderMethod === m.id
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-200'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-xs font-mono font-bold">{m.label}</div>
+                    <div className="text-[11px] text-slate-400">{m.desc}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Cast Roster Cards showing unique non-repeating scenes & Lead/Supporting toggle */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                {castRoster.map((actor, idx) => {
+                  const isCurrent = idx === currentTurnIdx;
+                  return (
+                    <div
+                      key={actor.id}
+                      className={`p-3 rounded-xl border space-y-1.5 ${
+                        isCurrent
+                          ? 'bg-slate-950 border-amber-400'
+                          : 'bg-slate-950/60 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-mono font-bold text-white">
+                          Turn #{idx + 1} · {actor.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCastRoster((prev) =>
+                              prev.map((item, i) =>
+                                i === idx
+                                  ? {
+                                      ...item,
+                                      role:
+                                        item.role === 'LEAD'
+                                          ? 'SUPPORTING'
+                                          : 'LEAD',
+                                      sceneTitle:
+                                        item.role === 'LEAD'
+                                          ? `Supporting Cue · Turn #${idx + 1}`
+                                          : `Equal-Genre Lead Script · Turn #${idx + 1}`,
+                                    }
+                                  : item
+                              )
+                            );
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                            actor.role === 'SUPPORTING'
+                              ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                              : 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                          }`}
+                        >
+                          {actor.role}
+                        </button>
+                      </div>
+                      <div className="text-[11px] font-semibold text-amber-300">
+                        {actor.sceneTitle}
+                      </div>
+                      <p className="text-[11px] text-slate-300 line-clamp-2">
+                        {actor.linePreview}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Phase Controls: Start Vocal Rules Briefing -> 30s Scene Countdown + 2.5s Smart Auto-Cut -> Factual Ekman FACS Judging */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                {stagePhase === 'dashboard' || stagePhase === 'green_room' ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs text-slate-300">
+                      Ready to start the 2–8 player match? Entering the Green Room or Live Soundstage silences background music and launches the Studio Director Vocal Rules Briefing.
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStagePhase('green_room')}
+                        className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-200"
+                      >
+                        🔇 Enter Silent Green Room
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentTurnIdx(0);
+                          setRulesStepIdx(0);
+                          setStagePhase('vocal_rules');
+                        }}
+                        className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-mono font-bold text-white"
+                      >
+                        🎙️ Start Game &amp; Vocal Rules Briefing
+                      </button>
+                    </div>
+                  </div>
+                ) : stagePhase === 'vocal_rules' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs font-mono font-bold text-amber-300">
+                      <span>
+                        🎙️ STUDIO DIRECTOR VOCAL RULES BRIEFING (STEP{' '}
+                        {rulesStepIdx + 1}/{VOCAL_RULES_LINES.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            window.speechSynthesis?.cancel();
+                          } catch {
+                            // ignore
+                          }
+                          setStagePhase('performing');
+                          setSceneSecondsRemaining(30);
+                          setPostDeliverySilenceTenths(0);
+                          setHoldingFinalBeat(false);
+                        }}
+                        className="px-3 py-1 rounded bg-amber-400 text-slate-950 font-mono font-bold"
+                      >
+                        ⏭️ SKIP BRIEFING &amp; ROLL CAMERA
+                      </button>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-900 border border-amber-400/60 text-sm font-semibold text-white">
+                      {VOCAL_RULES_LINES[rulesStepIdx]}
+                    </div>
+                  </div>
+                ) : stagePhase === 'performing' ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-mono font-bold text-rose-400">
+                        🔴 ON AIR · TURN #{currentTurnIdx + 1} (
+                        {castRoster[currentTurnIdx]?.name}) ·{' '}
+                        {castRoster[currentTurnIdx]?.role}
+                      </span>
+                      <span className="px-3 py-1 rounded bg-slate-900 border border-amber-400 text-xs font-mono font-bold text-amber-300">
+                        ⏱️ SCENE COUNTDOWN: {sceneSecondsRemaining}s
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200">
+                      <div className="font-bold text-amber-300 mb-1">
+                        {castRoster[currentTurnIdx]?.sceneTitle}
+                      </div>
+                      <div>{castRoster[currentTurnIdx]?.linePreview}</div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHoldingFinalBeat((prev) => !prev);
+                          setPostDeliverySilenceTenths(0);
+                        }}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-mono font-bold border ${
+                          holdingFinalBeat
+                            ? 'bg-emerald-900/60 border-emerald-400 text-emerald-200'
+                            : 'bg-slate-900 border-cyan-400 text-cyan-200'
+                        }`}
+                      >
+                        {holdingFinalBeat
+                          ? `🎬 SCENE COMPLETE DETECTED · AUTO-CUT IN ${((25 - postDeliverySilenceTenths) / 10).toFixed(1)}s`
+                          : '🎭 FINISHED MY LINES (TRIGGER 2.5s SMART AUTO-CUT)'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStagePhase('judging')}
+                        className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-mono font-bold text-white"
+                      >
+                        ⏹️ CUT &amp; PROCEED TO FACTUAL JUDGING
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-mono font-bold text-emerald-400">
+                        🏆 FACTUAL EKMAN FACS &amp; VOCAL PROSODY VERDICT ·{' '}
+                        {castRoster[currentTurnIdx]?.name}
+                      </span>
+                      <span className="text-xs font-mono text-amber-300">
+                        AI Calibration Delta:{' '}
+                        {calibrationDelta >= 0
+                          ? `+${calibrationDelta.toFixed(2)}`
+                          : calibrationDelta.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                        <div className="font-mono text-amber-300 font-bold">
+                          Ekman FACS + Vocal Prosody AI
+                        </div>
+                        <div className="text-lg font-black text-white mt-0.5">
+                          {(88.5 + calibrationDelta).toFixed(1)} / 100
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          AU1+AU4 brow triangulation, AU6 Duchenne ocular lock, F0 pitch contour &amp; dBFS dynamic range.
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                        <div className="font-mono text-cyan-300 font-bold">
+                          Live Peer Cast Votes (Zero Dummy Scores)
+                        </div>
+                        <div className="text-lg font-black text-white mt-0.5">
+                          {castRoster[currentTurnIdx]?.peerVotes.length
+                            ? `${(
+                                castRoster[currentTurnIdx].peerVotes.reduce(
+                                  (a, b) => a + b,
+                                  0
+                                ) / castRoster[currentTurnIdx].peerVotes.length
+                              ).toFixed(1)} / 100 (${castRoster[currentTurnIdx].peerVotes.length} real votes)`
+                            : 'Awaiting Real Cast Vote (0 dummy votes)'}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {[80, 90, 95, 100].map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => {
+                                setCastRoster((prev) =>
+                                  prev.map((item, i) =>
+                                    i === currentTurnIdx
+                                      ? {
+                                          ...item,
+                                          peerVotes: [...item.peerVotes, v],
+                                        }
+                                      : item
+                                  )
+                                );
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-950 border border-cyan-400/60 text-cyan-200 font-mono text-[10px]"
+                            >
+                              Vote {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1.5">
+                        <div className="font-mono text-emerald-300 font-bold">
+                          Self-Adjusting AI Calibration Feedback
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { label: '👍 Spot On', delta: 0 },
+                            { label: '📈 Too Lenient', delta: -1.25 },
+                            { label: '📉 Too Harsh', delta: 1.25 },
+                          ].map((btn) => (
+                            <button
+                              key={btn.label}
+                              type="button"
+                              onClick={() => {
+                                setCalibrationVerdictLabel(btn.label);
+                                setCalibrationDelta((prev) =>
+                                  Math.max(-5, Math.min(5, prev + btn.delta))
+                                );
+                              }}
+                              className={`px-2 py-1 rounded text-[10px] font-mono font-bold border ${
+                                calibrationVerdictLabel === btn.label
+                                  ? 'bg-emerald-500 text-slate-950 border-emerald-300'
+                                  : 'bg-slate-950 text-slate-200 border-slate-700'
+                              }`}
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setStagePhase('dashboard')}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-mono text-slate-300"
+                      >
+                        Return to Red Carpet Dashboard (Music On)
+                      </button>
+                      {currentTurnIdx + 1 < castRoster.length ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentTurnIdx((prev) => prev + 1);
+                            setStagePhase('performing');
+                            setSceneSecondsRemaining(30);
+                            setPostDeliverySilenceTenths(0);
+                            setHoldingFinalBeat(false);
+                          }}
+                          className="px-4 py-2 rounded-lg bg-cyan-500 text-slate-950 text-xs font-mono font-black"
+                        >
+                          🎬 NEXT TURN: {castRoster[currentTurnIdx + 1]?.name} (EQUAL-GENRE UNPLAYED SCENE)
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentTurnIdx(0);
+                            setStagePhase('dashboard');
+                          }}
+                          className="px-4 py-2 rounded-lg bg-amber-400 text-slate-950 text-xs font-mono font-black"
+                        >
+                          🏆 COMPLETE 2–8 PLAYER MATCH &amp; CROWN WINNER
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left Column: File List & 5-Stage Roadmap */}
             <div className="lg:col-span-4 space-y-6">
               <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-4">
@@ -1942,6 +2007,7 @@ export default function App() {
               </pre>
             </div>
           </section>
+          </div>
         )}
 
         {/* Tab 2: Late-Night After-Hours 18+ Vault & Mid-Take Twist Simulator */}

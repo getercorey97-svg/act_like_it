@@ -7,13 +7,18 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'game_settings_modal.dart';
 
-/// The 5 distinct themed audio zones across ACT LIKE IT™.
+/// The 7 distinct themed audio zones across ACT LIKE IT™.
+/// Note: `greenRoomLobby` (Setup Room) and `liveSoundstage` (Active Game Room)
+/// strictly silence background music so actors and live voice/video streams
+/// have 100% clean studio acoustics.
 enum SoundstageZone {
   premiereEntrance,
   castingSignUpSet,
   redCarpetDashboard,
   starDressingRoom,
   afterHoursVault,
+  greenRoomLobby,
+  liveSoundstage,
 }
 
 /// The 8 bespoke theme-related interactive click & foley SFX.
@@ -37,6 +42,11 @@ class SoundstageWaveSynthesizer {
   static final Map<SoundstageSfx, Uint8List> _sfxCache =
       <SoundstageSfx, Uint8List>{};
 
+  static bool isSilentGameZone(SoundstageZone zone) {
+    return zone == SoundstageZone.greenRoomLobby ||
+        zone == SoundstageZone.liveSoundstage;
+  }
+
   static String zoneTitle(SoundstageZone zone) {
     switch (zone) {
       case SoundstageZone.premiereEntrance:
@@ -49,6 +59,10 @@ class SoundstageWaveSynthesizer {
         return 'STAR DRESSING ROOM & VANITY LOUNGE';
       case SoundstageZone.afterHoursVault:
         return 'AFTER-HOURS 18+ VELVET NOIR';
+      case SoundstageZone.greenRoomLobby:
+        return 'GREEN ROOM CALL SHEET (QUIET SET — NO BGM)';
+      case SoundstageZone.liveSoundstage:
+        return 'LIVE SOUNDSTAGE ON-AIR (QUIET SET — NO BGM)';
     }
   }
 
@@ -59,11 +73,15 @@ class SoundstageWaveSynthesizer {
       case SoundstageZone.castingSignUpSet:
         return 'Backstage film-set groove, call-sheet clipboard stamp & stage dimmer clicks';
       case SoundstageZone.redCarpetDashboard:
-        return 'Inspiring superstar premiere anthem + live paparazzi DSLR shutters & flashbulbs';
+        return 'Inspiring superstar premiere anthem + live paparazzi DSLR crowd shutters & flashbulbs';
       case SoundstageZone.starDressingRoom:
         return 'Warm neo-soul green-room Rhodes, vanity mirror bulb pings & wardrobe rack foley';
       case SoundstageZone.afterHoursVault:
         return 'Midnight speakeasy Rhodes, upright bass pulse & steel vault lock tumblers';
+      case SoundstageZone.greenRoomLobby:
+        return 'Background music silenced for Green Room setup, turn draw & voice check';
+      case SoundstageZone.liveSoundstage:
+        return 'Background music silenced for live acting, director cues & vocal telemetry';
     }
   }
 
@@ -76,6 +94,11 @@ class SoundstageWaveSynthesizer {
     const int durationSec = 8;
     const int numSamples = sampleRate * durationSec;
     final Int16List samples = Int16List(numSamples);
+    if (isSilentGameZone(zone)) {
+      final Uint8List silentWav = _encodePcm16MonoWav(samples, sampleRate);
+      _zoneMusicCache[zone] = silentWav;
+      return silentWav;
+    }
     final math.Random rng = math.Random(zone.index + 101);
 
     late final List<List<double>> chords;
@@ -169,6 +192,8 @@ class SoundstageWaveSynthesizer {
         break;
 
       case SoundstageZone.afterHoursVault:
+      case SoundstageZone.greenRoomLobby:
+      case SoundstageZone.liveSoundstage:
         bpm = 88.0;
         chords = const <List<double>>[
           <double>[261.63, 311.13, 392.00, 466.16, 587.33], // Cm11
@@ -268,34 +293,62 @@ class SoundstageWaveSynthesizer {
 
     switch (sfx) {
       case SoundstageSfx.paparazziShutterFlash:
-        // Soft 35ms mechanical DSLR shutter click + warm low-pass ambient lounge chords (zero high-pitched whine)
-        const double dur = 0.64;
+        // Authentic Multi-Photographer DSLR Press Line Burst:
+        // 5 staggered camera shutters (0.00s, 0.065s, 0.14s, 0.23s, 0.31s)
+        // combining 1st-curtain release + reflex mirror slap (175-390Hz) +
+        // 2nd-curtain titanium snap (1850-3400Hz) + xenon flash discharge pop
+        const double dur = 0.68;
         final int count = (sampleRate * dur).round();
         samples = Int16List(count);
+        const List<double> shutterOffsets = <double>[
+          0.00,
+          0.065,
+          0.140,
+          0.230,
+          0.310,
+        ];
+        const List<double> pitchScales = <double>[
+          1.00,
+          0.94,
+          1.07,
+          0.97,
+          1.04,
+        ];
         for (int i = 0; i < count; i++) {
           final double t = i / sampleRate;
-          // Warm low-pass velvet lounge chord (A3 220Hz + C#4 277.18Hz + E4 329.63Hz)
-          double sig = (math.sin(2.0 * math.pi * 220.0 * t) * 0.14 +
-                  math.sin(2.0 * math.pi * 277.18 * t) * 0.11 +
-                  math.sin(2.0 * math.pi * 329.63 * t) * 0.09) *
-              math.exp(-t * 3.4);
+          double sig = 0.0;
 
-          // 3 soft 35ms mechanical DSLR shutter clicks at 0.00s, 0.11s, 0.22s
-          for (final double offset in const <double>[0.0, 0.11, 0.22]) {
-            if (t >= offset && t < offset + 0.035) {
+          for (int c = 0; c < shutterOffsets.length; c++) {
+            final double offset = shutterOffsets[c];
+            final double pScale = pitchScales[c];
+            // 1st curtain + mirror up
+            if (t >= offset && t < offset + 0.028) {
               final double dt = t - offset;
-              final double clickEnv = math.exp(-dt * 95.0);
-              final double mirrorBody =
-                  math.sin(2.0 * math.pi * 168.0 * dt) * 0.46;
-              final double leafClick =
-                  math.sin(2.0 * math.pi * 590.0 * dt) * 0.22;
-              final double shutterCurtain =
-                  (rng.nextDouble() * 2.0 - 1.0) * 0.20;
-              sig += (mirrorBody + leafClick + shutterCurtain) * clickEnv;
+              final double env = math.exp(-dt * 125.0);
+              final double mirrorUp =
+                  math.sin(2.0 * math.pi * (210.0 * pScale) * dt) * 0.44;
+              final double bladeRelease =
+                  math.sin(2.0 * math.pi * (1980.0 * pScale) * dt) * 0.28;
+              final double mechTransient =
+                  (rng.nextDouble() * 2.0 - 1.0) * 0.34;
+              sig += (mirrorUp + bladeRelease + mechTransient) * env;
+            }
+            // 2nd curtain + mirror return slap (+18ms later)
+            final double returnOffset = offset + 0.018;
+            if (t >= returnOffset && t < returnOffset + 0.032) {
+              final double dt = t - returnOffset;
+              final double env = math.exp(-dt * 110.0);
+              final double mirrorDown =
+                  math.sin(2.0 * math.pi * (162.0 * pScale) * dt) * 0.50;
+              final double titaniumSnap =
+                  math.sin(2.0 * math.pi * (2640.0 * pScale) * dt) * 0.24;
+              final double curtainNoise =
+                  (rng.nextDouble() * 2.0 - 1.0) * 0.28;
+              sig += (mirrorDown + titaniumSnap + curtainNoise) * env;
             }
           }
 
-          samples[i] = (sig.clamp(-0.85, 0.85) * 32767.0).round();
+          samples[i] = (sig.clamp(-0.88, 0.88) * 32767.0).round();
         }
         break;
 
@@ -469,6 +522,8 @@ class SoundstageWaveSynthesizer {
 /// bursts & dressing room ambience, and unique prop click SFX with persistent
 /// user toggles accessible from the Sign-In/Sign-Up menu, Dressing Room,
 /// Red Carpet Dashboard, and Settings Modal.
+/// Strictly silences background music in the Green Room Setup (`greenRoomLobby`)
+/// and Live Soundstage (`liveSoundstage`).
 class SoundstageAudioController extends ChangeNotifier {
   static final SoundstageAudioController instance =
       SoundstageAudioController._internal();
@@ -484,6 +539,10 @@ class SoundstageAudioController extends ChangeNotifier {
   final AudioPlayer _musicPlayer = AudioPlayer();
   final AudioPlayer _sfxPlayer = AudioPlayer();
   final AudioPlayer _ambiencePlayer = AudioPlayer();
+  final List<AudioPlayer> _paparazziCrowdPlayers = List<AudioPlayer>.generate(
+    3,
+    (_) => AudioPlayer(),
+  );
 
   Timer? _ambienceLoopTimer;
   SoundstageZone _activeZone = SoundstageZone.castingSignUpSet;
@@ -532,15 +591,32 @@ class SoundstageAudioController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Strictly stops background music and ambient loops when entering the
+  /// Green Room Setup (`greenRoomLobby`) or Live Soundstage (`liveSoundstage`).
+  Future<void> silenceMusicForSetupOrGameRoom({
+    bool isLiveSoundstage = false,
+  }) async {
+    await enterZone(
+      isLiveSoundstage
+          ? SoundstageZone.liveSoundstage
+          : SoundstageZone.greenRoomLobby,
+    );
+  }
+
   Future<void> enterZone(SoundstageZone zone, {bool forceRestart = false}) async {
     await ensureInitialized();
     final bool zoneChanged = _activeZone != zone;
     _activeZone = zone;
     notifyListeners();
 
-    if (!_masterEnabled || !_musicEnabled || _masterVolume <= 0.0) {
+    // STRICT REQUIREMENT: No background music in the Setup Room (Green Room) or Game Room (Live Soundstage)
+    if (SoundstageWaveSynthesizer.isSilentGameZone(zone) ||
+        !_masterEnabled ||
+        !_musicEnabled ||
+        _masterVolume <= 0.0) {
       try {
-        await _musicPlayer.pause();
+        await _musicPlayer.stop();
+        await _ambiencePlayer.stop();
       } catch (_) {}
       return;
     }
@@ -561,7 +637,10 @@ class SoundstageAudioController extends ChangeNotifier {
     _ambienceLoopTimer = Timer.periodic(
       const Duration(milliseconds: 3800),
       (_) {
-        if (!_masterEnabled || !_paparazziAmbienceEnabled || _masterVolume <= 0) {
+        if (!_masterEnabled ||
+            !_paparazziAmbienceEnabled ||
+            _masterVolume <= 0 ||
+            SoundstageWaveSynthesizer.isSilentGameZone(_activeZone)) {
           return;
         }
         switch (_activeZone) {
@@ -599,9 +678,29 @@ class SoundstageAudioController extends ChangeNotifier {
               ),
             );
             break;
+          case SoundstageZone.greenRoomLobby:
+          case SoundstageZone.liveSoundstage:
+            break;
         }
       },
     );
+  }
+
+  Future<void> _playLayeredPaparazziCrowdAsset(double baseVolume) async {
+    const List<int> delaysMs = <int>[0, 75, 165];
+    const List<double> rates = <double>[1.0, 0.94, 1.06];
+    for (int i = 0; i < _paparazziCrowdPlayers.length; i++) {
+      final int delay = delaysMs[i];
+      final double rate = rates[i];
+      final AudioPlayer player = _paparazziCrowdPlayers[i];
+      Future<void>.delayed(Duration(milliseconds: delay), () async {
+        try {
+          await player.setVolume((baseVolume * (0.92 - i * 0.14)).clamp(0.0, 1.0));
+          await player.setPlaybackRate(rate);
+          await player.play(AssetSource('audio/camclick.mp3'));
+        } catch (_) {}
+      });
+    }
   }
 
   Future<void> playSfx(
@@ -616,9 +715,12 @@ class SoundstageAudioController extends ChangeNotifier {
       final AudioPlayer targetPlayer =
           isAmbientLayer ? _ambiencePlayer : _sfxPlayer;
       final double vol = isAmbientLayer
-          ? (_masterVolume * 0.42).clamp(0.0, 1.0)
-          : (_masterVolume * 0.78).clamp(0.0, 1.0);
+          ? (_masterVolume * 0.46).clamp(0.0, 1.0)
+          : (_masterVolume * 0.82).clamp(0.0, 1.0);
       await targetPlayer.setVolume(vol);
+      if (sfx == SoundstageSfx.paparazziShutterFlash) {
+        unawaited(_playLayeredPaparazziCrowdAsset(vol));
+      }
       final Uint8List wavBytes = SoundstageWaveSynthesizer.buildSfxWav(sfx);
       await targetPlayer.play(BytesSource(wavBytes));
     } catch (_) {}

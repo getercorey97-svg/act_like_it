@@ -18,6 +18,7 @@ import 'ui/premiere_red_carpet_painters.dart';
 import 'ui/parody_scenes_catalog.dart';
 import 'ui/boondocks_character_rig.dart';
 import 'ui/living_25d_animation_engine.dart';
+import 'ui/soundstage_audio_controller.dart';
 import 'auth/auth_service.dart';
 import 'auth/onboarding_flow.dart';
 
@@ -168,6 +169,9 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   void _triggerPaparazziFrenzy() {
     HapticFeedback.heavyImpact();
     _frenzyBurstController.forward(from: 0.0);
+    SoundstageAudioController.instance.playCue(
+      SoundstageAudioCue.paparazziShutterFlash,
+    );
   }
 
   @override
@@ -180,6 +184,16 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   }
 
   void _onLobbyStateChanged() {
+    if (_lobbyManager.session != null) {
+      // Strictly silence background music upon entering the Setup / Green Room
+      SoundstageAudioController.instance.silenceMusicForSetupOrGameRoom(
+        isLiveSoundstage: false,
+      );
+    } else {
+      SoundstageAudioController.instance.enterMusicZone(
+        SoundstageMusicZone.redCarpetDashboard,
+      );
+    }
     if (mounted) {
       setState(() {});
     }
@@ -1475,10 +1489,28 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () {
+                          SoundstageAudioController.instance
+                              .silenceMusicForSetupOrGameRoom(
+                            isLiveSoundstage: true,
+                          );
+                          if (_lobbyManager.players.length < 2) {
+                            _lobbyManager.addAiCoStar();
+                          }
+                          final currentPlayers = _lobbyManager.players;
+                          final firstActor = currentPlayers.isNotEmpty
+                              ? currentPlayers.first
+                              : null;
+                          final initialScene = session.activeScene;
                           final syncedSession = session.copyWith(
-                            players: players,
+                            players: currentPlayers,
                             currentPlayerIndex: 0,
-                            totalLocalPlayers: math.max(1, players.length),
+                            totalLocalPlayers:
+                                math.max(2, currentPlayers.length),
+                            activeActorId:
+                                firstActor?.userId ?? session.activeActorId,
+                            usedSceneIdsInMatch: initialScene != null
+                                ? <String>[initialScene.id]
+                                : const <String>[],
                           );
                           Navigator.of(context).push(
                             StageSharedTransitionRoute(
@@ -1606,6 +1638,93 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                 ],
               ),
               const SizedBox(height: 10),
+              // 2-8 Player Audition Turn-Order Method Selector (Host Pick, Call Sheet Draw, Audition Spin)
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A0F1D),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '🎬 AUDITION TURN-ORDER METHOD (2–8 PLAYERS)',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          session.turnSelectionMethod.label.toUpperCase(),
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0CB6D4),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${session.turnSelectionMethod.subtitle} · Players 2–8 receive equal-genre unplayed scripts (never repeating Player 1).',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: TurnSelectionMethod.values.map((method) {
+                        final selected = session.turnSelectionMethod == method;
+                        return ChoiceChip(
+                          selected: selected,
+                          selectedColor: const Color(0x33F59E0B),
+                          backgroundColor: const Color(0xFF121722),
+                          side: BorderSide(
+                            color: selected
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF334155),
+                          ),
+                          label: Text(
+                            method == TurnSelectionMethod.hostPick
+                                ? '👑 Host Pick'
+                                : (method == TurnSelectionMethod.callSheetDraw
+                                    ? '📋 Call Sheet Draw'
+                                    : '🎡 Audition Spin'),
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: selected
+                                  ? const Color(0xFFFDE68A)
+                                  : Colors.white70,
+                            ),
+                          ),
+                          onSelected: (_) {
+                            HapticFeedback.selectionClick();
+                            _lobbyManager.setTurnSelectionMethod(method);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
               ...players.asMap().entries.map(
                 (entry) {
                   final slotIndex = entry.key;
@@ -1669,28 +1788,85 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                       title: Text(
                         isGenericPassAndPlaySlot
                             ? '${player.displayName} (Tap to Select Local Actor)'
-                            : player.displayName,
+                            : 'Turn #${slotIndex + 1} · ${player.displayName}',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
                         isGenericPassAndPlaySlot
                             ? 'Couch Pass & Play Slot · Tap to open LocalCastRosterBottomSheet'
-                            : '${player.isHost ? 'Executive Producer' : 'Featured Ensemble Cast'} · ${playerArchetype.name}',
+                            : '${player.isSupportingRole ? 'Supporting Actor Cue' : (player.isHost ? 'Executive Producer (Lead)' : 'Featured Ensemble (Lead)')} · ${playerArchetype.name}',
                         style: TextStyle(
                           fontSize: 12,
                           color: isGenericPassAndPlaySlot
                               ? const Color(0xFF00E5FF)
-                              : const Color(0xFF94A3B8),
+                              : (player.isSupportingRole
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFF94A3B8)),
                         ),
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      trailing: Wrap(
+                        spacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
+                          InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              _lobbyManager
+                                  .togglePlayerSupportingRole(player.userId);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: player.isSupportingRole
+                                    ? const Color(0x33F59E0B)
+                                    : const Color(0x220CB6D4),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: player.isSupportingRole
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF0CB6D4),
+                                ),
+                              ),
+                              child: Text(
+                                player.isSupportingRole
+                                    ? 'SUPPORTING'
+                                    : 'LEAD',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: player.isSupportingRole
+                                      ? const Color(0xFFFDE68A)
+                                      : const Color(0xFF0CB6D4),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (session.turnSelectionMethod ==
+                                  TurnSelectionMethod.hostPick &&
+                              slotIndex > 0)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.vertical_align_top_rounded,
+                                size: 16,
+                                color: Color(0xFFF59E0B),
+                              ),
+                              tooltip: 'Host Pick: Set as 1st Audition',
+                              onPressed: () {
+                                HapticFeedback.selectionClick();
+                                _lobbyManager
+                                    .promotePlayerToFirstTurn(player.userId);
+                              },
+                            ),
                           Text(
                             player.isReady ? 'ON SET' : 'STANDBY',
                             style: TextStyle(
                               fontFamily: 'monospace',
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: player.isReady
                                   ? const Color(0xFF10B981)
@@ -1698,7 +1874,6 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
                             ),
                           ),
                           if (player.userId != _lobbyManager.localUserId) ...[
-                            const SizedBox(width: 4),
                             IconButton(
                               icon: const Icon(
                                 Icons.flag_outlined,

@@ -621,6 +621,80 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// One-Tap Social OAuth Sign-In (`google` or `apple`).
+  /// Uses Supabase `signInWithOAuth` when cloud credentials are configured,
+  /// and hydrates/creates a persistent ActorProfileState with 50 starter AI tokens.
+  Future<ActorProfileState> signInWithSocialOAuthProvider({
+    required String provider,
+    String? preferredUsername,
+    String? avatarArchetypeId,
+    int? birthYear,
+  }) async {
+    final normProvider = provider.trim().toLowerCase();
+    _setLoading(true);
+    _lastError = null;
+
+    try {
+      if (AppConfig.hasCloudSupabase) {
+        final client = Supabase.instance.client;
+        final oauthProvider = normProvider == 'apple'
+            ? OAuthProvider.apple
+            : OAuthProvider.google;
+        try {
+          await client.auth.signInWithOAuth(
+            oauthProvider,
+            redirectTo: kIsWeb ? null : 'io.supabase.actlikeit://login-callback/',
+          );
+        } catch (e) {
+          debugPrint('Supabase OAuth redirect notice ($normProvider): $e');
+        }
+        final activeUser = client.auth.currentUser;
+        if (activeUser != null) {
+          return await fetchAndHydrateProfile(
+            userId: activeUser.id,
+            email: activeUser.email ?? '$normProvider.star@actlikeit.stage',
+          );
+        }
+      }
+
+      final handle = (preferredUsername ?? '').trim().isNotEmpty
+          ? preferredUsername!.trim()
+          : (normProvider == 'apple' ? 'AppleStageStar' : 'GoogleStageStar');
+      final socialEmail =
+          '${handle.toLowerCase().replaceAll(' ', '.')}@$normProvider.actlikeit.stage';
+      final userId = _deterministicUserIdForEmail(socialEmail);
+      final existing = await _readLocalProfile(userId);
+      final profile = (existing ??
+              ActorProfileState(
+                userId: userId,
+                email: socialEmail,
+                username: handle,
+                birthYear: (birthYear ?? 1998).clamp(1920, DateTime.now().year),
+                favoriteEras: const <String>['1970–1999', '2000–2026'],
+                actingStrengths: const <String>['Method Drama', 'Improv Comedy'],
+                aiTokenBalance: kDefaultStarterAiTokens,
+                unlockedScenePacks: const <String>[],
+                onboardingCompleted: true,
+                avatarArchetypeId: avatarArchetypeId ?? _cachedSelectedAvatarId,
+                castingTrack: 'social_oauth_$normProvider',
+                updatedAt: DateTime.now().toUtc(),
+              ))
+          .copyWith(
+        avatarArchetypeId: avatarArchetypeId ?? existing?.avatarArchetypeId,
+        onboardingCompleted: true,
+        updatedAt: DateTime.now().toUtc(),
+      );
+
+      await persistProfileToSupabaseAndCache(profile);
+      return profile;
+    } catch (e) {
+      _lastError = _humanizeAuthError(e);
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<ActorProfileState> signUpWithEmailAndPassword({
     required String email,
     required String password,

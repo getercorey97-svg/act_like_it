@@ -102,6 +102,46 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
+    // Allow Founder Admin (admin88 / Cg0167853!8808) to sign in directly from User Sign-In
+    if (!_isSignUpMode &&
+        OfficialClosedAlphaNdaGateWrapper.verifyFounderAdminCredentials(
+          email,
+          password,
+        )) {
+      HapticFeedback.heavyImpact();
+      unawaited(
+        SoundstageAudioController.instance.playSfx(
+          SoundstageSfx.clapperSnap,
+        ),
+      );
+      setState(() {
+        _isSubmitting = true;
+        _statusMessage = null;
+      });
+      try {
+        await AuthService.instance.setFounderAdminStatus(true);
+        await AuthService.instance.saveOnboardingQuestionnaire(
+          username: 'Founder_Corey_Geter',
+          birthYear: 1997,
+          favoriteEras: const <String>['1970–1999', '2000–2026'],
+          actingStrengths: const <String>['Method Drama', 'Improv Comedy'],
+          avatarArchetypeId: _selectedArchetypeId,
+          castingTrack: 'founder_admin',
+        );
+        if (!mounted) return;
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const LivingMarqueeDashboardScreen(),
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+        }
+      }
+      return;
+    }
+
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
         _statusMessage = 'Please enter a valid stage email address.';
@@ -430,6 +470,138 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
     );
   }
 
+  Future<void> _handleOneTapSocialSignIn(String provider) async {
+    if (_isSubmitting) return;
+    HapticFeedback.mediumImpact();
+    unawaited(
+      SoundstageAudioController.instance.playSfx(
+        SoundstageSfx.clapperSnap,
+      ),
+    );
+    setState(() {
+      _isSubmitting = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final profile = await AuthService.instance.signInWithSocialOAuthProvider(
+        provider: provider,
+        preferredUsername: _usernameController.text.trim(),
+        avatarArchetypeId: _selectedArchetypeId,
+        birthYear: _birthYear,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF0B0E17),
+          content: Text(
+            'Signed in via ${provider.toUpperCase()} as ${profile.username} · ${profile.aiTokenBalance} AI Tokens ready!',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const LivingMarqueeDashboardScreen(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = _formatFriendlyAuthError(e);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildOneTapSocialAuthRow() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          '1-TAP PREMIERE SOCIAL SIGN-IN',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 10.5,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.0,
+            color: Color(0xFFFDE68A),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0B0E17),
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFF06B6D4), width: 1.6),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+                onPressed: _isSubmitting
+                    ? null
+                    : () => _handleOneTapSocialSignIn('google'),
+                icon: const Icon(
+                  Icons.g_mobiledata_rounded,
+                  size: 22,
+                  color: Color(0xFF38BDF8),
+                ),
+                label: const Text(
+                  'GOOGLE 1-TAP',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0B0E17),
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.6),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+                onPressed: _isSubmitting
+                    ? null
+                    : () => _handleOneTapSocialSignIn('apple'),
+                icon: const Icon(
+                  Icons.apple_rounded,
+                  size: 19,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  'APPLE 1-TAP',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildAuthCard() {
     final currentYear = DateTime.now().year;
 
@@ -463,6 +635,8 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildOneTapSocialAuthRow(),
+          const SizedBox(height: 14),
           // Dual-Track Selector: Track A (Claim Your Star) vs Track B (Sneak Backstage)
           Row(
             children: [
@@ -520,7 +694,7 @@ class _LivingMarqueeLoginScreenState extends State<LivingMarqueeLoginScreen>
               onPressed: _isSubmitting ? null : _handleTrackBSneakBackstage,
               icon: const Icon(Icons.bolt_rounded),
               label: const Text(
-                '1-TAP QUICK TESTER PROFILE (50 FREE AI TOKENS)',
+                '1-TAP EXPRESS GUEST PASS (50 FREE AI TOKENS)',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 11.5,

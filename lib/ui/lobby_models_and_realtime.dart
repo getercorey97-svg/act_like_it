@@ -272,11 +272,41 @@ class ScenePrompt {
       };
 }
 
-/// Built-in Scene Vaults with all 90 Original Copyright-Safe Parody Scripts (9 categories × 10 scenes)
+/// Built-in Scene Vaults with all 180 Original Copyright-Safe Parody Scripts (9 categories × 20 scenes)
 /// so the APK and Web app work 100% offline or online on the S26 Ultra.
-/// The 10 adult scenes (`is_18_plus: true`) live in `kLateNightAfterHoursScenes`.
-const Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault =
+/// The 70 adult scenes (`is_18_plus: true`) live in `kLateNightAfterHoursScenes`.
+final Map<SceneCategory, List<ScenePrompt>> kBuiltInSceneVault =
     kParodyGeneralScenesByCategory;
+
+enum TurnSelectionMethod {
+  hostPick(
+    'host_pick',
+    'Host Pick',
+    'Host / Director chooses who auditions first',
+  ),
+  callSheetDraw(
+    'call_sheet_draw',
+    'Call Sheet Draw',
+    'Hollywood numbered Call Sheet draw sets 2-8 turn order',
+  ),
+  auditionSpin(
+    'audition_spin',
+    'Audition Spin',
+    'Random casting wheel spin selects the audition order',
+  );
+
+  final String key;
+  final String label;
+  final String subtitle;
+  const TurnSelectionMethod(this.key, this.label, this.subtitle);
+
+  static TurnSelectionMethod fromKey(String? raw) {
+    for (final m in TurnSelectionMethod.values) {
+      if (m.key == raw) return m;
+    }
+    return TurnSelectionMethod.callSheetDraw;
+  }
+}
 
 typedef LobbyParticipant = LobbyPlayer;
 
@@ -288,6 +318,7 @@ class LobbyPlayer {
   final String avatarArchetypeId;
   final bool isHost;
   final bool isReady;
+  final bool isSupportingRole;
   final double aiTelemetricsScore;
   final double peerScore;
   final double socialScore;
@@ -300,6 +331,7 @@ class LobbyPlayer {
     this.avatarArchetypeId = 'the_method_actor',
     required this.isHost,
     required this.isReady,
+    this.isSupportingRole = false,
     this.aiTelemetricsScore = 0,
     this.peerScore = 0,
     this.socialScore = 0,
@@ -312,6 +344,7 @@ class LobbyPlayer {
     String? displayName,
     String? avatarArchetypeId,
     bool? isReady,
+    bool? isSupportingRole,
     double? aiTelemetricsScore,
     double? peerScore,
     double? socialScore,
@@ -324,6 +357,7 @@ class LobbyPlayer {
       avatarArchetypeId: avatarArchetypeId ?? this.avatarArchetypeId,
       isHost: isHost,
       isReady: isReady ?? this.isReady,
+      isSupportingRole: isSupportingRole ?? this.isSupportingRole,
       aiTelemetricsScore: aiTelemetricsScore ?? this.aiTelemetricsScore,
       peerScore: peerScore ?? this.peerScore,
       socialScore: socialScore ?? this.socialScore,
@@ -360,6 +394,7 @@ class LobbyPlayer {
       avatarArchetypeId: resolvedAvatarId,
       isHost: resolvedIsHost,
       isReady: json['is_ready'] == true,
+      isSupportingRole: json['is_supporting_role'] == true,
       aiTelemetricsScore:
           (json['ai_telemetrics_score'] as num?)?.toDouble() ?? 0,
       peerScore: (json['peer_score'] as num?)?.toDouble() ?? 0,
@@ -383,6 +418,8 @@ class LobbySession {
   final List<LobbyPlayer> players;
   final int currentPlayerIndex;
   final int totalLocalPlayers;
+  final TurnSelectionMethod turnSelectionMethod;
+  final List<String> usedSceneIdsInMatch;
 
   const LobbySession({
     required this.id,
@@ -399,6 +436,8 @@ class LobbySession {
     this.players = const <LobbyPlayer>[],
     this.currentPlayerIndex = 0,
     this.totalLocalPlayers = 1,
+    this.turnSelectionMethod = TurnSelectionMethod.callSheetDraw,
+    this.usedSceneIdsInMatch = const <String>[],
   });
 
   LobbySession copyWith({
@@ -411,6 +450,8 @@ class LobbySession {
     List<LobbyPlayer>? players,
     int? currentPlayerIndex,
     int? totalLocalPlayers,
+    TurnSelectionMethod? turnSelectionMethod,
+    List<String>? usedSceneIdsInMatch,
   }) {
     final nextPlayers = players ?? this.players;
     return LobbySession(
@@ -429,6 +470,49 @@ class LobbySession {
       currentPlayerIndex: currentPlayerIndex ?? this.currentPlayerIndex,
       totalLocalPlayers: totalLocalPlayers ??
           (nextPlayers.isNotEmpty ? nextPlayers.length : this.totalLocalPlayers),
+      turnSelectionMethod: turnSelectionMethod ?? this.turnSelectionMethod,
+      usedSceneIdsInMatch: usedSceneIdsInMatch ?? this.usedSceneIdsInMatch,
+    );
+  }
+
+  /// Advances the session to [targetPlayerIndex] (0..7) and assigns a non-repeating
+  /// scene of equal genre, difficulty, and acting method (or a Supporting Actor cue
+  /// if that cast member is designated as a Supporting Actor/Actress).
+  LobbySession advanceToPlayerTurn(int targetPlayerIndex) {
+    final safePlayers = players;
+    final clampedIndex = safePlayers.isEmpty
+        ? 0
+        : targetPlayerIndex.clamp(0, safePlayers.length - 1);
+    final nextPlayer =
+        safePlayers.isNotEmpty ? safePlayers[clampedIndex] : null;
+    final reference = activeScene ??
+        (kBuiltInSceneVault[selectedCategory]?.first ??
+            kBuiltInSceneVault[SceneCategory.era1970To1999]!.first);
+    final updatedUsed = <String>{
+      ...usedSceneIdsInMatch,
+      reference.id,
+    };
+
+    final bool isSupporting = nextPlayer?.isSupportingRole == true ||
+        selectedCategory == SceneCategory.bestSupportingActor;
+
+    final ScenePrompt nextScene = clampedIndex == 0 && !isSupporting
+        ? reference
+        : selectEqualGenreUnplayedScene(
+            category: selectedCategory,
+            referenceScene: reference,
+            usedSceneIds: updatedUsed,
+            playerIndex: clampedIndex,
+            isSupportingActorRole: isSupporting,
+          );
+
+    updatedUsed.add(nextScene.id);
+
+    return copyWith(
+      currentPlayerIndex: clampedIndex,
+      activeActorId: nextPlayer?.userId ?? activeActorId,
+      activeScene: nextScene,
+      usedSceneIdsInMatch: updatedUsed.toList(growable: false),
     );
   }
 
@@ -453,6 +537,8 @@ class LobbySession {
         ? SceneCategory.fromKey(rawCategory)
         : (fallbackCategory ?? SceneCategory.era1970To1999);
 
+    final rawTurnMethod = json['turn_selection_method']?.toString();
+
     return LobbySession(
       id: json['id']?.toString() ?? '',
       roomCode: roomCode,
@@ -474,6 +560,7 @@ class LobbySession {
       totalLocalPlayers: players.isNotEmpty
           ? players.length
           : ((json['total_local_players'] as num?)?.toInt() ?? 1),
+      turnSelectionMethod: TurnSelectionMethod.fromKey(rawTurnMethod),
     );
   }
 }
@@ -1036,6 +1123,64 @@ class LobbyRealtimeManager extends ChangeNotifier {
   void blockAndRemovePlayer(String targetUserId) {
     if (targetUserId == _localUserId) return;
     _players = _players.where((p) => p.userId != targetUserId).toList();
+    _notifySafely();
+  }
+
+  /// Sets the audition turn-order method (`Host Pick`, `Call Sheet Draw`, or `Audition Spin`)
+  /// and re-orders the 2–8 player roster accordingly.
+  void setTurnSelectionMethod(TurnSelectionMethod method) {
+    if (_session == null || _isDisposed) return;
+    final updatedPlayers = List<LobbyPlayer>.from(_players);
+    if (updatedPlayers.length > 1) {
+      if (method == TurnSelectionMethod.auditionSpin) {
+        updatedPlayers.shuffle(_safeRandom());
+      } else if (method == TurnSelectionMethod.callSheetDraw) {
+        // Hollywood Call Sheet Draw: deterministic hash-weighted draw across all 2-8 actors
+        final seed = _session!.roomCode.hashCode ^ DateTime.now().millisecond;
+        updatedPlayers.sort(
+          (a, b) => (a.userId.hashCode ^ seed)
+              .compareTo(b.userId.hashCode ^ seed),
+        );
+      }
+    }
+    _players = updatedPlayers;
+    _session = _session!.copyWith(
+      turnSelectionMethod: method,
+      players: List<LobbyPlayer>.unmodifiable(_players),
+      activeActorId:
+          _players.isNotEmpty ? _players.first.userId : _session!.activeActorId,
+    );
+    _notifySafely();
+  }
+
+  /// Moves a specific player to Audition Slot #1 when `TurnSelectionMethod.hostPick` is active.
+  void promotePlayerToFirstTurn(String userId) {
+    if (_session == null || _isDisposed) return;
+    final idx = _players.indexWhere((p) => p.userId == userId);
+    if (idx <= 0) return;
+    final updated = List<LobbyPlayer>.from(_players);
+    final chosen = updated.removeAt(idx);
+    updated.insert(0, chosen);
+    _players = updated;
+    _session = _session!.copyWith(
+      turnSelectionMethod: TurnSelectionMethod.hostPick,
+      players: List<LobbyPlayer>.unmodifiable(_players),
+      activeActorId: chosen.userId,
+    );
+    _notifySafely();
+  }
+
+  /// Toggles whether a cast member is called as a Supporting Actor / Actress
+  /// (receiving a copyright-safe historical supporting line instead of a lead monologue).
+  void togglePlayerSupportingRole(String userId) {
+    if (_session == null || _isDisposed) return;
+    final idx = _players.indexWhere((p) => p.userId == userId);
+    if (idx == -1) return;
+    final updated = List<LobbyPlayer>.from(_players);
+    updated[idx] = updated[idx].copyWith(
+      isSupportingRole: !updated[idx].isSupportingRole,
+    );
+    _players = updated;
     _notifySafely();
   }
 

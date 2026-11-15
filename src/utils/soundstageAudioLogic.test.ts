@@ -11,7 +11,7 @@ import {
   toggleAudioChannel,
 } from './soundstageAudioLogic';
 
-test('SOUNDSTAGE_ZONES defines all 5 distinct theme zones with musical progressions', () => {
+test('SOUNDSTAGE_ZONES defines all 5 distinct musical theme zones and 2 silent setup/game room zones', () => {
   const zoneIds = Object.keys(SOUNDSTAGE_ZONES);
   assert.deepEqual(zoneIds, [
     'premiere_entrance',
@@ -19,15 +19,24 @@ test('SOUNDSTAGE_ZONES defines all 5 distinct theme zones with musical progressi
     'red_carpet_dashboard',
     'star_dressing_room',
     'after_hours_vault',
+    'green_room_lobby',
+    'live_soundstage',
   ]);
 
   assert.equal(SOUNDSTAGE_ZONES.red_carpet_dashboard.hasPaparazziFlashes, true);
   assert.equal(SOUNDSTAGE_ZONES.premiere_entrance.hasPaparazziFlashes, true);
   assert.equal(SOUNDSTAGE_ZONES.star_dressing_room.hasPaparazziFlashes, false);
+  assert.equal(SOUNDSTAGE_ZONES.green_room_lobby.isSilentGameZone, true);
+  assert.equal(SOUNDSTAGE_ZONES.live_soundstage.isSilentGameZone, true);
   for (const zone of Object.values(SOUNDSTAGE_ZONES)) {
-    assert.ok(zone.chordProgressionHz.length >= 4);
-    assert.ok(zone.leadMotifHz.length >= 8);
-    assert.ok(zone.bpm >= 80 && zone.bpm <= 140);
+    if (zone.isSilentGameZone) {
+      assert.equal(zone.bpm, 0);
+      assert.equal(zone.chordProgressionHz.length, 0);
+    } else {
+      assert.ok(zone.chordProgressionHz.length >= 4);
+      assert.ok(zone.leadMotifHz.length >= 8);
+      assert.ok(zone.bpm >= 80 && zone.bpm <= 140);
+    }
   }
 });
 

@@ -1117,6 +1117,216 @@ const List<ScenePrompt> kFiftyNewRatedRSpeakeasyScenes = [
     durationSeconds: 35,
     difficultyTier: 5,
   ),
+  ScenePrompt(
+    id: 'ln_61',
+    title: 'The Velvet Rope Valet Receipt Interrogation',
+    filmOrSeries: 'Chateau Marmont Alibi (TV-MA Parody)',
+    releaseYear: 2026,
+    characterName: 'Jealous Co-Star & Smooth Valet Conspirator',
+    promptScript:
+        'Explain to me why the valet ticket in your tuxedo pocket is stamped 4:15 AM at the Sunset Marquis when you told the group chat you went home with a migraine! You still have glitter on your collarbone, your collar is inside-out, and that smirk says you weren\'t reading scripts in the lobby!',
+    duetLeadA:
+        'Explain why the valet ticket in your tuxedo pocket is stamped 4:15 AM when you said you had a migraine!',
+    duetLeadB:
+        'It was a method rehearsal in the penthouse suite, darling—and if you lower your voice, I\'ll tell you why the director gave us a standing ovation!',
+    directorCue:
+        'Wave an imaginary valet stub at the lens with razor-sharp comedic timing and suspicious narrowed eyes.',
+    emotionalTarget: 'Suspicious Glamour & Late-Night Wit [Tier 1 · 1.15x]',
+    improvTwist:
+        'TWIST AT 15s: The hotel concierge calls your phone on speaker to return a pair of silk cuffs left by the ice machine!',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'ln_62',
+    title: 'VIP Trailer Soundproofing Failure',
+    filmOrSeries: 'Lot D After Dark (Rated-R Parody)',
+    releaseYear: 2026,
+    characterName: 'Lead Star & Mortified Sound Mixer',
+    promptScript:
+        'Nobody told me the fiberglass walls on this luxury star trailer were thinner than a tortilla! The entire stunt crew, two producers, and the catering truck just heard us rehearsing the "climax" of Episode Six at ninety decibels—and frankly, they should be thanking us for the free masterclass!',
+    duetLeadA:
+        'The entire stunt crew and the catering truck just heard us through the trailer walls at ninety decibels!',
+    duetLeadB:
+        'Worse—your wireless lavalier pack was still switched to Channel One, so the boom operator recorded the whole thing in Dolby Atmos!',
+    directorCue:
+        'Start mortified covering your face, then pivot into unapologetic movie-star pride.',
+    emotionalTarget: 'Shameless Backlot Bravado [Tier 1 · 1.15x]',
+    improvTwist:
+        'TWIST AT 15s: Knock on the trailer door—the stunt coordinator is outside asking for your cardio routine!',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'ln_63',
+    title: 'Champagne Ice Bucket Truth or Dare',
+    filmOrSeries: 'Penthouse Suite 909 (Rated-R Parody)',
+    releaseYear: 2026,
+    characterName: 'Midnight Instigator & Hesitant Crush',
+    promptScript:
+        'Everyone else at the after-party already took the elevator down, the city lights are glowing through the floor-to-ceiling glass, and you just spun the champagne bottle straight at my knees. Skip the PG-13 truth questions—give me the dare you\'ve been thinking about since the red carpet!',
+    duetLeadA:
+        'Skip the PG-13 truth questions—give me the dare you\'ve been thinking about since the red carpet!',
+    duetLeadB:
+        'Lock the terrace door and put your phone on airplane mode for the next twenty minutes—let\'s see if you\'re as bold off-camera as you are on script.',
+    directorCue:
+        'Lean forward with slow-burn velvet intimacy, letting a dangerous half-smile build on the final phrase.',
+    emotionalTarget: 'Magnetic Penthouse Seduction [Tier 2 · 1.25x]',
+    improvTwist:
+        'TWIST AT 15s: Hold an unblinking eye-lock with the lens for 4 full beats before whispering the closing line.',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'ln_64',
+    title: 'The Intimacy Coordinator Quit at Lunch',
+    filmOrSeries: 'Unscripted Chemistry (TV-MA Parody)',
+    releaseYear: 2026,
+    characterName: 'Method Co-Leads on Set',
+    promptScript:
+        'The intimacy coordinator threw her clipboard in the fountain at noon because we ignored the five-second cut call three takes in a row! Now the director is hiding behind the monitor, the lens is fogging up, and we still have two pages of dialogue left on this silk chaise!',
+    duetLeadA:
+        'The intimacy coordinator threw her clipboard in the fountain because we ignored the cut call three takes in a row!',
+    duetLeadB:
+        'Tell the camera operator to keep rolling on Take Four—we\'re not breaking character until the film reel runs out.',
+    directorCue:
+        'Deliver in a breathless, conspiratorial stage whisper inches from the camera.',
+    emotionalTarget: 'Electric On-Set Chemistry [Tier 2 · 1.25x]',
+    improvTwist:
+        'TWIST AT 15s: The director yells "CUT!" from off-screen and you defiantly wave them off without breaking eye contact!',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'ln_65',
+    title: 'Silk Robe Room-Service Standoff',
+    filmOrSeries: 'Bellhop Confidential (Rated-R Parody)',
+    releaseYear: 2026,
+    characterName: 'Caught VIP & Unimpressed Lover',
+    promptScript:
+        'Do not answer the suite door in a half-untied hotel robe while there are two champagne flutes, a feather boa, and my heels hanging from the chandelier! Just sign the room-service tablet through the crack of the door before we end up on the morning gossip blogs!',
+    duetLeadA:
+        'Do not open that hotel door while my heels are literally hanging from the chandelier!',
+    duetLeadB:
+        'Relax, I tipped the bellhop a hundred bucks to forget our room number and bring extra chocolate strawberries!',
+    directorCue:
+        'Whisper-shout with frantic physical comedy while clutching an imaginary robe lapel.',
+    emotionalTarget: 'High-Comedic Scandal Panic [Tier 2 · 1.25x]',
+    improvTwist:
+        'TWIST AT 15s: Flash a sudden polite "Everything is totally normal!" smile toward the hallway door.',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 3,
+  ),
+  ScenePrompt(
+    id: 'ln_66',
+    title: 'The Group-Chat Screenshot Tribunal',
+    filmOrSeries: 'Receipts in 4K (TV-MA Parody)',
+    releaseYear: 2026,
+    characterName: 'Chief Prosecutor of the Group Chat',
+    promptScript:
+        'Court is officially in session at this booth because someone in this circle sent a "You up?" text at 3:14 AM to their ex after swearing on a stack of tequila menus they were blocked! I have the 4K screenshots AirDropped to my tablet—confess now or I read the emojis out loud!',
+    duetLeadA:
+        'I have the 3:14 AM screenshots on my tablet—confess to the table now or I read the emojis out loud!',
+    duetLeadB:
+        'My thumb slipped while I was ordering late-night tacos, and the eggplant emoji was strictly culinary!',
+    directorCue:
+        'Hold up your hand like a courtroom prosecutor presenting damning forensic evidence.',
+    emotionalTarget: 'Merciless Group-Chat Roast [Tier 3 · 1.35x]',
+    improvTwist:
+        'TWIST AT 15s: Put on imaginary reading glasses and dramatically zoom in on the imaginary screenshot!',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'ln_67',
+    title: 'Yacht Party NDA Mutiny',
+    filmOrSeries: 'Marina Del Rey Aftermath (TV-MA Parody)',
+    releaseYear: 2026,
+    characterName: 'Captain of Chaos & Crisis Lawyer',
+    promptScript:
+        'Who invited a tax attorney to a midnight yacht party?! Nobody is signing a twelve-page liability waiver while the DJ is dropping bass and half the guests are already in the hot tub! Throw the briefcase in the dinghy and pour themezcal!',
+    duetLeadA:
+        'Nobody is signing a twelve-page waiver while half the yacht is already in the hot tub!',
+    duetLeadB:
+        'Listen to me—there is an inflatable flamingo in the harbor and a senator\'s nephew on the upper deck, sign the page!',
+    directorCue:
+        'Sway slightly as if on a rocking yacht deck while projecting over imaginary club music.',
+    emotionalTarget: 'Hedonistic Yacht Mutiny [Tier 3 · 1.35x]',
+    improvTwist:
+        'TWIST AT 15s: Grab an imaginary ship megaphone and announce "No lawyers past the jacuzzi!"',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'ln_68',
+    title: 'The Walk-In Closet Alibi Collapse',
+    filmOrSeries: 'Seven Minutes in Cashmere (TV-MA Parody)',
+    releaseYear: 2026,
+    characterName: 'Flustered Party Host & Closet Stowaway',
+    promptScript:
+        'We have been hiding inside this cedar walk-in closet for eleven minutes, my knee is cramping against a rack of vintage fur coats, and someone outside just jiggled the doorknob! If we walk out right now with lipstick on your ear, what is our cover story?!',
+    duetLeadA:
+        'If we walk out of this closet right now with lipstick on your ear, what is our cover story?!',
+    duetLeadB:
+        'Tell them we were looking for the extra wine glasses in the dark—now wipe my cheek and act natural!',
+    directorCue:
+        'Hunch slightly as if squeezed inside a cramped luxury closet, whispering with urgent comedic heat.',
+    emotionalTarget: 'Claustrophobic Guilty Heat [Tier 2 · 1.25x]',
+    improvTwist:
+        'TWIST AT 15s: The closet door swings open—instantly strike a casual pose inspecting a coat hanger!',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
+  ScenePrompt(
+    id: 'ln_69',
+    title: 'After-Party Karaoke Mic Hijack',
+    filmOrSeries: 'Velvet Lounge Unplugged (TV-MA Parody)',
+    releaseYear: 2026,
+    characterName: 'Unhinged Ex & Panicked DJ',
+    promptScript:
+        'Cut the backing track, DJ! Before I sing this power ballad, I would like to dedicate verse two to the coward sitting in Booth Three who said he was "working on himself" and then showed up tonight in a mesh shirt! Turn the reverb up to ten!',
+    duetLeadA:
+        'Before I sing this power ballad, I\'m dedicating verse two to the coward hiding in Booth Three!',
+    duetLeadB:
+        'Put the microphone down before management cuts the power—he\'s literally ducking under the nacho platter!',
+    directorCue:
+        'Grip an imaginary microphone stand with rockstar vengeance and theatrical vibrato.',
+    emotionalTarget: 'Vengeful Karaoke Showstopper [Tier 3 · 1.35x]',
+    improvTwist:
+        'TWIST AT 15s: Hit a dramatic silent lip-sync high note before dropping the final spoken burn.',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 5,
+  ),
+  ScenePrompt(
+    id: 'ln_70',
+    title: 'The 4 AM Diner Booth Debrief',
+    filmOrSeries: 'Waffles & Regrets (TV-MA Parody)',
+    releaseYear: 2026,
+    characterName: 'Best Friends in Evening Wear',
+    promptScript:
+        'Order me a stack of pancakes, two espressos, and do not say "I told you so" until my blood sugar stabilizes! Yes, I lost one earring in a limo, yes, I gave a fake name to a bouncer, and yes, it was the greatest night of the fiscal year!',
+    duetLeadA:
+        'Order me pancakes and two espressos, and do not say "I told you so" until my blood sugar stabilizes!',
+    duetLeadB:
+        'You are wearing a VIP lanyard that belongs to the headliner and you still have confetti in your hair—spill every detail!',
+    directorCue:
+        'Slump into an imaginary vinyl diner booth, exhausted, exhilarated, and completely unfiltered.',
+    emotionalTarget: 'Euphoric 4 AM Confession [Tier 3 · 1.35x]',
+    improvTwist:
+        'TWIST AT 15s: Raise an imaginary coffee mug in a toast to terrible decisions and wink at the lens.',
+    is18Plus: true,
+    durationSeconds: 35,
+    difficultyTier: 4,
+  ),
 ];
 
 /// ============================================================================
@@ -1412,5 +1622,137 @@ const List<LifeIsImprovSecretDare> kTwentyRaunchyLifeIsImprovDares = <LifeIsImpr
     targetReactionFromRoom:
         'Commit 100% to the pretentious Hollywood excuse until the clock hits zero.',
     spiceTier: 5,
+  ),
+
+  // 21-30: 10 Additional Life Is Improv Dares across all 4 settings
+  LifeIsImprovSecretDare(
+    id: 'lii_party_06',
+    setting: LifeIsImprovSetting.housePartyBar,
+    dossierTitle: 'The VIP Bottle-Service Audit',
+    undercoverPersona: 'Nightclub Sommelier of Chaos',
+    openingLineToSayOutLoud:
+        'Excuse me, everyone—I am conducting a mandatory forensic vibe check on this table\'s drink choices to determine who is texting their ex before 1 AM.',
+    midDareEscalation15s:
+        'Point to the nearest glass and announce: "That beverage screams \'I still have their Netflix password.\'"',
+    targetReactionFromRoom:
+        'Get the table to defend their drink orders on camera.',
+    spiceTier: 4,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_party_07',
+    setting: LifeIsImprovSetting.housePartyBar,
+    dossierTitle: 'The Award-Show Acceptance Hijack',
+    undercoverPersona: 'Delusional Best Actor Winner',
+    openingLineToSayOutLoud:
+        'Before the bartender pours the next round, I\'d like to thank the Academy, my therapist, and the person in this room who still owes me twenty bucks from Taco Tuesday.',
+    midDareEscalation15s:
+        'Wipe away a fake tear and wave off the imaginary play-off orchestra!',
+    targetReactionFromRoom:
+        'Get the room to applaud like it\'s the Dolby Theatre.',
+    spiceTier: 4,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_party_08',
+    setting: LifeIsImprovSetting.housePartyBar,
+    dossierTitle: 'The Secret Agent Toast',
+    undercoverPersona: 'Burned MI6 Double Agent',
+    openingLineToSayOutLoud:
+        'Raise your glasses—if a woman in a trench coat asks if I was here tonight, tell her I parachuted into Geneva twenty minutes ago.',
+    midDareEscalation15s:
+        'Check your wristwatch and whisper: "Our cover is blown, act like we\'re discussing real estate."',
+    targetReactionFromRoom:
+        'Have someone in the room chime in with fake real-estate advice.',
+    spiceTier: 4,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_wild_06',
+    setting: LifeIsImprovSetting.publicOutInWild,
+    dossierTitle: 'The Method Casting Director Scout',
+    undercoverPersona: 'Hollywood Talent Scout in Disguise',
+    openingLineToSayOutLoud:
+        'Don\'t move a muscle—the way you just held that cup had raw, gritty Scorsese energy, and I have one supporting role left in my summer thriller.',
+    midDareEscalation15s:
+        'Frame their face with your thumbs and say: "Give me five seconds of \'betrayed billionaire\' right now."',
+    targetReactionFromRoom:
+        'Get a bystander or friend to strike a dramatic movie expression.',
+    spiceTier: 4,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_wild_07',
+    setting: LifeIsImprovSetting.publicOutInWild,
+    dossierTitle: 'The Time-Traveler Arrival Check',
+    undercoverPersona: 'Chrono-Agent from 2039',
+    openingLineToSayOutLoud:
+        'Quick question for the room—what year is this, and has the incident with the robotic flamingos happened yet?',
+    midDareEscalation15s:
+        'Sigh with relief and mutter into your wrist: "Timeline intact, we still have forty-eight hours."',
+    targetReactionFromRoom:
+        'Hold a deadpan sci-fi expression while someone answers the year.',
+    spiceTier: 3,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_wild_08',
+    setting: LifeIsImprovSetting.publicOutInWild,
+    dossierTitle: 'The Undercover Food Critic Verdict',
+    undercoverPersona: 'Michelin Inspector of Drama',
+    openingLineToSayOutLoud:
+        'The ambiance in this room is a solid nine out of ten, the lighting is pure film noir, and the sexual tension near the snack table is frankly Michelin-starred.',
+    midDareEscalation15s:
+        'Jot an imaginary note in your palm and nod approvingly at the nearest person.',
+    targetReactionFromRoom:
+        'Capture a laugh or dramatic pose from the snack table.',
+    spiceTier: 4,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_couch_06',
+    setting: LifeIsImprovSetting.lateNightCouchPartner,
+    dossierTitle: 'The Rom-Com Rain Climax on Dry Land',
+    undercoverPersona: 'Soaked Notebook Lead',
+    openingLineToSayOutLoud:
+        'Pretend it is pouring rain right now—it wasn\'t over for me in the kitchen, it isn\'t over for me on this couch, and I am not leaving until you kiss the lead actor!',
+    midDareEscalation15s:
+        'Slick your hair back as if drenched in a thunderstorm and hold out your hands.',
+    targetReactionFromRoom:
+        'Get your partner or co-star to deliver a dramatic rom-com reply.',
+    spiceTier: 4,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_couch_07',
+    setting: LifeIsImprovSetting.lateNightCouchPartner,
+    dossierTitle: 'The Lie Detector Pillow Interrogation',
+    undercoverPersona: 'Polygraph Detective of Love',
+    openingLineToSayOutLoud:
+        'Put your hand on this throw pillow—it is calibrated to detect micro-blushes, and Question One is: what was the first filthy thought you had when we met?',
+    midDareEscalation15s:
+        'Make a loud "BEEP!" sound and declare: "The pillow says you\'re holding back!"',
+    targetReactionFromRoom:
+        'Get an honest or hilarious confession before the timer runs out.',
+    spiceTier: 5,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_phone_06',
+    setting: LifeIsImprovSetting.phoneCallBluff,
+    dossierTitle: 'The Paparazzi Helicopter Decoy Call',
+    undercoverPersona: 'A-List Bodyguard Chief',
+    openingLineToSayOutLoud:
+        'Alpha Team, bring the tinted SUV around to the back alley—there are three paparazzi drones hovering over the patio and the talent refuses to put a shirt on!',
+    midDareEscalation15s:
+        'Cover the mouthpiece and tell the room: "Put your hoods up, we move on my count!"',
+    targetReactionFromRoom:
+        'Get everyone in frame to duck or pose like A-list celebrities.',
+    spiceTier: 4,
+  ),
+  LifeIsImprovSecretDare(
+    id: 'lii_phone_07',
+    setting: LifeIsImprovSetting.phoneCallBluff,
+    dossierTitle: 'The Studio Executive Contract Demand',
+    undercoverPersona: 'Mega-Agent Ari Gold-Style Mogul',
+    openingLineToSayOutLoud:
+        'Listen to me, Paramount—my client does NOT get out of bed for less than twenty million, final-cut approval, and a bowl of green M&Ms chilled to forty-two degrees!',
+    midDareEscalation15s:
+        'Point at the person next to you and shout: "Look at that face—that is box-office gold, double the offer!"',
+    targetReactionFromRoom:
+        'Get your co-star to nod like a pampered movie superstar.',
+    spiceTier: 4,
   ),
 ];

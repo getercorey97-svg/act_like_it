@@ -443,7 +443,8 @@ class TriModalJudgingEngine extends ChangeNotifier {
   bool _isDisposed = false;
   String? _errorMessage;
 
-  final List<double> _peerVotes = [88.0];
+  // 100% Real Factual Peer Votes (Zero dummy/hardcoded initial votes)
+  final List<double> _peerVotes = <double>[];
   int _externalShares = 0;
   int _externalReactions = 0;
   int _loopCompletions = 1;
@@ -458,6 +459,45 @@ class TriModalJudgingEngine extends ChangeNotifier {
   bool _speakeasySubtextMultiplierActive = false;
   static int spectatorTokenShards = 2;
   static bool undercoverLegendUnlocked = false;
+  static const String _kCalibrationDeltaPrefsKey =
+      'act_like_it_ai_calibration_delta_v1';
+  static double calibrationStrictnessDelta = 0.0;
+
+  static Future<double> loadCalibrationStrictnessDelta() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      calibrationStrictnessDelta =
+          (prefs.getDouble(_kCalibrationDeltaPrefsKey) ?? 0.0)
+              .clamp(-5.0, 5.0);
+    } catch (_) {}
+    return calibrationStrictnessDelta;
+  }
+
+  static Future<double> applyCalibrationFeedbackAdjustment(
+    String ratingLabel,
+  ) async {
+    await loadCalibrationStrictnessDelta();
+    if (ratingLabel.contains('Too Lenient')) {
+      calibrationStrictnessDelta =
+          (calibrationStrictnessDelta - 1.25).clamp(-5.0, 5.0);
+    } else if (ratingLabel.contains('Too Harsh')) {
+      calibrationStrictnessDelta =
+          (calibrationStrictnessDelta + 1.25).clamp(-5.0, 5.0);
+    } else {
+      calibrationStrictnessDelta =
+          (calibrationStrictnessDelta * 0.85).clamp(-5.0, 5.0);
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(
+        _kCalibrationDeltaPrefsKey,
+        calibrationStrictnessDelta,
+      );
+    } catch (_) {}
+    return calibrationStrictnessDelta;
+  }
+
+  bool get hasRealPeerVotes => _peerVotes.isNotEmpty;
 
   AiTelemetricsReport? get aiReport => _aiReport;
   double get improvBonus => _improvBonus;
@@ -636,10 +676,12 @@ class TriModalJudgingEngine extends ChangeNotifier {
     throw const FormatException('Gemini response was not a JSON object.');
   }
 
-  double get aiScore => _aiReport?.overallAiScore ?? 86.0;
+  double get aiScore =>
+      ((_aiReport?.overallAiScore ?? 86.0) + calibrationStrictnessDelta)
+          .clamp(0.0, 100.0);
 
   double get peerScore {
-    if (_peerVotes.isEmpty) return 88.0;
+    if (_peerVotes.isEmpty) return 0.0;
     final sum = _peerVotes.fold<double>(0.0, (acc, v) => acc + v);
     return (sum / _peerVotes.length).clamp(0.0, 100.0);
   }
@@ -653,11 +695,12 @@ class TriModalJudgingEngine extends ChangeNotifier {
     return raw.clamp(0.0, 100.0);
   }
 
-  /// Sum of enabled base weights (AI=45, Peer=35, Social=20).
+  /// Sum of enabled base weights (AI=45, Peer=35 when real peer votes exist, Social=20).
   int get enabledWeightSum {
     final cfg = GameSettingsModal.latestConfig;
+    final peerActive = cfg.peerJudgingEnabled && _peerVotes.isNotEmpty;
     return (cfg.aiTelemetricsEnabled ? 45 : 0) +
-        (cfg.peerJudgingEnabled ? 35 : 0) +
+        (peerActive ? 35 : 0) +
         (cfg.socialJudgingEnabled ? 20 : 0);
   }
 
@@ -669,12 +712,13 @@ class TriModalJudgingEngine extends ChangeNotifier {
     return cfg.aiTelemetricsEnabled ? (45.0 / sum) * 100.0 : 0.0;
   }
 
-  /// Dynamically normalized percentage (0–100) for Peer Loop Judging.
+  /// Dynamically normalized percentage (0–100) for Peer Loop Judging (0% until real peer votes are submitted).
   double get actualPeerWeight {
     final cfg = GameSettingsModal.latestConfig;
+    final peerActive = cfg.peerJudgingEnabled && _peerVotes.isNotEmpty;
     final sum = enabledWeightSum;
-    if (sum <= 0) return 35.0;
-    return cfg.peerJudgingEnabled ? (35.0 / sum) * 100.0 : 0.0;
+    if (sum <= 0) return 0.0;
+    return peerActive ? (35.0 / sum) * 100.0 : 0.0;
   }
 
   /// Dynamically normalized percentage (0–100) for Social Viral Judging.
@@ -807,17 +851,27 @@ class TriModalJudgingEngine extends ChangeNotifier {
         );
       }
 
+      await loadCalibrationStrictnessDelta();
+
       const systemPersonaPrompt = '''
 You are an unforgiving, ruthless A-List Hollywood Casting Director and AI Telemetrics Auditor for "Act Like It".
 You power 45% of the official Tri-Modal Verdict. Do NOT act like a polite or lenient chatbot.
 Watch the 30-second video and audit every facial frame and audio decibel sample with clinical, studio-grade scrutiny.
 
+EMPIRICAL EKMAN FACS & ACOUSTIC VOCAL PROSODY RESEARCH ALIGNMENT (MANDATORY):
+Ground all facial and vocal telemetry in peer-reviewed acting & affective computing research (Paul Ekman & Wallace Friesen's Facial Action Coding System — FACS, and Banse & Scherer's acoustic correlates of vocal emotion):
+- Anger / Confrontation / Villainy: Brow Lowerer (AU4), Upper Lid Raiser (AU5), Lid Tightener (AU7), Lip Tightener (AU23) + high mean fundamental frequency (F0), wide dynamic range (dBFS), fast speech onset, and elevated chest-register intensity.
+- Grief / Tragedy / Vulnerability: Inner Brow Raiser (AU1) + Brow Lowerer (AU4) oblique tragedy triangulation, Lip Corner Depressor (AU15) + descending F0 contour, elevated vocal jitter/shimmer (micro-tremor), and breathy lower harmonic-to-noise ratio (HNR).
+- Joy / Comedic Timing / Charm: Genuine Duchenne Cheek Raiser (AU6, orbicularis oculi) + Lip Corner Puller (AU12) + wide F0 pitch variability, bright formant dispersion, and crisp beat pauses before punchlines.
+- Fear / Suspense / Thriller Shock: Inner + Outer Brow Raiser (AU1+AU2), Upper Lid Raiser (AU5), Lip Stretcher (AU20), Jaw Drop (AU26) + high F0 baseline, rapid speech rate, and irregular respiratory pauses.
+- Cold Authority / Deadpan / Subtext: Controlled Lid Tightener (AU7), minimal facial displacement, steady low F0 floor, deliberate sub-glottal downward inflection, and intentional 1.5s–2.5s dramatic pauses.
+
 ELITE MULTIMODAL 5-PILLAR ACTING ASSESSMENT (GRADE EACH PILLAR OUT OF 100):
-1. Facial Kinesiology (0-100): Duchenne smiles, brow furrowing, and micro-expressions.
-2. Ocular Fidelity (0-100): Eyeline maintenance, strategic blinking, and gaze intensity.
-3. Vocal Prosody (0-100): Pitch dynamics, cadence, volume control, and pregnant pauses.
+1. Facial Kinesiology (0-100): Duchenne smiles (AU6+AU12), brow furrowing (AU1/AU4), and Ekman FACS micro-expressions matching the scene's target emotion.
+2. Ocular Fidelity (0-100): Eyeline maintenance (AU5/AU7), strategic blinking, and gaze intensity without reading flatly off the teleprompter.
+3. Vocal Prosody (0-100): Pitch dynamics (F0 contour), vocal jitter/shimmer, cadence, volume control (dBFS), and pregnant pauses.
 4. Somatic Tension (0-100): Shoulder posture, breathing rhythm, and camera framing.
-5. Curveball Adaptation (0-100): How flawlessly the actor pivots emotion at the 15-second mark.
+5. Curveball Adaptation (0-100): How flawlessly the actor pivots emotion and FACS/prosody markers at the 15-second mark.
 
 STRICT SCORING DISTRIBUTION MATRIX (MANDATORY):
 - Score 90–100 ("90-100_OSCAR_LEVEL") ONLY for flawless, Oscar-level delivery where facial micro-expressions, vocal prosody shifts, and the Director Cue align with unmistakable conviction.
@@ -1475,7 +1529,8 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
   AudioPlayer? _verdictStingPlayer;
   double _peerSliderValue = 90.0;
   int _selectedPassAndPlayRating1To10 = 9;
-  final List<int> _passAndPlayRatings1To10 = [9];
+  // Zero dummy peer ratings: only real cast votes submitted during judging are stored
+  final List<int> _passAndPlayRatings1To10 = <int>[];
   bool _queuedForOfflineAi = false;
   bool _isPlaying = true;
   bool _isMuted = false;
@@ -1509,6 +1564,10 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
 
   Future<void> _submitAiCalibrationFeedback(String ratingLabel) async {
     HapticFeedback.mediumImpact();
+    final updatedDelta =
+        await TriModalJudgingEngine.applyCalibrationFeedbackAdjustment(
+      ratingLabel,
+    );
     setState(() {
       _selectedCalibrationRating = ratingLabel;
       _calibrationFeedbackSubmitted = true;
@@ -1522,6 +1581,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
       'scene_id': _scene.id,
       'scene_title': _scene.title,
       'calibration_verdict': ratingLabel,
+      'calibration_strictness_delta': updatedDelta,
       'tester_comment': comment,
       'ai_score': _engine.aiScore,
       'facial_score': report?.facialExpressionScore ?? 86.0,
@@ -2767,10 +2827,11 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                     _engine.loopController?.pause();
 
                     if (hasRemainingLocalPlayers) {
-                      final nextSession = widget.lobbySession.copyWith(
-                        currentPlayerIndex: nextPlayerIndex,
-                        totalLocalPlayers: effectiveTotalPlayers,
-                      );
+                      final nextSession = widget.lobbySession
+                          .advanceToPlayerTurn(nextPlayerIndex)
+                          .copyWith(
+                            totalLocalPlayers: effectiveTotalPlayers,
+                          );
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
                           builder: (_) => MatchHoldingRoomScreen(
@@ -2781,7 +2842,7 @@ class _TriModalJudgingScreenState extends State<TriModalJudgingScreen>
                                 'local_p_${nextPlayerIndex + 1}',
                             nextPlayerName: nextPlayerName,
                             nextPlayerAvatarId: nextPlayer?.avatarArchetypeId ??
-                                'the_ leading_lady'.replaceAll(' ', ''),
+                                'the_leading_lady',
                           ),
                         ),
                       );

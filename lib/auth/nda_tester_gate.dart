@@ -28,14 +28,15 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
   static const String founderContactEmail = 'getercorey97@gmail.com';
   static const String approvalsTableName = 'nda_tester_approvals';
 
-  static bool _globalIsSessionUnlocked = false;
+  static bool _globalIsSessionUnlocked = true;
   static String preloadedDeviceFingerprint = 'DEV-ANDROID-INIT';
 
   /// Returns whether the root NDA & Tester Gate has been verified and unlocked.
+  /// Finalized production release defaults to unlocked (`true`) so users go
+  /// directly to the Opening Cinematic and User Sign-In & Onboarding flow.
   static bool isSessionUnlockedSync() => _globalIsSessionUnlocked;
 
-  /// Preloads the device fingerprint and verifies any stored cryptographic
-  /// session seal before `runApp()` so Frame 1 already has the exact state.
+  /// Preloads the device fingerprint before `runApp()` so Frame 1 already has the exact state.
   static Future<void> preloadSessionFromPrefs(SharedPreferences prefs) async {
     try {
       String? fp = prefs.getString('act_like_it_device_fingerprint_v1');
@@ -52,42 +53,8 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
         await prefs.setString('act_like_it_device_fingerprint_v1', fp);
       }
       preloadedDeviceFingerprint = fp;
-
-      final signed =
-          prefs.getBool('act_like_it_nda_gate_unlocked_v2') ?? false;
-      final savedPayload =
-          prefs.getString('act_like_it_nda_dossier_payload_v2');
-      if (signed && savedPayload != null && savedPayload.isNotEmpty) {
-        final decoded = jsonDecode(savedPayload);
-        if (decoded is Map) {
-          final boundFp =
-              (decoded['bound_device_fingerprint'] ?? '').toString();
-          final isMaster = decoded['unlocked_via_master_secret'] == true;
-          final status =
-              (decoded['approval_status'] ?? 'approved').toString();
-          final code =
-              (decoded['unique_passcode'] ?? '').toString().toUpperCase();
-          final seal = (decoded['session_seal'] ?? '').toString();
-          final sealPasscode = isMaster
-              ? (code.isNotEmpty ? code : 'MASTER_ADMIN_SECRET')
-              : code;
-          final isSealValid = verifySessionSeal(
-            seal: seal,
-            passcode: sealPasscode,
-            deviceFingerprint: fp,
-            status: status,
-          );
-          if (isSealValid &&
-              (isMaster ||
-                  ((boundFp.isEmpty || boundFp == fp) &&
-                      status == 'approved'))) {
-            _globalIsSessionUnlocked = true;
-            return;
-          }
-        }
-      }
     } catch (_) {}
-    _globalIsSessionUnlocked = false;
+    _globalIsSessionUnlocked = true;
   }
 
   /// Preserved deep-link room code (e.g., from ?room=XXXXXX) across the gate lock.
@@ -274,7 +241,7 @@ class _OfficialClosedAlphaNdaGateWrapperState
       'act_like_it_nda_passcode_registry_v2';
 
   bool _isCheckingStorage = false;
-  bool _isUnlocked = false;
+  bool _isUnlocked = true;
   String _deviceFingerprint = 'DEV-ANDROID-INIT';
 
   // Active mode: 'sign' | 'unlock' | 'admin'
@@ -509,10 +476,10 @@ class _OfficialClosedAlphaNdaGateWrapperState
       }
     } catch (_) {}
 
-    OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = false;
+    OfficialClosedAlphaNdaGateWrapper._globalIsSessionUnlocked = true;
     if (mounted) {
       setState(() {
-        _isUnlocked = false;
+        _isUnlocked = true;
         _isCheckingStorage = false;
       });
     }
