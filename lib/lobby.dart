@@ -170,8 +170,8 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
   void _triggerPaparazziFrenzy() {
     HapticFeedback.heavyImpact();
     _frenzyBurstController.forward(from: 0.0);
-    SoundstageAudioController.instance.playCue(
-      SoundstageAudioCue.paparazziShutterFlash,
+    SoundstageAudioController.instance.playSfx(
+      SoundstageSfx.paparazziShutterFlash,
     );
   }
 
@@ -217,8 +217,8 @@ class _LobbyMatchmakingScreenState extends State<LobbyMatchmakingScreen>
         });
       }
     } else {
-      SoundstageAudioController.instance.enterMusicZone(
-        SoundstageMusicZone.redCarpetDashboard,
+      SoundstageAudioController.instance.enterZone(
+        SoundstageZone.redCarpetDashboard,
       );
     }
     if (mounted) {

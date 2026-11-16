@@ -513,11 +513,10 @@ class LobbySession {
     final ScenePrompt nextScene = clampedIndex == 0 && !isSupporting
         ? reference
         : selectEqualGenreUnplayedScene(
-            category: selectedCategory,
             referenceScene: reference,
             usedSceneIds: updatedUsed,
-            playerIndex: clampedIndex,
-            isSupportingActorRole: isSupporting,
+            isSupportingActor: isSupporting,
+            playerTurnIndex: clampedIndex,
           );
 
     updatedUsed.add(nextScene.id);
