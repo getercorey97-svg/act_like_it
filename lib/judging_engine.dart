@@ -426,13 +426,13 @@ class TriModalJudgingEngine extends ChangeNotifier {
     'gemini-flash-latest',
   ];
   static const List<String> kGeminiModelCascade = <String>[
-    'gemini-2.5-pro',
-    'gemini-4-hydrogen',
-    'gemini-2.5-flash',
     'gemini-3.8-flash',
     'gemini-3.5-flash-lite',
-    'gemini-3.1-flash-lite',
     'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-4-hydrogen',
+    'gemini-3.1-flash-lite',
     'gemini-flash-latest',
   ];
   static final RegExp _uuidRegex = RegExp(

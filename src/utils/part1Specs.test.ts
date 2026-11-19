@@ -98,7 +98,7 @@ test('Supabase migration, 100-scene parody catalog, seed.sql, and official app l
   // Verify .github/workflows/build_apk.yml has Build Release APK step
   const workflowYml = fs.readFileSync('.github/workflows/build_apk.yml', 'utf8');
   assert.ok(workflowYml.includes('name: Build Release APK'));
-  assert.ok(workflowYml.includes('act-like-it-apk'));
+  assert.ok(workflowYml.includes('act-like-it-release-apk'));
 
   // Verify lib/dashboard_marquee.dart, lib/lobby.dart, lib/ui/lobby_models_and_realtime.dart, and lib/late_night_vault.dart
   const dashboardDart = fs.readFileSync('lib/dashboard_marquee.dart', 'utf8');

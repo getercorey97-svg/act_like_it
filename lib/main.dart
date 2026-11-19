@@ -71,20 +71,25 @@ class SafeBootDiagnostics {
 /// Supports both CI `--dart-define` secrets AND in-app configuration on the
 /// Samsung Galaxy S26 Ultra so the APK works out-of-the-box immediately.
 class AppConfig {
+  static const String defaultSupabaseUrl =
+      'https://tcflglijmtegujkuzcyn.supabase.co';
+  static const String defaultSupabaseAnonKey =
+      'sb_publishable_2-0RY7aHtubt70tNha0auQ_QJdi_Bur';
+  static const String defaultLiveKitCloudUrl =
+      'wss://act-like-it-3nsihhbg.livekit.cloud';
+
   static const String _envSupabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: '',
+    defaultValue: defaultSupabaseUrl,
   );
   static const String _envSupabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: '',
+    defaultValue: defaultSupabaseAnonKey,
   );
   static const String _envLiveKitUrl = String.fromEnvironment(
     'LIVEKIT_URL',
-    defaultValue: 'wss://act-like-it-3nsihhbg.livekit.cloud',
+    defaultValue: defaultLiveKitCloudUrl,
   );
-  static const String defaultLiveKitCloudUrl =
-      'wss://act-like-it-3nsihhbg.livekit.cloud';
   static const String _envGeminiApiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
     defaultValue: '',
@@ -106,13 +111,17 @@ class AppConfig {
     return trimmed;
   }
 
-  static String get supabaseUrl => _runtimeSupabaseUrl.isNotEmpty
-      ? _runtimeSupabaseUrl
-      : _sanitizeDefine(_envSupabaseUrl);
+  static String get supabaseUrl {
+    if (_runtimeSupabaseUrl.isNotEmpty) return _runtimeSupabaseUrl;
+    final defined = _sanitizeDefine(_envSupabaseUrl);
+    return defined.isNotEmpty ? defined : defaultSupabaseUrl;
+  }
 
-  static String get supabaseAnonKey => _runtimeSupabaseAnonKey.isNotEmpty
-      ? _runtimeSupabaseAnonKey
-      : _sanitizeDefine(_envSupabaseAnonKey);
+  static String get supabaseAnonKey {
+    if (_runtimeSupabaseAnonKey.isNotEmpty) return _runtimeSupabaseAnonKey;
+    final defined = _sanitizeDefine(_envSupabaseAnonKey);
+    return defined.isNotEmpty ? defined : defaultSupabaseAnonKey;
+  }
 
   static String get liveKitUrl {
     if (_runtimeLiveKitUrl.isNotEmpty) return _runtimeLiveKitUrl;

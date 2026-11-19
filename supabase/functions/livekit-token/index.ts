@@ -1,19 +1,32 @@
 // LiveKit SFU JWT Minting Edge Function for ACT LIKE IT™
 // Deploy with: supabase functions deploy livekit-token
 // Required Supabase Edge Function Secrets:
-//   supabase secrets set LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...
+//   supabase secrets set LIVEKIT_URL=... LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...
 
 declare const Deno: {
   env: { get(key: string): string | undefined };
   serve(handler: (req: Request) => Response | Promise<Response>): void;
 };
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const ALLOWED_WEB_ORIGIN = 'https://act-like-it.vercel.app';
+
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin') ?? '';
+  const allowOrigin =
+    origin === ALLOWED_WEB_ORIGIN ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:')
+      ? origin
+      : ALLOWED_WEB_ORIGIN;
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers':
+      'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+}
 
 function base64UrlEncode(data: Uint8Array): string {
   let binary = '';
@@ -59,6 +72,8 @@ async function signLiveKitJwt(
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const corsHeaders = buildCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { status: 204, headers: corsHeaders });
   }
@@ -74,8 +89,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const apiKey = Deno.env.get('LIVEKIT_API_KEY')?.trim() ?? '';
-    const apiSecret = Deno.env.get('LIVEKIT_API_SECRET')?.trim() ?? '';
+    const livekitUrl = (Deno.env.get('LIVEKIT_URL') ?? '').trim();
+    const apiKey = (Deno.env.get('LIVEKIT_API_KEY') ?? '').trim();
+    const apiSecret = (Deno.env.get('LIVEKIT_API_SECRET') ?? '').trim();
 
     if (!apiKey || !apiSecret) {
       return new Response(
@@ -92,20 +108,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const body = (await req.json()) as {
       room_name?: string;
+      roomName?: string;
       identity?: string;
+      participantIdentity?: string;
       display_name?: string;
+      displayName?: string;
+      participantName?: string;
       role?: string;
     };
 
-    const roomName = (body.room_name ?? '').trim();
-    const identity = (body.identity ?? '').trim();
-    const displayName = (body.display_name ?? 'StageActor').trim();
+    const roomName = (body.room_name ?? body.roomName ?? '').trim();
+    const displayName = (
+      body.display_name ??
+      body.participantName ??
+      body.displayName ??
+      'StageActor'
+    ).trim();
+    const identity = (
+      body.identity ??
+      body.participantIdentity ??
+      body.participantName ??
+      ''
+    ).trim();
     const role = (body.role ?? 'activePerformer').trim();
 
     if (!roomName || !identity) {
       return new Response(
         JSON.stringify({
-          error: 'Both room_name and identity are required.',
+          error: 'Both roomName/room_name and identity/participantName are required.',
         }),
         {
           status: 400,
@@ -138,6 +168,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({
         token,
+        url: livekitUrl,
         room_name: roomName,
         identity,
         role: isSpectator ? 'remoteSpectator' : 'activePerformer',

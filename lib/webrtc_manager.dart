@@ -287,8 +287,10 @@ class WebRtcStageManager extends ChangeNotifier {
             'livekit-token',
             body: {
               'room_name': roomName,
+              'roomName': roomName,
               'identity': participantIdentity,
               'display_name': participantName,
+              'participantName': participantName,
               'role': initialRole.name,
             },
           );
@@ -317,7 +319,12 @@ class WebRtcStageManager extends ChangeNotifier {
 
             final room = Room(roomOptions: roomOptions);
             _bindRoomListeners(room);
-            await room.connect(AppConfig.liveKitUrl, data['token'] as String);
+            final dynamic rawUrl = data['url'];
+            final targetLiveKitUrl = (rawUrl is String &&
+                    rawUrl.trim().startsWith('wss://'))
+                ? rawUrl.trim()
+                : AppConfig.liveKitUrl;
+            await room.connect(targetLiveKitUrl, data['token'] as String);
             if (_isDisposed) {
               await room.disconnect();
               await room.dispose();

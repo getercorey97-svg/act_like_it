@@ -17,8 +17,8 @@ dependencies:
   supabase_flutter: ^2.18.3
 
   # Real-Time Video/Audio WebRTC SFU Routing (2-8 Remote Players)
-  livekit_client: ^2.9.0
-  flutter_webrtc: ^1.6.2+hotfix.4
+  livekit_client: ^2.13.2
+  flutter_webrtc: ^1.6.3
 
   # Multimodal AI Telemetrics Judging (Video/Audio Frame Evaluation)
   google_generative_ai: ^0.4.6
@@ -26,12 +26,12 @@ dependencies:
   # Media Playback, Camera Capture & Device Permissions
   video_player: ^2.9.2
   audioplayers: ^6.8.1
-  camera: ^0.11.0+2
+  camera: ^0.12.2
   permission_handler: ^11.3.1
   path_provider: ^2.1.4
   connectivity_plus: ^7.3.0
   device_info_plus: ^13.3.0
-  sensors_plus: ^6.1.1
+  sensors_plus: ^7.1.1
 
   # State Management, Local SQLite/Prefs Persistence, Utilities & Social Sharing
   provider: ^6.1.2
@@ -58,6 +58,3 @@ flutter:
     - assets/characters/
     - assets/living_25d/
     - assets/videos/
-
-dependency_overrides:
-  shared_preferences_android: ^2.4.28
