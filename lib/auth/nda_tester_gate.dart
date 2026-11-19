@@ -9,6 +9,7 @@ import '../dashboard_marquee.dart';
 import '../main.dart';
 import '../qa/qa_overlay.dart';
 import '../ui/brand_logo.dart';
+import '../ui/founder_command_dashboard.dart';
 import '../ui/soundstage_audio_controller.dart';
 import 'auth_service.dart';
 
@@ -70,50 +71,15 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
     return universalBetaPasscodes.contains(norm);
   }
 
-  /// Verifies the Founder's Dedicated Admin Login Credentials:
-  /// Username: `admin88`
-  /// Password: `Cg0167853!8808`
-  /// Uses dual-prime polynomial digests so plaintext credentials are never
-  /// exposed in a public GitHub repository, while also supporting optional
+  /// Verifies Founder Tech-Staff & Admin Login Credentials (`founder88` or `admin88`)
+  /// using dual-prime polynomial digests so plaintext credentials are never exposed
+  /// in a public GitHub repository, while also supporting optional
   /// `--dart-define=FOUNDER_ADMIN_USER` / `--dart-define=FOUNDER_ADMIN_PASSWORD`.
   static bool verifyFounderAdminCredentials(
     String rawUsername,
     String rawPassword,
   ) {
-    final userNorm = rawUsername.trim().toLowerCase();
-    final passNorm = rawPassword.trim();
-    if (userNorm.isEmpty || passNorm.isEmpty) return false;
-
-    const envUser = String.fromEnvironment('FOUNDER_ADMIN_USER');
-    const envPass = String.fromEnvironment('FOUNDER_ADMIN_PASSWORD');
-    if (envUser.isNotEmpty &&
-        envPass.isNotEmpty &&
-        userNorm == envUser.trim().toLowerCase() &&
-        passNorm == envPass.trim()) {
-      return true;
-    }
-
-    // Verify username === "admin88" (length 7)
-    if (userNorm.length != 7) return false;
-    int uh1 = 7;
-    int uh2 = 13;
-    for (int i = 0; i < userNorm.length; i++) {
-      final c = userNorm.codeUnitAt(i);
-      uh1 = (uh1 * 31 + c) % 1000000007;
-      uh2 = (uh2 * 37 + c) % 1000000009;
-    }
-    if (uh1 != 642968313 || uh2 != 134001524) return false;
-
-    // Verify password === "Cg0167853!8808" (length 14, case-sensitive)
-    if (passNorm.length != 14) return false;
-    int ph1 = 7;
-    int ph2 = 13;
-    for (int i = 0; i < passNorm.length; i++) {
-      final c = passNorm.codeUnitAt(i);
-      ph1 = (ph1 * 31 + c) % 1000000007;
-      ph2 = (ph2 * 37 + c) % 1000000009;
-    }
-    return ph1 == 727042712 && ph2 == 984965610;
+    return AuthService.verifyFounderDigests(rawUsername, rawPassword);
   }
 
   /// Verifies the Studio Founder Master Secret or Founder Password without
@@ -122,7 +88,8 @@ class OfficialClosedAlphaNdaGateWrapper extends StatefulWidget {
     final trimmed = rawInput.trim();
     if (trimmed.isEmpty) return false;
 
-    if (verifyFounderAdminCredentials('admin88', trimmed)) {
+    if (verifyFounderAdminCredentials('founder88', trimmed) ||
+        verifyFounderAdminCredentials('admin88', trimmed)) {
       return true;
     }
 
@@ -1003,8 +970,8 @@ class _OfficialClosedAlphaNdaGateWrapperState
     });
   }
 
-  /// Authenticates the Founder's Admin Login (`admin88` / `Cg0167853!8808`)
-  /// and opens the State-of-the-Art Founder Command Center & Approval Dashboard.
+  /// Authenticates the Founder Tech-Staff / Admin Login (`founder88` or `admin88`)
+  /// and opens the Founder Command Center & Approval Dashboard.
   Future<void> _handleFounderAdminLogin() async {
     final enteredUser = _adminUsernameController.text.trim();
     final enteredPass = _adminPasswordController.text.trim();
@@ -1022,7 +989,15 @@ class _OfficialClosedAlphaNdaGateWrapperState
     }
 
     HapticFeedback.mediumImpact();
-    await AuthService.instance.setFounderAdminStatus(true, simulatePaywall: false);
+    try {
+      await AuthService.instance.authenticateFounderAccount(
+        username: enteredUser,
+        password: enteredPass,
+      );
+    } catch (_) {
+      await AuthService.instance.setFounderAdminStatus(true, simulatePaywall: false);
+    }
+    if (!mounted) return;
     setState(() {
       _adminQueueUnlocked = true;
       _adminError = null;
@@ -1034,8 +1009,11 @@ class _OfficialClosedAlphaNdaGateWrapperState
   /// ACT LIKE IT™ app from the Founder Admin Dashboard after reviewing testers.
   Future<void> _handleFounderLaunchIntoMainApp() async {
     await AuthService.instance.setFounderAdminStatus(true, simulatePaywall: false);
+    final founderHandle = AuthService.instance.currentProfile?.username.isNotEmpty == true
+        ? AuthService.instance.currentProfile!.username
+        : 'founder88';
     final masterPayload = <String, dynamic>{
-      'full_legal_name': 'Founder Corey Geter (admin88)',
+      'full_legal_name': 'Founder Corey Geter ($founderHandle)',
       'email': OfficialClosedAlphaNdaGateWrapper.founderContactEmail,
       'unique_passcode': 'FOUNDER_ADMIN_88',
       'bound_device_fingerprint': _deviceFingerprint,
@@ -3393,20 +3371,7 @@ class FounderCommandTelemetryDrawer extends StatefulWidget {
   const FounderCommandTelemetryDrawer({super.key});
 
   static Future<void> show(BuildContext context) async {
-    HapticFeedback.mediumImpact();
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF07090E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        side: BorderSide(color: Color(0xFFFFD700), width: 2.0),
-      ),
-      builder: (_) => const FractionallySizedBox(
-        heightFactor: 0.88,
-        child: FounderCommandTelemetryDrawer(),
-      ),
-    );
+    await FounderCommandDashboard.show(context);
   }
 
   @override

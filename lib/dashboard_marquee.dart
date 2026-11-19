@@ -25,6 +25,9 @@ import 'auth/auth_service.dart';
 import 'auth/nda_tester_gate.dart';
 import 'profile/actor_profile_screen.dart';
 import 'monetization/payment_dashboard_screen.dart';
+import 'services/system_health_service.dart';
+import 'ui/system_health_table.dart';
+import 'ui/founder_command_dashboard.dart';
 
 export 'ui/brand_logo.dart';
 export 'ui/living_25d_animation_engine.dart';
@@ -211,7 +214,9 @@ class _LivingMarqueeDashboardScreenState
 
     OfflineManager.instance.ensureInitialized().then((_) {
       if (mounted) setState(() {});
+      unawaited(SystemHealthService.instance.refreshHealthChecks());
     });
+    unawaited(SystemHealthService.instance.refreshHealthChecks());
     _refreshVipHudState();
   }
 
@@ -577,86 +582,144 @@ class _LivingMarqueeDashboardScreenState
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    VipCredentialHeaderBar(
-                                      actorHandle: AuthService.instance
-                                                  .currentProfile?.username
-                                                  .isNotEmpty ==
-                                              true
-                                          ? '@${AuthService.instance.currentProfile!.username.toUpperCase()}'
-                                          : '@GALAXY_S26_ACTOR',
-                                      telemetricsTokens: AuthService
-                                              .instance.isGodModeActive
-                                          ? AuthService
-                                              .kFounderInfiniteTokenDisplay
-                                          : _telemetricsTokens,
-                                      careerWins: OfflineManager
-                                          .instance.totalCareerWins,
-                                      isOnline:
-                                          OfflineManager.instance.isOnline,
-                                      onProfileTap: _openActorProfileScreen,
-                                      onTokensTap: () => _openPaymentDashboard(
-                                        highlightProductKey: 'tokens_100',
-                                      ),
-                                    ),
-                                    if (AuthService.instance.isFounderAdmin) ...[
-                                      const SizedBox(height: 8),
-                                      GestureDetector(
-                                        onTap: () =>
-                                            FounderCommandTelemetryDrawer.show(
-                                          context,
-                                        ),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 14,
-                                            vertical: 10,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF1F1705),
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: const Color(0xFFFFD700),
-                                              width: 1.8,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              const Text(
-                                                '👑 FOUNDER ADMIN',
-                                                style: TextStyle(
-                                                  fontFamily: 'monospace',
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: Color(0xFFFFD700),
-                                                ),
+                                    const SystemHealthTable(),
+                                    const SizedBox(height: 8),
+                                    ListenableBuilder(
+                                      listenable: AuthService.instance,
+                                      builder: (context, _) {
+                                        final auth = AuthService.instance;
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            VipCredentialHeaderBar(
+                                              actorHandle: auth.currentProfile
+                                                          ?.username.isNotEmpty ==
+                                                      true
+                                                  ? '@${auth.currentProfile!.username.toUpperCase()}'
+                                                  : '@GALAXY_S26_ACTOR',
+                                              telemetricsTokens:
+                                                  auth.isGodModeActive
+                                                      ? AuthService
+                                                          .kFounderInfiniteTokenDisplay
+                                                      : _telemetricsTokens,
+                                              careerWins: OfflineManager
+                                                  .instance.totalCareerWins,
+                                              isOnline: OfflineManager
+                                                  .instance.isOnline,
+                                              onProfileTap:
+                                                  _openActorProfileScreen,
+                                              onTokensTap: () =>
+                                                  _openPaymentDashboard(
+                                                highlightProductKey:
+                                                    'tokens_100',
                                               ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Text(
-                                                  AuthService.instance
-                                                          .isGodModeActive
-                                                      ? '∞ ADMIN TOKENS · ALL VAULTS UNLOCKED · TAP FOR TELEMETRY & LOBBY HUD'
-                                                      : 'SIMULATING PAYWALL · TAP TO TOGGLE GOD-MODE OR VIEW TELEMETRY',
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontFamily: 'monospace',
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFFFDE68A),
+                                            ),
+                                            if (auth.isFounderAdmin) ...[
+                                              const SizedBox(height: 8),
+                                              GestureDetector(
+                                                onTap: () =>
+                                                    FounderCommandDashboard
+                                                        .show(context),
+                                                child: Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 9,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFF1F1705),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                      12,
+                                                    ),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0xFFFFD700,
+                                                      ),
+                                                      width: 1.8,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 7,
+                                                          vertical: 3,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: const Color(
+                                                            0x33FFD700,
+                                                          ),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(6),
+                                                          border: Border.all(
+                                                            color: const Color(
+                                                              0xFFFFD700,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        child: const Text(
+                                                          '👑 FOUNDER TECH',
+                                                          style: TextStyle(
+                                                            fontFamily:
+                                                                'monospace',
+                                                            fontSize: 10.5,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                            color: Color(
+                                                              0xFFFFD700,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: FittedBox(
+                                                          fit: BoxFit.scaleDown,
+                                                          alignment: Alignment
+                                                              .centerLeft,
+                                                          child: Text(
+                                                            auth.isGodModeActive
+                                                                ? 'FOUNDER ADMIN · ∞ TOKENS · LIVE ROSTER & CREDENTIALS'
+                                                                : 'SIMULATING PAYWALL · TAP TO OPEN COMMAND HUD',
+                                                            style:
+                                                                const TextStyle(
+                                                              fontFamily:
+                                                                  'monospace',
+                                                              fontSize: 9.5,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color: Color(
+                                                                0xFFFDE68A,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      const Icon(
+                                                        Icons.tune_rounded,
+                                                        size: 16,
+                                                        color: Color(
+                                                          0xFFFFD700,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
                                               ),
-                                              const Icon(
-                                                Icons.tune_rounded,
-                                                size: 16,
-                                                color: Color(0xFFFFD700),
-                                              ),
                                             ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                          ],
+                                        );
+                                      },
+                                    ),
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [

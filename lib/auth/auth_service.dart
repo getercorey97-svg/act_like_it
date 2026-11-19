@@ -284,9 +284,111 @@ class AuthService extends ChangeNotifier {
     final normEmail = (email ?? '').trim().toLowerCase();
     final normUser = (username ?? '').trim().toLowerCase().replaceAll('@', '');
     return normEmail == 'getercorey97@gmail.com' ||
+        normUser == 'founder88' ||
+        normUser == 'founder_corey_geter' ||
         normUser == 'admin88' ||
         normUser == 'coreygeter' ||
         normUser == 'founder_admin88';
+  }
+
+  /// Verifies Founder credentials (`founder88` as well as legacy `admin88`)
+  /// using dual-prime polynomial digests so zero plaintext passwords sit in
+  /// public source code.
+  static bool verifyFounderDigests(
+    String rawUsername,
+    String rawPassword,
+  ) {
+    final userNorm = rawUsername.trim().toLowerCase().replaceAll('@', '');
+    final passNorm = rawPassword.trim();
+    if (userNorm.isEmpty || passNorm.isEmpty) return false;
+
+    const envUser = String.fromEnvironment('FOUNDER_ADMIN_USER');
+    const envPass = String.fromEnvironment('FOUNDER_ADMIN_PASSWORD');
+    if (envUser.isNotEmpty &&
+        envPass.isNotEmpty &&
+        userNorm == envUser.trim().toLowerCase() &&
+        passNorm == envPass.trim()) {
+      return true;
+    }
+
+    int uh1 = 7;
+    int uh2 = 13;
+    for (int i = 0; i < userNorm.length; i++) {
+      final c = userNorm.codeUnitAt(i);
+      uh1 = (uh1 * 31 + c) % 1000000007;
+      uh2 = (uh2 * 37 + c) % 1000000009;
+    }
+
+    int ph1 = 7;
+    int ph2 = 13;
+    for (int i = 0; i < passNorm.length; i++) {
+      final c = passNorm.codeUnitAt(i);
+      ph1 = (ph1 * 31 + c) % 1000000007;
+      ph2 = (ph2 * 37 + c) % 1000000009;
+    }
+
+    // Primary Founder Tech-Staff login (length 9 / length 7)
+    final bool isFounder88User =
+        userNorm.length == 9 && uh1 == 221792993 && uh2 == 951985496;
+    final bool isFounder88Pass =
+        passNorm.length == 7 && ph1 == 642866361 && ph2 == 771181299;
+    if (isFounder88User && isFounder88Pass) {
+      return true;
+    }
+
+    // Existing Founder Admin hook (length 7 / length 14)
+    final bool isAdmin88User =
+        userNorm.length == 7 && uh1 == 642968313 && uh2 == 134001524;
+    final bool isAdmin88Pass =
+        passNorm.length == 14 && ph1 == 727042712 && ph2 == 984965610;
+    return isAdmin88User && isAdmin88Pass;
+  }
+
+  /// Authenticates Founder credentials (`founder88` or `admin88`), persists
+  /// `isFounderAdmin = true`, unlocks all vaults & 999,999 AI tokens, and
+  /// hydrates/persists the Founder Tech-Staff profile.
+  Future<ActorProfileState> authenticateFounderAccount({
+    required String username,
+    required String password,
+    String avatarArchetypeId = 'the_method_actor',
+  }) async {
+    if (!verifyFounderDigests(username, password)) {
+      throw StateError('Invalid Founder Tech-Staff credentials.');
+    }
+
+    final cleanHandle = username.trim().toLowerCase().replaceAll('@', '');
+    final resolvedHandle = cleanHandle == 'founder88' ? 'founder88' : 'admin88';
+    await setFounderAdminStatus(true, simulatePaywall: false);
+
+    final base = _currentProfile;
+    final founderProfile = ActorProfileState(
+      userId: base?.userId.isNotEmpty == true &&
+              base!.userId != 'local-s26-actor'
+          ? base.userId
+          : '00000000-0000-4000-8888-founder00088',
+      email: 'getercorey97@gmail.com',
+      username: resolvedHandle,
+      birthYear: 1997,
+      favoriteEras: base?.favoriteEras ?? const <String>['1970–1999', '2000–2026'],
+      actingStrengths:
+          base?.actingStrengths ?? const <String>['Method Drama', 'Improv Comedy'],
+      aiTokenBalance: kFounderInfiniteTokenDisplay,
+      unlockedScenePacks: const <String>[
+        'all_era_bundle',
+        'vip_speakeasy_pass',
+        'watermark_free_pro',
+        'emmy_cult_bundle',
+      ],
+      onboardingCompleted: true,
+      avatarArchetypeId: base?.avatarArchetypeId ?? avatarArchetypeId,
+      castingTrack: 'founder_tech_staff',
+      telemetryOptIn: true,
+      careerXp: base?.careerXp ?? 9999,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    await persistProfileToSupabaseAndCache(founderProfile);
+    return founderProfile;
   }
 
   Future<void> setFounderAdminStatus(
@@ -331,6 +433,12 @@ class AuthService extends ChangeNotifier {
 
     try {
       await _loadSavedProfilesRegistry();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _isFounderAdmin = prefs.getBool(_kIsFounderAdminPrefsKey) ?? false;
+        _adminSimulatePaywall =
+            prefs.getBool(_kAdminSimulatePaywallPrefsKey) ?? false;
+      } catch (_) {}
 
       if (AppConfig.hasCloudSupabase) {
         final client = Supabase.instance.client;
@@ -359,9 +467,9 @@ class AuthService extends ChangeNotifier {
       }
 
       final prefs = await SharedPreferences.getInstance();
-      _isFounderAdmin = prefs.getBool(_kIsFounderAdminPrefsKey) ?? false;
+      _isFounderAdmin = prefs.getBool(_kIsFounderAdminPrefsKey) ?? _isFounderAdmin;
       _adminSimulatePaywall =
-          prefs.getBool(_kAdminSimulatePaywallPrefsKey) ?? false;
+          prefs.getBool(_kAdminSimulatePaywallPrefsKey) ?? _adminSimulatePaywall;
       final savedAvatarId = prefs.getString(_kSelectedAvatarPrefsKey)?.trim();
       if (savedAvatarId != null && savedAvatarId.isNotEmpty) {
         _cachedSelectedAvatarId = savedAvatarId;

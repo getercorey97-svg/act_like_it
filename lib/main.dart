@@ -13,6 +13,7 @@ import 'offline_manager.dart';
 import 'qa/qa_overlay.dart';
 import 'qa/qa_web_portal.dart';
 import 'auth/nda_tester_gate.dart';
+import 'services/system_health_service.dart';
 
 /// Captures startup, plugin, and widget build exceptions in Release APKs so the
 /// app never fails silently with a blank white screen on Android devices.
@@ -222,6 +223,9 @@ class AppConfig {
     } catch (e) {
       SafeBootDiagnostics.log('OfflineManager warm-up notice: $e');
     }
+
+    // Trigger initial live operational health checks across all core services
+    unawaited(SystemHealthService.instance.refreshHealthChecks());
   }
 
   static Future<void> saveRuntimeConfig({
@@ -261,6 +265,7 @@ class AppConfig {
         );
       }
     }
+    unawaited(SystemHealthService.instance.refreshHealthChecks());
   }
 }
 
